@@ -8,12 +8,20 @@ const App = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [afbMode, setAfbMode] = useState(false);
+  const [afbFormData, setAfbFormData] = useState({
+    selectedGame: '',
+    customMatchup: '',
+    voice: 'analyst',
+    longshotLevel: 'standard',
+    angles: [],
+    lineFocus: ''
+  });
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
 
   useEffect(() => {
     // Initialize socket connection
-    socketRef.current = io(process.env.NODE_ENV === 'production' ? window.location.origin : 'http://localhost:5000');
+    socketRef.current = io(process.env.NODE_ENV === 'production' ? window.location.origin : 'http://localhost:8080');
     
     socketRef.current.on('connect', () => {
       setIsConnected(true);
@@ -41,6 +49,62 @@ const App = () => {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleAFBGenerate = async () => {
+    const matchup = afbFormData.selectedGame === 'custom' ? afbFormData.customMatchup : afbFormData.selectedGame;
+    
+    if (!matchup) return;
+    
+    // Create a user message showing what they requested
+    const userMessage = {
+      text: `🎯 AFB Builder Request:\n• Game: ${matchup}\n• Style: ${afbFormData.voice}\n• Variance: ${afbFormData.longshotLevel}\n• Line: ${afbFormData.lineFocus || 'None specified'}\n• Focus: ${afbFormData.angles.length > 0 ? afbFormData.angles.join(', ') : 'General analysis'}`,
+      sender: 'user',
+      timestamp: new Date().toISOString(),
+      room: 'general'
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+
+    try {
+      // Use AFB client to generate scripts
+      const afbResult = await buildAFBScripts({
+        matchup,
+        lineFocus: afbFormData.lineFocus,
+        angles: afbFormData.angles,
+        voice: afbFormData.voice,
+        wantJson: false // Get formatted text for better display
+      });
+      
+      const aiMessage = {
+        text: typeof afbResult === 'string' ? afbResult : afbResult.scripts || JSON.stringify(afbResult, null, 2),
+        sender: 'ai',
+        timestamp: new Date().toISOString(),
+        room: 'general',
+        isAFB: true,
+        afbData: afbResult
+      };
+      
+      setMessages(prev => [...prev, aiMessage]);
+      
+      // Also emit to other connected users
+      if (socketRef.current) {
+        socketRef.current.emit('send_message', aiMessage);
+      }
+      
+    } catch (error) {
+      console.error('AFB generation error:', error);
+      const errorMessage = {
+        text: `Sorry, I encountered an error generating your AFB scripts: ${error.message}. Please try again.`,
+        sender: 'ai',
+        timestamp: new Date().toISOString(),
+        room: 'general'
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const sendMessage = async (e) => {
@@ -80,7 +144,7 @@ const App = () => {
           };
         } else {
           // Fall back to chat if matchup not found
-          const response = await fetch('/api/chat', {
+          const response = await fetch('http://localhost:8080/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -92,7 +156,7 @@ const App = () => {
         }
       } else {
         // Standard chat endpoint
-        const response = await fetch('/api/chat', {
+        const response = await fetch('http://localhost:8080/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -166,12 +230,135 @@ const App = () => {
             <div className="welcome-message">
               <h2>Welcome to ParlayGPT! 👋</h2>
               {afbMode ? (
-                <div>
-                  <p><strong>🎯 AFB Script Parlay Builder Mode</strong></p>
-                  <p>Generate correlated same-game parlay scripts for any matchup!</p>
-                  <div className="afb-examples">
-                    <p>Try: "Chiefs vs Bills, Over 54.5 total, analyst voice"</p>
-                    <p>Or: "Ravens vs Steelers, focusing on rushing, hype voice"</p>
+                <div className="afb-builder-form">
+                  <div className="afb-header">
+                    <h3>🎯 AFB Script Parlay Builder</h3>
+                    <p>Generate 2-3 correlated same-game parlay scripts with professional analysis</p>
+                  </div>
+                  
+                  <div className="afb-form-grid">
+                    {/* Game Selection */}
+                    <div className="form-section">
+                      <label>🏈 Select Game or Enter Custom Matchup</label>
+                      <select 
+                        value={afbFormData.selectedGame}
+                        onChange={(e) => setAfbFormData({...afbFormData, selectedGame: e.target.value, customMatchup: ''})}
+                        className="afb-select"
+                      >
+                        <option value="">Choose a popular game...</option>
+                        <option value="Chiefs vs Bills">Kansas City Chiefs vs Buffalo Bills</option>
+                        <option value="Ravens vs Steelers">Baltimore Ravens vs Pittsburgh Steelers</option>
+                        <option value="Cowboys vs Eagles">Dallas Cowboys vs Philadelphia Eagles</option>
+                        <option value="49ers vs Seahawks">San Francisco 49ers vs Seattle Seahawks</option>
+                        <option value="Packers vs Bears">Green Bay Packers vs Chicago Bears</option>
+                        <option value="custom">Enter Custom Matchup</option>
+                      </select>
+                      
+                      {afbFormData.selectedGame === 'custom' && (
+                        <input
+                          type="text"
+                          placeholder="e.g., Lions vs Vikings"
+                          value={afbFormData.customMatchup}
+                          onChange={(e) => setAfbFormData({...afbFormData, customMatchup: e.target.value})}
+                          className="afb-input"
+                        />
+                      )}
+                    </div>
+
+                    {/* Line Focus */}
+                    <div className="form-section">
+                      <label>📊 Line Focus (Optional)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., Over 54.5, -3.5 spread"
+                        value={afbFormData.lineFocus}
+                        onChange={(e) => setAfbFormData({...afbFormData, lineFocus: e.target.value})}
+                        className="afb-input"
+                      />
+                    </div>
+
+                    {/* Voice Style */}
+                    <div className="form-section">
+                      <label>🎤 Analysis Style</label>
+                      <div className="radio-group">
+                        {['analyst', 'hype', 'coach'].map(voice => (
+                          <label key={voice} className="radio-label">
+                            <input
+                              type="radio"
+                              name="voice"
+                              value={voice}
+                              checked={afbFormData.voice === voice}
+                              onChange={(e) => setAfbFormData({...afbFormData, voice: e.target.value})}
+                            />
+                            <span className="radio-text">
+                              {voice === 'analyst' && '📈 Analyst (Data-driven, concise)'}
+                              {voice === 'hype' && '🔥 Hype (Energetic, exciting)'}
+                              {voice === 'coach' && '🎯 Coach (Strategic, directive)'}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Longshot Level */}
+                    <div className="form-section">
+                      <label>🎲 Script Variance</label>
+                      <div className="radio-group">
+                        {[
+                          { value: 'conservative', label: '🛡️ Conservative (Higher probability)' },
+                          { value: 'standard', label: '⚖️ Standard (Balanced approach)' },
+                          { value: 'longshot', label: '🚀 Longshot (Higher payouts)' }
+                        ].map(option => (
+                          <label key={option.value} className="radio-label">
+                            <input
+                              type="radio"
+                              name="longshotLevel"
+                              value={option.value}
+                              checked={afbFormData.longshotLevel === option.value}
+                              onChange={(e) => setAfbFormData({...afbFormData, longshotLevel: e.target.value})}
+                            />
+                            <span className="radio-text">{option.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Data Considerations */}
+                    <div className="form-section full-width">
+                      <label>🔍 Focus Areas (Select what matters most)</label>
+                      <div className="checkbox-grid">
+                        {[
+                          'Pace of play', 'Red zone efficiency', 'Explosive plays', 
+                          'Pressure rate', 'OL/DL matchups', 'Weather conditions',
+                          'Injuries/Rest', 'Early-down EPA', 'Coverage schemes'
+                        ].map(angle => (
+                          <label key={angle} className="checkbox-label">
+                            <input
+                              type="checkbox"
+                              checked={afbFormData.angles.includes(angle)}
+                              onChange={(e) => {
+                                const newAngles = e.target.checked 
+                                  ? [...afbFormData.angles, angle]
+                                  : afbFormData.angles.filter(a => a !== angle);
+                                setAfbFormData({...afbFormData, angles: newAngles});
+                              }}
+                            />
+                            <span className="checkbox-text">{angle}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Generate Button */}
+                    <div className="form-section full-width">
+                      <button 
+                        className="afb-generate-btn"
+                        onClick={handleAFBGenerate}
+                        disabled={isLoading || (!afbFormData.selectedGame && !afbFormData.customMatchup)}
+                      >
+                        {isLoading ? '🔄 Generating Scripts...' : '🎯 Generate Parlay Scripts'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (

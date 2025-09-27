@@ -27,7 +27,7 @@ export async function buildAFBScripts(request) {
     throw new Error('matchup is required');
   }
 
-  const response = await fetch('/api/afb', {
+  const response = await fetch('http://localhost:8080/api/afb', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
