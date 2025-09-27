@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
+import { buildAFBScripts, parseAFBInput, isAFBRequest } from './afbClient';
 
 const App = () => {
   const [messages, setMessages] = useState([]);
@@ -55,30 +56,61 @@ const App = () => {
 
     // Add user message immediately
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputMessage;
     setInputMessage('');
     setIsLoading(true);
 
     try {
-      // Send to AI API
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: inputMessage,
-          context: messages.slice(-5) // Send last 5 messages for context
-        }),
-      });
-
-      const aiResponse = await response.json();
+      let aiResponse;
+      
+      // Enhanced logic: Use AFB mode or detect AFB-style requests
+      if (afbMode || isAFBRequest(currentInput)) {
+        // Parse input for AFB parameters
+        const afbParams = parseAFBInput(currentInput);
+        
+        if (afbParams.matchup) {
+          // Use dedicated AFB endpoint
+          const afbResult = await buildAFBScripts(afbParams);
+          
+          aiResponse = {
+            message: typeof afbResult === 'string' ? afbResult : JSON.stringify(afbResult, null, 2),
+            timestamp: new Date().toISOString(),
+            isAFB: true,
+            afbData: afbResult
+          };
+        } else {
+          // Fall back to chat if matchup not found
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: currentInput,
+              context: messages.slice(-5)
+            }),
+          });
+          aiResponse = await response.json();
+        }
+      } else {
+        // Standard chat endpoint
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: currentInput,
+            context: messages.slice(-5)
+          }),
+        });
+        aiResponse = await response.json();
+      }
       
       // Add AI response
       const aiMessage = {
         text: aiResponse.message,
         sender: 'ai',
-        timestamp: aiResponse.timestamp,
-        room: 'general'
+        timestamp: aiResponse.timestamp || new Date().toISOString(),
+        room: 'general',
+        isAFB: aiResponse.isAFB || false,
+        afbData: aiResponse.afbData
       };
       
       setMessages(prev => [...prev, aiMessage]);
@@ -91,7 +123,7 @@ const App = () => {
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMessage = {
-        text: 'Sorry, I encountered an error. Please try again.',
+        text: `Sorry, I encountered an error: ${error.message}. Please try again.`,
         sender: 'ai',
         timestamp: new Date().toISOString(),
         room: 'general'

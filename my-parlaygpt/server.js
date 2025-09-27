@@ -5,14 +5,21 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const OpenAI = require('openai');
+const { validateAFBRequest } = require('./afbTypes');
 require('dotenv').config();
 
-// Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// Initialize OpenAI with enhanced configuration (matches your original design)
+const baseURL = process.env.GPT_BASE_URL || "https://api.openai.com/v1";
+const model = process.env.GPT_MODEL_ID || "gpt-4";
+const apiKey = process.env.GPT_API_KEY || process.env.OPENAI_API_KEY;
 
-// AFB Script Parlay Builder System Prompt
+if (!apiKey) {
+  console.error("Missing GPT_API_KEY or OPENAI_API_KEY");
+}
+
+const openai = new OpenAI({ apiKey, baseURL });
+
+// Enhanced AFB Script Parlay Builder System Prompt (matches your original specification exactly)
 function getAFBSystemPrompt() {
   return `You are "AFB Script Parlay Builder." Your job: generate up to THREE distinct, coherent narratives ("scripts") for a single upcoming AFB matchup and, for each script, output 3–5 CORRELATED Same Game Parlay legs.
 
@@ -44,7 +51,7 @@ STANDARD NOTES (include in every script):
 - If odds not supplied, american odds are illustrative — paste your book's prices to re-price.
 
 Voice options: "analyst" (concise, data-driven), "hype" (energetic), or "coach" (directive).
-Finish every set of scripts with: "Want the other side of this story?"`;
+Finish every set of scripts with: "Want the other side of this story?"`.trim();
 }
 
 const app = express();
@@ -85,56 +92,106 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Dedicated AFB Parlay Builder endpoint
+// Enhanced AFB Parlay Builder endpoint (matches your original superior design)
 app.post('/api/afb', async (req, res) => {
   try {
-    const { matchup, line, angles, voice = 'analyst', format = 'text' } = req.body;
-    
-    if (!process.env.OPENAI_API_KEY) {
+    const {
+      matchup,
+      lineFocus,
+      angles,
+      voice = 'analyst',
+      wantJson = true
+    } = req.body;
+
+    // Validate request using your original validation logic
+    const validation = validateAFBRequest({ matchup, lineFocus, angles, voice, wantJson });
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
+    }
+
+    if (!apiKey) {
       return res.status(500).json({ 
         error: 'OpenAI API key not configured',
-        message: 'Please set your OPENAI_API_KEY in the .env file'
+        message: 'Please set your GPT_API_KEY or OPENAI_API_KEY in the .env file'
       });
     }
-    
-    // Build AFB-specific prompt
-    let promptMessage = `Generate AFB scripts for`;
-    if (matchup) promptMessage += ` ${matchup}`;
-    if (line) promptMessage += `, focusing on ${line}`;
-    if (angles) promptMessage += `, emphasizing ${angles}`;
-    if (voice !== 'analyst') promptMessage += ` in ${voice} voice`;
-    if (format === 'json') promptMessage += `. Return as JSON format.`;
-    
-    const messages = [
-      { role: 'system', content: getAFBSystemPrompt() },
-      { role: 'user', content: promptMessage }
-    ];
-    
-    // Call OpenAI API with AFB-optimized settings
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4', // Use GPT-4 for better analysis
-      messages: messages,
-      max_tokens: 2000, // More tokens for detailed scripts
-      temperature: 0.8, // Slightly higher for creative narratives
-      top_p: 0.9,
-      frequency_penalty: 0.1,
-      presence_penalty: 0.1
-    });
-    
-    const response = {
-      scripts: completion.choices[0]?.message?.content || 'Could not generate scripts.',
-      timestamp: new Date().toISOString(),
-      model: 'gpt-4',
-      usage: completion.usage,
-      parameters: { matchup, line, angles, voice, format }
-    };
-    
-    res.json(response);
-    
+
+    // Build enhanced user prompt (matches your original structure)
+    const userPrompt = `
+Build correlated parlay scripts.
+
+Matchup: ${matchup}
+Line or total of interest: ${lineFocus ?? "unspecified"}
+Angles to emphasize: ${Array.isArray(angles) ? angles.join(", ") : angles || "none specified"}
+Voice: ${voice}
+
+Respond in ${wantJson ? "JSON ONLY matching the Output Contract schema" : "plain text"}.
+    `.trim();
+
+    // Try to use Responses API if available, fall back to Chat Completions
+    let completion;
+    try {
+      // Attempt your original Responses API approach
+      if (openai.responses && typeof openai.responses.create === 'function') {
+        completion = await openai.responses.create({
+          model,
+          reasoning: { effort: "high" },
+          response_format: wantJson ? { type: "json_object" } : { type: "text" },
+          input: [
+            { role: "system", content: getAFBSystemPrompt() },
+            { role: "user", content: userPrompt }
+          ]
+        });
+      } else {
+        throw new Error("Responses API not available");
+      }
+    } catch (responsesError) {
+      console.log("Responses API unavailable, falling back to Chat Completions");
+      // Fall back to standard Chat Completions API
+      completion = await openai.chat.completions.create({
+        model,
+        messages: [
+          { role: "system", content: getAFBSystemPrompt() },
+          { role: "user", content: userPrompt }
+        ],
+        max_tokens: 2000,
+        temperature: 0.8,
+        top_p: 0.9,
+        frequency_penalty: 0.1,
+        presence_penalty: 0.1,
+        response_format: wantJson ? { type: "json_object" } : undefined
+      });
+    }
+
+    // Extract content (handles both API formats)
+    let content;
+    if (completion.output && completion.output[0] && completion.output[0].content) {
+      // Responses API format
+      const contentBlock = completion.output[0].content[0];
+      content = contentBlock && "text" in contentBlock ? contentBlock.text : JSON.stringify(completion);
+    } else if (completion.choices && completion.choices[0]) {
+      // Chat Completions API format
+      content = completion.choices[0].message.content;
+    } else {
+      content = JSON.stringify(completion);
+    }
+
+    if (wantJson) {
+      try {
+        const parsed = JSON.parse(content);
+        return res.json(parsed);
+      } catch (parseError) {
+        return res.json({ raw: content }, { status: 200 });
+      }
+    }
+
+    res.set('Content-Type', 'text/plain; charset=utf-8');
+    res.send(content);
+
   } catch (error) {
     console.error('AFB error:', error);
     res.status(500).json({ 
-      error: 'Internal server error',
+      error: error?.message ?? 'Unknown error',
       message: 'An error occurred generating AFB scripts.'
     });
   }
@@ -144,10 +201,10 @@ app.post('/api/chat', async (req, res) => {
   try {
     const { message, context } = req.body;
     
-    if (!process.env.OPENAI_API_KEY) {
+    if (!apiKey) {
       return res.status(500).json({ 
         error: 'OpenAI API key not configured',
-        message: 'Please set your OPENAI_API_KEY in the .env file'
+        message: 'Please set your GPT_API_KEY or OPENAI_API_KEY in the .env file'
       });
     }
     
@@ -180,11 +237,11 @@ app.post('/api/chat', async (req, res) => {
     // Add current user message
     messages.push({ role: 'user', content: message });
     
-    // Call OpenAI API
+    // Call OpenAI API with enhanced configuration
     const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      model: isAFBRequest ? model : 'gpt-3.5-turbo', // Use configured model for AFB requests
       messages: messages,
-      max_tokens: 1000,
+      max_tokens: isAFBRequest ? 2000 : 1000,
       temperature: 0.7,
       top_p: 1,
       frequency_penalty: 0,
