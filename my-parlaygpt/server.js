@@ -4,7 +4,13 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const OpenAI = require('openai');
 require('dotenv').config();
+
+// Initialize OpenAI
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -48,17 +54,87 @@ app.post('/api/chat', async (req, res) => {
   try {
     const { message, context } = req.body;
     
-    // Mock AI response for now
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ 
+        error: 'OpenAI API key not configured',
+        message: 'Please set your OPENAI_API_KEY in the .env file'
+      });
+    }
+    
+    // Prepare conversation history for ChatGPT
+    const messages = [
+      {
+        role: 'system',
+        content: 'You are ParlayGPT, a helpful AI assistant. Be conversational, friendly, and concise in your responses.'
+      }
+    ];
+    
+    // Add context from previous messages
+    if (context && Array.isArray(context)) {
+      context.slice(-10).forEach(msg => {
+        if (msg.sender === 'user') {
+          messages.push({ role: 'user', content: msg.text });
+        } else if (msg.sender === 'ai') {
+          messages.push({ role: 'assistant', content: msg.text });
+        }
+      });
+    }
+    
+    // Add current user message
+    messages.push({ role: 'user', content: message });
+    
+    // Call OpenAI API
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: messages,
+      max_tokens: 1000,
+      temperature: 0.7,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0
+    });
+    
+    const aiMessage = completion.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+    
     const response = {
-      message: `Echo: ${message}`,
+      message: aiMessage,
       timestamp: new Date().toISOString(),
-      id: Math.random().toString(36).substr(2, 9)
+      id: Math.random().toString(36).substr(2, 9),
+      model: 'gpt-3.5-turbo',
+      usage: completion.usage
     };
     
     res.json(response);
+    
   } catch (error) {
     console.error('Chat error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    
+    // Handle specific OpenAI errors
+    if (error.code === 'insufficient_quota') {
+      return res.status(429).json({ 
+        error: 'API quota exceeded',
+        message: 'OpenAI API quota has been exceeded. Please check your billing.'
+      });
+    }
+    
+    if (error.code === 'invalid_api_key') {
+      return res.status(401).json({ 
+        error: 'Invalid API key',
+        message: 'Please check your OpenAI API key configuration.'
+      });
+    }
+    
+    if (error.code === 'rate_limit_exceeded') {
+      return res.status(429).json({ 
+        error: 'Rate limit exceeded',
+        message: 'Too many requests. Please try again in a moment.'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: 'An unexpected error occurred. Please try again.'
+    });
   }
 });
 
