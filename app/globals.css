@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body, #__next {
+  height: 100%;
+}
+
+body {
+  @apply bg-[color:var(--tw-color-background,#0b0b10)] text-[color:var(--tw-color-foreground,#e6e6eb)];
+}
+
+.card {
+  @apply bg-card rounded-2xl shadow-soft border border-border;
+}
+
+.heading {
+  @apply text-sm font-medium text-foreground/80 tracking-wide uppercase;
+}
+
+.label {
+  @apply text-sm text-foreground/80;
+}
+
+.input {
+  @apply w-full rounded-lg bg-[#0e0e15] border border-border px-3 py-2 text-sm placeholder-muted focus:outline-none focus:ring-2 focus:ring-accent/60;
+}
+
+.pill {
+  @apply inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs hover:bg-white/5 cursor-pointer select-none;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-accent text-white px-4 py-2 text-sm font-medium hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-white/5;
+}
+
+.tab {
+  @apply inline-flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-white/5 aria-selected:bg-white/10 aria-selected:text-white;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+

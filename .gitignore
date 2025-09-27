@@ -64,7 +64,9 @@ jspm_packages/
 .parcel-cache
 
 # next.js build output
-.next
+.next/
+out/
+.vercel/
 
 # nuxt.js build output
 .nuxt
