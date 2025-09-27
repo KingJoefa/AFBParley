@@ -1,8 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom CSS Variables for Black + Silver Theme */
+:root {
+  --bg-primary: #000000;
+  --bg-secondary: #111111;
+  --bg-tertiary: #1A1A1A;
+  --bg-card: #0F0F0F;
+  
+  --text-primary: #E0E0E0;
+  --text-secondary: #C0C0C0;
+  --text-accent: #FFFFFF;
+  --text-muted: #8A8A8A;
+  
+  --accent-silver: #C0C0C0;
+  --accent-chrome: #E5E5E5;
+  --accent-steel: #A8A8A8;
+  
+  --border-silver: #C0C0C0;
+  --border-subtle: #333333;
+}
+
 .app {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--bg-primary);
 }
 
 .header {
