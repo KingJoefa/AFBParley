@@ -12,6 +12,41 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+// AFB Script Parlay Builder System Prompt
+function getAFBSystemPrompt() {
+  return `You are "AFB Script Parlay Builder." Your job: generate up to THREE distinct, coherent narratives ("scripts") for a single upcoming AFB matchup and, for each script, output 3–5 CORRELATED Same Game Parlay legs.
+
+INPUTS expected (infer if missing):
+(1) matchup, (2) a total or spread the user cares about, (3) any stat angles to emphasize (pace, PROE, early-down EPA, pressure rate, OL/DL mismatches, red-zone TD%, explosive plays, coverage, weather, injuries, travel/rest/short week), (4) delivery style: "analyst" (default), "hype", or "coach".
+
+OUTPUT — PLAIN TEXT by default, but when asked for JSON use the schema exactly. Use clean sections and consistent formatting:
+- Assumptions: matchup, line focus, angles, voice.
+- Script 1 (Title)
+  • Narrative: one tight paragraph in the chosen voice.
+  • Legs (3–5): bullet list with market, selection, odds written as "Alt Total: Under 41.5, odds -105, illustrative."
+  • $1 Parlay Math: list leg decimals, product, payout, and profit. Always format decimals and currency to 2 decimals. Include a one-line Steps string, e.g., "1.91 × 2.20 × 1.87 = 7.85; payout $7.85; profit $6.85." Use formulas: for positive odds A, decimal = 1 + A/100; for negative odds −B, decimal = 1 + 100/B.
+  • Notes: include the two standard bullets below.
+- Script 2 (if applicable) …
+- Script 3 — Super Long (Longshot) (if applicable): a higher-variance, longer-tail build with 4–5 highly correlated legs and a larger total price. Same math format.
+- Close with: "Want the other side of this story?" (Offer only; do not auto-generate.)
+
+RULES:
+- Default to generating 2–3 scripts per request. If 3, the third is the Super Long longshot.
+- Prefer longer-tail combos that are CORRELATED with the narrative (TDs, alt lines/ladders, combo props). No hedging or internal contradictions.
+- Keep 3–5 legs per script. One crisp paragraph per narrative.
+- If the user provides odds, label them "user-supplied" and use exactly those odds. Otherwise, label as "illustrative."
+- Do the $1 parlay math deterministically with the given formulas. Round all leg decimals, product, payout, and profit to exactly 2 decimals.
+- If inputs are missing, proceed with reasonable assumptions and record them in Assumptions.
+- Avoid "lock" language; this is informational/entertainment only.
+
+STANDARD NOTES (include in every script):
+- No guarantees; high variance by design; bet what you can afford.
+- If odds not supplied, american odds are illustrative — paste your book's prices to re-price.
+
+Voice options: "analyst" (concise, data-driven), "hype" (energetic), or "coach" (directive).
+Finish every set of scripts with: "Want the other side of this story?"`;
+}
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
@@ -50,6 +85,61 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Dedicated AFB Parlay Builder endpoint
+app.post('/api/afb', async (req, res) => {
+  try {
+    const { matchup, line, angles, voice = 'analyst', format = 'text' } = req.body;
+    
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ 
+        error: 'OpenAI API key not configured',
+        message: 'Please set your OPENAI_API_KEY in the .env file'
+      });
+    }
+    
+    // Build AFB-specific prompt
+    let promptMessage = `Generate AFB scripts for`;
+    if (matchup) promptMessage += ` ${matchup}`;
+    if (line) promptMessage += `, focusing on ${line}`;
+    if (angles) promptMessage += `, emphasizing ${angles}`;
+    if (voice !== 'analyst') promptMessage += ` in ${voice} voice`;
+    if (format === 'json') promptMessage += `. Return as JSON format.`;
+    
+    const messages = [
+      { role: 'system', content: getAFBSystemPrompt() },
+      { role: 'user', content: promptMessage }
+    ];
+    
+    // Call OpenAI API with AFB-optimized settings
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4', // Use GPT-4 for better analysis
+      messages: messages,
+      max_tokens: 2000, // More tokens for detailed scripts
+      temperature: 0.8, // Slightly higher for creative narratives
+      top_p: 0.9,
+      frequency_penalty: 0.1,
+      presence_penalty: 0.1
+    });
+    
+    const response = {
+      scripts: completion.choices[0]?.message?.content || 'Could not generate scripts.',
+      timestamp: new Date().toISOString(),
+      model: 'gpt-4',
+      usage: completion.usage,
+      parameters: { matchup, line, angles, voice, format }
+    };
+    
+    res.json(response);
+    
+  } catch (error) {
+    console.error('AFB error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: 'An error occurred generating AFB scripts.'
+    });
+  }
+});
+
 app.post('/api/chat', async (req, res) => {
   try {
     const { message, context } = req.body;
@@ -61,11 +151,18 @@ app.post('/api/chat', async (req, res) => {
       });
     }
     
+    // Detect if this is an AFB/parlay request
+    const isAFBRequest = message.toLowerCase().includes('parlay') || 
+                        message.toLowerCase().includes('afb') || 
+                        message.toLowerCase().includes('script') ||
+                        message.toLowerCase().includes('matchup') ||
+                        message.toLowerCase().includes('betting');
+    
     // Prepare conversation history for ChatGPT
     const messages = [
       {
         role: 'system',
-        content: 'You are ParlayGPT, a helpful AI assistant. Be conversational, friendly, and concise in your responses.'
+        content: isAFBRequest ? getAFBSystemPrompt() : 'You are ParlayGPT, a helpful AI assistant. Be conversational, friendly, and concise in your responses.'
       }
     ];
     

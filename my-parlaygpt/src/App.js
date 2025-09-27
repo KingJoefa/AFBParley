@@ -6,6 +6,7 @@ const App = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [afbMode, setAfbMode] = useState(false);
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
 
@@ -105,9 +106,25 @@ const App = () => {
     <div className="app">
       <header className="header">
         <h1>🎯 ParlayGPT</h1>
-        <div className="connection-status">
-          <span className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`}></span>
-          {isConnected ? 'Connected' : 'Disconnected'}
+        <div className="header-controls">
+          <div className="mode-toggle">
+            <button 
+              className={`mode-btn ${!afbMode ? 'active' : ''}`}
+              onClick={() => setAfbMode(false)}
+            >
+              💬 Chat
+            </button>
+            <button 
+              className={`mode-btn ${afbMode ? 'active' : ''}`}
+              onClick={() => setAfbMode(true)}
+            >
+              🎯 AFB Builder
+            </button>
+          </div>
+          <div className="connection-status">
+            <span className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`}></span>
+            {isConnected ? 'Connected' : 'Disconnected'}
+          </div>
         </div>
       </header>
       
@@ -116,7 +133,18 @@ const App = () => {
           {messages.length === 0 && (
             <div className="welcome-message">
               <h2>Welcome to ParlayGPT! 👋</h2>
-              <p>Start a conversation by typing a message below.</p>
+              {afbMode ? (
+                <div>
+                  <p><strong>🎯 AFB Script Parlay Builder Mode</strong></p>
+                  <p>Generate correlated same-game parlay scripts for any matchup!</p>
+                  <div className="afb-examples">
+                    <p>Try: "Chiefs vs Bills, Over 54.5 total, analyst voice"</p>
+                    <p>Or: "Ravens vs Steelers, focusing on rushing, hype voice"</p>
+                  </div>
+                </div>
+              ) : (
+                <p>Start a conversation by typing a message below.</p>
+              )}
             </div>
           )}
           
@@ -152,7 +180,7 @@ const App = () => {
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="Type your message..."
+              placeholder={afbMode ? "Enter matchup (e.g., Chiefs vs Bills, Over 54.5)..." : "Type your message..."}
               className="message-input"
               disabled={isLoading}
             />
