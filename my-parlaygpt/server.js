@@ -92,6 +92,46 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// NFL Schedule endpoint
+app.get('/api/nfl/schedule', (req, res) => {
+  try {
+    // Current week's NFL schedule (Week 4, September 28, 2025)
+    const currentWeekGames = [
+      { id: 'vikings-steelers', display: 'Minnesota Vikings @ Pittsburgh Steelers', time: 'Sun 6:30 AM PDT', week: 4, date: '2025-09-28' },
+      { id: 'saints-bills', display: 'New Orleans Saints @ Buffalo Bills', time: 'Sun 10:00 AM PDT', week: 4, date: '2025-09-28' },
+      { id: 'titans-texans', display: 'Tennessee Titans @ Houston Texans', time: 'Sun 10:00 AM PDT', week: 4, date: '2025-09-28' },
+      { id: 'browns-lions', display: 'Cleveland Browns @ Detroit Lions', time: 'Sun 10:00 AM PDT', week: 4, date: '2025-09-28' },
+      { id: 'commanders-falcons', display: 'Washington Commanders @ Atlanta Falcons', time: 'Sun 10:00 AM PDT', week: 4, date: '2025-09-28' },
+      { id: 'eagles-bucs', display: 'Philadelphia Eagles @ Tampa Bay Buccaneers', time: 'Sun 10:00 AM PDT', week: 4, date: '2025-09-28' },
+      { id: 'panthers-patriots', display: 'Carolina Panthers @ New England Patriots', time: 'Sun 10:00 AM PDT', week: 4, date: '2025-09-28' },
+      { id: 'chargers-giants', display: 'Los Angeles Chargers @ New York Giants', time: 'Sun 10:00 AM PDT', week: 4, date: '2025-09-28' },
+      { id: 'jaguars-49ers', display: 'Jacksonville Jaguars @ San Francisco 49ers', time: 'Sun 1:05 PM PDT', week: 4, date: '2025-09-28' },
+      { id: 'colts-rams', display: 'Indianapolis Colts @ Los Angeles Rams', time: 'Sun 1:05 PM PDT', week: 4, date: '2025-09-28' },
+      { id: 'bears-raiders', display: 'Chicago Bears @ Las Vegas Raiders', time: 'Sun 1:25 PM PDT', week: 4, date: '2025-09-28' },
+      { id: 'ravens-chiefs', display: 'Baltimore Ravens @ Kansas City Chiefs', time: 'Sun 1:25 PM PDT', week: 4, date: '2025-09-28' },
+      { id: 'packers-cowboys', display: 'Green Bay Packers @ Dallas Cowboys', time: 'Sun 5:20 PM PDT', week: 4, date: '2025-09-28' }
+    ];
+
+    // Mark popular games
+    const popularGameIds = ['ravens-chiefs', 'packers-cowboys', 'eagles-bucs', 'jaguars-49ers', 'saints-bills'];
+    const gamesWithPopularity = currentWeekGames.map(game => ({
+      ...game,
+      isPopular: popularGameIds.includes(game.id)
+    }));
+
+    res.json({
+      games: gamesWithPopularity,
+      week: 4,
+      season: 2025,
+      lastUpdated: new Date().toISOString(),
+      totalGames: currentWeekGames.length
+    });
+  } catch (error) {
+    console.error('NFL schedule error:', error);
+    res.status(500).json({ error: 'Failed to fetch NFL schedule' });
+  }
+});
+
 // Enhanced AFB Parlay Builder endpoint (matches your original superior design)
 app.post('/api/afb', async (req, res) => {
   try {

@@ -147,6 +147,21 @@
   font-size: 1rem;
 }
 
+.schedule-info {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.schedule-status {
+  display: inline-block;
+  background: rgba(0, 255, 0, 0.1);
+  color: #90EE90;
+  padding: 0.5rem 1rem;
+  border-radius: 1rem;
+  font-size: 0.85rem;
+  border: 1px solid rgba(0, 255, 0, 0.2);
+}
+
 .afb-form-grid {
   display: grid;
   gap: 1.5rem;

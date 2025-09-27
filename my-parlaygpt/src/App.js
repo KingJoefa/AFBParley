@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import { buildAFBScripts, parseAFBInput, isAFBRequest } from './afbClient';
+import { getCurrentWeekGames, getPopularGames, formatGameDisplay, extractMatchupName } from './nflSchedule';
 
 const App = () => {
   const [messages, setMessages] = useState([]);
@@ -16,6 +17,8 @@ const App = () => {
     angles: [],
     lineFocus: ''
   });
+  const [nflGames, setNflGames] = useState([]);
+  const [popularGames, setPopularGames] = useState([]);
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
 
@@ -35,6 +38,19 @@ const App = () => {
     socketRef.current.on('receive_message', (message) => {
       setMessages(prev => [...prev, message]);
     });
+
+    // Load current week's NFL games
+    try {
+      const currentGames = getCurrentWeekGames();
+      const featuredGames = getPopularGames();
+      setNflGames(currentGames);
+      setPopularGames(featuredGames);
+    } catch (error) {
+      console.error('Error loading NFL games:', error);
+      // Fallback to empty arrays - user can still enter custom matchups
+      setNflGames([]);
+      setPopularGames([]);
+    }
 
     return () => {
       if (socketRef.current) {
@@ -234,24 +250,49 @@ const App = () => {
                   <div className="afb-header">
                     <h3>🎯 AFB Script Parlay Builder</h3>
                     <p>Generate 2-3 correlated same-game parlay scripts with professional analysis</p>
+                    {nflGames.length > 0 && (
+                      <div className="schedule-info">
+                        <span className="schedule-status">
+                          📅 Showing {nflGames.length} games for Week 4 • Updated for Sep 28, 2025
+                        </span>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="afb-form-grid">
                     {/* Game Selection */}
                     <div className="form-section">
-                      <label>🏈 Select Game or Enter Custom Matchup</label>
+                      <label>🏈 This Week's NFL Games</label>
                       <select 
                         value={afbFormData.selectedGame}
                         onChange={(e) => setAfbFormData({...afbFormData, selectedGame: e.target.value, customMatchup: ''})}
                         className="afb-select"
                       >
-                        <option value="">Choose a popular game...</option>
-                        <option value="Chiefs vs Bills">Kansas City Chiefs vs Buffalo Bills</option>
-                        <option value="Ravens vs Steelers">Baltimore Ravens vs Pittsburgh Steelers</option>
-                        <option value="Cowboys vs Eagles">Dallas Cowboys vs Philadelphia Eagles</option>
-                        <option value="49ers vs Seahawks">San Francisco 49ers vs Seattle Seahawks</option>
-                        <option value="Packers vs Bears">Green Bay Packers vs Chicago Bears</option>
-                        <option value="custom">Enter Custom Matchup</option>
+                        <option value="">Choose from this week's games...</option>
+                        
+                        {/* Featured Games */}
+                        {popularGames.length > 0 && (
+                          <optgroup label="🔥 Featured Games">
+                            {popularGames.map(game => (
+                              <option key={game.id} value={extractMatchupName(game.display)}>
+                                {formatGameDisplay(game)}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        
+                        {/* All Games */}
+                        {nflGames.length > 0 && (
+                          <optgroup label="📅 All This Week's Games">
+                            {nflGames.filter(game => !game.isPopular).map(game => (
+                              <option key={game.id} value={extractMatchupName(game.display)}>
+                                {formatGameDisplay(game)}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        
+                        <option value="custom">💭 Enter Custom Matchup</option>
                       </select>
                       
                       {afbFormData.selectedGame === 'custom' && (
