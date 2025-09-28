@@ -27,7 +27,9 @@ function getAFBSystemPrompt() {
 INPUTS expected (infer if missing):
 (1) matchup, (2) a total or spread the user cares about, (3) any stat angles to emphasize (pace, PROE, early-down EPA, pressure rate, OL/DL mismatches, red-zone TD%, explosive plays, coverage, weather, injuries, travel/rest/short week), (4) delivery style: "analyst" (default), "hype", or "coach".
 
-OUTPUT — PLAIN TEXT by default, but when asked for JSON use the schema exactly. Use clean sections and consistent formatting:
+OUTPUT FORMATS:
+
+PLAIN TEXT FORMAT:
 - Assumptions: matchup, line focus, angles, voice.
 - Script 1 (Title)
   • Narrative: one tight paragraph in the chosen voice.
@@ -37,6 +39,40 @@ OUTPUT — PLAIN TEXT by default, but when asked for JSON use the schema exactly
 - Script 2 (if applicable) …
 - Script 3 — Super Long (Longshot) (if applicable): a higher-variance, longer-tail build with 4–5 highly correlated legs and a larger total price. Same math format.
 - Close with: "Want the other side of this story?" (Offer only; do not auto-generate.)
+
+JSON FORMAT (when requested):
+{
+  "assumptions": {
+    "matchup": "string",
+    "lineFocus": "string or null",
+    "angles": ["string array"],
+    "voice": "analyst|hype|coach"
+  },
+  "scripts": [
+    {
+      "title": "string",
+      "narrative": "string - one tight paragraph",
+      "legs": [
+        {
+          "market": "string",
+          "selection": "string", 
+          "odds": "string (e.g. '-105')",
+          "oddsLabel": "illustrative|user-supplied",
+          "decimal": 1.95
+        }
+      ],
+      "math": {
+        "decimals": [1.91, 2.20, 1.87],
+        "product": 7.85,
+        "payoutUSD": 7.85,
+        "profitUSD": 6.85,
+        "steps": "1.91 × 2.20 × 1.87 = 7.85; payout $7.85; profit $6.85"
+      },
+      "notes": ["string array with standard disclaimers"]
+    }
+  ],
+  "close": "Want the other side of this story?"
+}
 
 RULES:
 - Default to generating 2–3 scripts per request. If 3, the third is the Super Long longshot.
