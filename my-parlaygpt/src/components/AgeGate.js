@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { APP_CONFIG, STORAGE_KEYS, ERROR_MESSAGES } from '../utils/constants';
 
 const AgeGate = () => {
   const [isOver21, setIsOver21] = useState(null);
@@ -8,7 +9,7 @@ const AgeGate = () => {
   const handleAgeVerification = (over21) => {
     setIsOver21(over21);
     if (over21) {
-      localStorage.setItem('ageVerified', 'true');
+      localStorage.setItem(STORAGE_KEYS.AGE_VERIFIED, 'true');
       navigate('/builder');
     }
   };
@@ -26,10 +27,10 @@ const AgeGate = () => {
         {/* Logo Section */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-text-accent mb-2 tracking-wide uppercase">
-            🎯 PARLAYGPT
+            🎯 {APP_CONFIG.name.toUpperCase()}
           </h1>
           <p className="text-text-secondary text-lg font-medium">
-            AI-POWERED SPORTS BETTING ASSISTANT
+            {APP_CONFIG.description.toUpperCase()}
           </p>
         </div>
         
@@ -39,12 +40,12 @@ const AgeGate = () => {
             AGE VERIFICATION REQUIRED
           </h2>
           <p className="text-text-primary text-center mb-6">
-            You must be 21 or older to use this service.
+            You must be {APP_CONFIG.legalAge} or older to use this service.
           </p>
           
           {isOver21 === false && (
             <div className="bg-red-900/20 border border-red-500/50 rounded-2xl p-4 mb-6 text-center">
-              <p className="text-red-300">❌ You must be 21 or older to access this site.</p>
+              <p className="text-red-300">❌ {ERROR_MESSAGES.AGE_VERIFICATION_REQUIRED}</p>
             </div>
           )}
           
