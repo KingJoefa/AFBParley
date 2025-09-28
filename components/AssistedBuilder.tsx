@@ -35,16 +35,20 @@ export default function AssistedBuilder() {
   const { build, isLoading, error } = useAfb()
   const [gameQuery, setGameQuery] = useState('')
   const [selectedGame, setSelectedGame] = useState<string>('')
+  const [comboOpen, setComboOpen] = useState(false)
+  const [highlight, setHighlight] = useState(0)
   const [lineFocus, setLineFocus] = useState('')
   const [voice, setVoice] = useState<Voice>('analyst')
   const [variance, setVariance] = useState<Variance>('standard')
   const [focusAreas, setFocusAreas] = useState<string[]>([])
   const [advancedAngles, setAdvancedAngles] = useState('')
+  const [byoaFiles, setByoaFiles] = useState<{ filename: string; content: string; size: number }[]>([])
   const [summary, setSummary] = useState<string>('')
   const [json, setJson] = useState<any>(null)
   const [copied, setCopied] = useState(false)
-  const [activeTab, setActiveTab] = useState<'summary' | 'json'>('summary')
+  const [activeTab, setActiveTab] = useState<'summary' | 'json' | 'slips'>('summary')
   const comboRef = useRef<HTMLInputElement>(null)
+  const comboWrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     track('ui_view_loaded')
@@ -69,25 +73,44 @@ export default function AssistedBuilder() {
   }, [activeTab, summary, json])
 
   const onBuild = useCallback(async () => {
-    if (!selectedGame) return
+    const matchup = selectedGame || gameQuery
+    if (!matchup) return
     track('ui_build_clicked', { voice, variance, focusAreasCount: focusAreas.length })
     try {
       const req = {
-        matchup: selectedGame,
+        matchup,
         lineFocus: lineFocus || undefined,
         angles: [...focusAreas, ...chips],
         voice,
         wantJson: true,
+        byoa: byoaFiles.map(f => ({ filename: f.filename, content: f.content })),
       }
       const data = await build(req)
-      setJson(data)
-      const plain = data?.scripts ?
-        [
-          `Assumptions: matchup ${data?.assumptions?.matchup ?? selectedGame}${data?.assumptions?.lineFocus ? `; line ${data.assumptions.lineFocus}` : ''}; voice ${data?.assumptions?.voice ?? voice}.`,
-          ...data.scripts.map((s: any, i: number) => `Script ${i + 1}: ${s.title}\n${s.narrative}\nLegs:\n${s.legs.map((l: any) => `• ${l.market}: ${l.selection}, odds ${l.odds} (${l.oddsLabel})`).join('\n')}\n$1 Parlay Math: ${s.math?.steps}\nNotes: ${s.notes?.join(' ')}`)
+
+      // Normalize outputs so all tabs can render
+      let normalizedSummary = ''
+      let normalizedJson: any = null
+
+      if (typeof data === 'string') {
+        normalizedSummary = data
+        normalizedJson = safeParseTextToScripts(data)
+      } else if (data && typeof data === 'object' && 'scripts' in data) {
+        const d: any = data
+        normalizedJson = d
+        normalizedSummary = [
+          `Assumptions: matchup ${d?.assumptions?.matchup ?? matchup}${d?.assumptions?.lineFocus ? `; line ${d.assumptions.lineFocus}` : ''}; voice ${d?.assumptions?.voice ?? voice}.`,
+          ...d.scripts.map((s: any, i: number) => `Script ${i + 1}: ${s.title}\n${s.narrative}\nLegs:\n${s.legs.map((l: any) => `• ${l.market}: ${l.selection}, odds ${l.odds} (${l.oddsLabel})`).join('\n')}\n$1 Parlay Math: ${s.math?.steps}\nNotes: ${s.notes?.join(' ')}`)
         ].join('\n\n')
-        : (typeof data === 'string' ? data : JSON.stringify(data, null, 2))
-      setSummary(plain)
+      } else if (data && typeof data === 'object' && 'raw' in (data as any)) {
+        const raw = (data as any).raw as string
+        normalizedSummary = raw
+        normalizedJson = safeParseTextToScripts(raw)
+      } else {
+        normalizedSummary = JSON.stringify(data, null, 2)
+      }
+
+      setJson(normalizedJson)
+      setSummary(normalizedSummary)
       setActiveTab('summary')
       track('ui_build_success')
     } catch (e) {
@@ -106,8 +129,20 @@ export default function AssistedBuilder() {
 
   const filteredGames = useMemo(() => {
     const q = gameQuery.toLowerCase()
-    return gameOptions.filter(g => g.toLowerCase().includes(q)).slice(0, 20)
+    const list = q ? gameOptions.filter(g => g.toLowerCase().includes(q)) : gameOptions
+    return list.slice(0, 20)
   }, [gameOptions, gameQuery])
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!comboWrapRef.current) return
+      if (!comboWrapRef.current.contains(e.target as Node)) {
+        setComboOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [])
 
   return (
     <div className="min-h-screen">
@@ -134,36 +169,53 @@ export default function AssistedBuilder() {
             <div className="heading mb-4">Selections</div>
             {/* Game combobox */}
             <label className="label" htmlFor="game">Game</label>
-            <div className="relative mt-1" role="combobox" aria-expanded="true" aria-controls="game-list">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search size={16} className="absolute left-2 top-2.5 text-muted" />
-                  <input
-                    ref={comboRef}
-                    id="game"
-                    className="input pl-8"
-                    placeholder="Choose this week's game…"
-                    value={gameQuery}
-                    onChange={(e) => setGameQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && filteredGames[0]) {
-                        setSelectedGame(filteredGames[0])
-                        setGameQuery(filteredGames[0])
-                      }
-                    }}
-                    aria-autocomplete="list"
-                  />
-                </div>
-                <button className="btn-ghost" type="button" aria-label="Open list"><ChevronDown size={16} /></button>
+            <div ref={comboWrapRef} className="relative mt-1" role="combobox" aria-expanded={comboOpen} aria-controls="game-list">
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" aria-hidden="true" />
+                <input
+                  ref={comboRef}
+                  id="game"
+                  className="input input--with-icons"
+                  placeholder="Choose this week's game…"
+                  value={gameQuery}
+                  onChange={(e) => { setGameQuery(e.target.value); setComboOpen(true); setHighlight(0) }}
+                  onFocus={() => setComboOpen(true)}
+                  onKeyDown={(e) => {
+                    if (!comboOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) setComboOpen(true)
+                    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlight(h => Math.min(h + 1, Math.max(filteredGames.length - 1, 0))) }
+                    if (e.key === 'ArrowUp') { e.preventDefault(); setHighlight(h => Math.max(h - 1, 0)) }
+                    if (e.key === 'Enter') {
+                      const choice = filteredGames[highlight] || filteredGames[0]
+                      if (choice) { setSelectedGame(choice); setGameQuery(choice); setComboOpen(false) }
+                    }
+                    if (e.key === 'Escape' || e.key === 'Tab') { setComboOpen(false) }
+                  }}
+                  aria-autocomplete="list"
+                  aria-activedescendant={comboOpen ? `game-opt-${highlight}` : undefined}
+                />
+                <button
+                  type="button"
+                  aria-label="Open list"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-white/5"
+                  onClick={() => { setComboOpen(o => !o); if (!comboOpen) comboRef.current?.focus() }}
+                >
+                  <ChevronDown size={16} />
+                </button>
               </div>
-              {gameQuery && (
-                <ul id="game-list" className="mt-2 max-h-56 overflow-auto rounded-lg border border-border bg-card">
+              {comboOpen && (
+                <ul id="game-list" role="listbox" className="absolute z-10 mt-2 w-full max-h-56 overflow-auto rounded-lg border border-border bg-card">
                   {filteredGames.length === 0 && (
                     <li className="px-3 py-2 text-sm text-muted">No matches</li>
                   )}
-                  {filteredGames.map(g => (
-                    <li key={g}>
-                      <button className="w-full text-left px-3 py-2 text-sm hover:bg-white/5" onClick={() => { setSelectedGame(g); setGameQuery(g) }}>{g}</button>
+                  {filteredGames.map((g, idx) => (
+                    <li key={g} id={`game-opt-${idx}`} role="option" aria-selected={idx===highlight}>
+                      <button
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-white/5 ${idx===highlight?'bg-white/10':''}`}
+                        onMouseEnter={() => setHighlight(idx)}
+                        onClick={() => { setSelectedGame(g); setGameQuery(g); setComboOpen(false) }}
+                      >
+                        {g}
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -222,22 +274,46 @@ export default function AssistedBuilder() {
               </div>
             </div>
 
-            {/* Advanced angles */}
+            {/* BYOA Upload */}
             <div className="mt-4">
-              <label className="label" htmlFor="angles">Advanced angles</label>
-              <textarea id="angles" className="input mt-1 min-h-[84px]" placeholder="Comma-separated, e.g., early-down EPA, PROE, coverage shells" value={advancedAngles} onChange={(e) => setAdvancedAngles(e.target.value)} />
-              {chips.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {chips.map(c => (
-                    <span key={c} className="px-2 py-1 text-xs rounded-full bg-white/10 border border-border">{c}</span>
+              <label className="label" htmlFor="byoa">Bring Your Own Analytics (optional)</label>
+              <input
+                id="byoa"
+                type="file"
+                accept=".csv,.tsv,.txt,.md,.json"
+                multiple
+                className="mt-1 block w-full text-xs text-muted"
+                onChange={async (e) => {
+                  const files = Array.from(e.target.files || [])
+                  const next: { filename: string; content: string; size: number }[] = []
+                  for (const f of files) {
+                    const text = await f.text()
+                    const capped = text.length > 64 * 1024 ? text.slice(0, 64 * 1024) : text
+                    next.push({ filename: f.name, content: capped, size: f.size })
+                  }
+                  setByoaFiles(prev => [...prev, ...next].slice(0, 5))
+                  e.currentTarget.value = ''
+                }}
+              />
+              {byoaFiles.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {byoaFiles.map((f, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs rounded-lg border border-border bg-white/5 px-2 py-1">
+                      <span className="truncate max-w-[70%]">{f.filename}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="opacity-70">{Math.round(f.size/1024)} KB</span>
+                        <button className="btn-ghost" onClick={() => setByoaFiles(files => files.filter((_, i) => i !== idx))}>Remove</button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
+              <p className="mt-1 text-xs text-muted">We include exact file chunks in the prompt (size-capped; up to 5 files).</p>
             </div>
 
             {/* CTA */}
             <div className="mt-6">
-              <button onClick={onBuild} disabled={isLoading || !selectedGame} className="btn-primary w-full">
+              <button onClick={onBuild} disabled={isLoading || !(selectedGame || gameQuery)} className="btn-primary w-full">
                 {isLoading ? (<><Loader2 className="animate-spin" size={16} /> Generating…</>) : 'Generate Parlay Scripts'}
               </button>
               <p className="mt-2 text-xs text-muted">2–3 correlated scripts with $1 parlay math.</p>
@@ -255,6 +331,7 @@ export default function AssistedBuilder() {
               <div className="inline-flex rounded-lg border border-border p-1" role="tablist" aria-label="Result tabs">
                 <button role="tab" aria-selected={activeTab==='summary'} onClick={() => setActiveTab('summary')} className={`tab ${activeTab==='summary'?'bg-white/10 text-white':''}`}>Summary</button>
                 <button role="tab" aria-selected={activeTab==='json'} onClick={() => setActiveTab('json')} className={`tab ${activeTab==='json'?'bg-white/10 text-white':''}`}>JSON</button>
+                <button role="tab" aria-selected={activeTab==='slips'} onClick={() => setActiveTab('slips')} className={`tab ${activeTab==='slips'?'bg-white/10 text-white':''}`}>Bet Slips</button>
               </div>
               <button className="btn-ghost" onClick={onCopy} aria-label="Copy">
                 {copied ? <ClipboardCheck size={16} /> : <Copy size={16} />}
@@ -285,11 +362,74 @@ export default function AssistedBuilder() {
 {JSON.stringify(json, null, 2)}
               </pre>
             )}
+
+            {activeTab === 'slips' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {renderSlips(json, summary)}
+              </div>
+            )}
           </div>
         </section>
       </main>
     </div>
   )
+}
+
+function renderSlips(json: any, summary: string) {
+  // Prefer structured JSON; fallback to parse summary heuristically
+  let scripts: any[] = []
+  if (json && typeof json === 'object' && Array.isArray(json.scripts)) {
+    scripts = json.scripts
+  } else {
+    // minimal parser: split by Script blocks
+    const blocks = summary ? summary.split(/\n\s*Script\s+\d+:/i).slice(1) : []
+    scripts = blocks.map((b, idx) => ({
+      title: `Script ${idx + 1}`,
+      legs: b.split(/\n\s*•\s*/).slice(1, 6).map(t => ({ text: t }))
+    }))
+  }
+
+  if (!scripts || scripts.length === 0) {
+    return <p className="text-sm text-muted">No slips yet. Generate first.</p>
+  }
+
+  return scripts.slice(0, 3).map((s, i) => (
+    <div key={i} className="rounded-2xl border border-border bg-[#0f0f16] p-4 shadow-soft">
+      <div className="text-xs uppercase tracking-wide text-muted mb-1">Bet Slip</div>
+      <div className="text-sm font-semibold mb-2">{s.title || `Slip ${i+1}`}</div>
+      <div className="space-y-2">
+        {(s.legs || []).slice(0,5).map((l: any, idx: number) => (
+          <div key={idx} className="flex items-start gap-2">
+            <span className="mt-0.5 inline-block h-2 w-2 rounded-full bg-accent"></span>
+            <div className="text-xs leading-5 opacity-90">{l.text || `${l.market}: ${l.selection} (${l.odds ?? '—'})`}</div>
+          </div>
+        ))}
+      </div>
+      {s.math?.steps && (
+        <div className="mt-3 text-xs text-foreground/80">{s.math.steps.replace('product, payout, and profit', 'product; payout; profit')}</div>
+      )}
+    </div>
+  ))
+}
+
+function safeParseTextToScripts(text: string) {
+  try {
+    const blocks = text.split(/\n\s*Script\s+\d+\s*[:\-]/i)
+    if (blocks.length <= 1) return null
+    const scripts: any[] = []
+    for (let i = 1; i < blocks.length; i++) {
+      const b = blocks[i]
+      const titleMatch = b.match(/^\s*"?([^\n"]{3,80})"?/)
+      const title = titleMatch ? titleMatch[1].trim() : `Script ${i}`
+      const legs = (b.match(/\n\s*•\s+.*$/gm) || []).slice(0,5).map(l => ({ text: l.replace(/^\s*•\s+/, '').trim() }))
+      const mathMatch = b.match(/\$1\s*Parlay\s*Math:\s*([^\n]+)/i)
+      const math = mathMatch ? { steps: mathMatch[1].trim() } : undefined
+      scripts.push({ title, legs, math })
+    }
+    return { scripts }
+  } catch {
+    return null
+  }
 }
 
 

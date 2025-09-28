@@ -140,7 +140,8 @@ app.post('/api/afb', async (req, res) => {
       lineFocus,
       angles,
       voice = 'analyst',
-      wantJson = true
+      wantJson = true,
+      byoa
     } = req.body;
 
     // Validate request using your original validation logic
@@ -156,6 +157,28 @@ app.post('/api/afb', async (req, res) => {
       });
     }
 
+    // Build BYOA context (optional)
+    let byoaContext = ''
+    try {
+      if (Array.isArray(byoa) && byoa.length > 0) {
+        const MAX_TOTAL = 128 * 1024 // 128KB across files
+        let used = 0
+        const parts = []
+        for (const f of byoa) {
+          if (!f || typeof f.content !== 'string') continue
+          const name = (f.filename || 'upload').toString().slice(0, 80)
+          const remain = Math.max(0, MAX_TOTAL - used)
+          if (remain <= 0) break
+          const chunk = f.content.slice(0, remain)
+          used += chunk.length
+          parts.push(`File: ${name}\n\n${chunk}`)
+        }
+        if (parts.length > 0) {
+          byoaContext = `\n\nUser Analytics Context (verbatim, size-capped):\n${parts.map((p,i)=>`--- ${i+1}/${parts.length} ---\n${p}`).join("\n\n")}`
+        }
+      }
+    } catch {}
+
     // Build enhanced user prompt (matches your original structure)
     const userPrompt = `
 Build correlated parlay scripts.
@@ -166,7 +189,7 @@ Angles to emphasize: ${Array.isArray(angles) ? angles.join(", ") : angles || "no
 Voice: ${voice}
 
 Respond in ${wantJson ? "JSON ONLY matching the Output Contract schema" : "plain text"}.
-    `.trim();
+    `.trim() + byoaContext;
 
     // Try to use Responses API if available, fall back to Chat Completions
     let completion;
@@ -198,8 +221,7 @@ Respond in ${wantJson ? "JSON ONLY matching the Output Contract schema" : "plain
         temperature: 0.8,
         top_p: 0.9,
         frequency_penalty: 0.1,
-        presence_penalty: 0.1,
-        response_format: wantJson ? { type: "json_object" } : undefined
+        presence_penalty: 0.1
       });
     }
 
