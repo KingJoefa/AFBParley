@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import io from 'socket.io-client';
 
 const ParlayBuilder = () => {
@@ -51,23 +51,27 @@ const ParlayBuilder = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const addBetToParlay = (bet) => {
+  const calculateOdds = useCallback((bets) => {
+    return bets.reduce((acc, bet) => acc * (1 + bet.odds/100), 1);
+  }, []);
+
+  const addBetToParlay = useCallback((bet) => {
     setParlayBets(prev => {
       const newBets = [...prev, bet];
-      const newTotalOdds = newBets.reduce((acc, b) => acc * (1 + b.odds/100), 1);
+      const newTotalOdds = calculateOdds(newBets);
       setTotalOdds(newTotalOdds);
       return newBets;
     });
-  };
+  }, [calculateOdds]);
 
-  const removeBetFromParlay = (index) => {
+  const removeBetFromParlay = useCallback((index) => {
     setParlayBets(prev => {
       const newBets = prev.filter((_, i) => i !== index);
-      const newTotalOdds = newBets.reduce((acc, b) => acc * (1 + b.odds/100), 1);
+      const newTotalOdds = calculateOdds(newBets);
       setTotalOdds(newTotalOdds);
       return newBets;
     });
-  };
+  }, [calculateOdds]);
 
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -127,9 +131,13 @@ const ParlayBuilder = () => {
     }
   };
 
-  const calculatePotentialPayout = () => {
+  const calculatePotentialPayout = useCallback(() => {
     return (betAmount * totalOdds).toFixed(2);
-  };
+  }, [betAmount, totalOdds]);
+
+  const calculatePotentialProfit = useCallback(() => {
+    return (calculatePotentialPayout() - betAmount).toFixed(2);
+  }, [calculatePotentialPayout, betAmount]);
 
   return (
     <div className="min-h-screen bg-background-primary">
@@ -348,7 +356,7 @@ const ParlayBuilder = () => {
                         <div className="flex justify-between border-t border-border-subtle pt-2">
                           <span className="text-text-secondary font-medium">Potential Profit:</span>
                           <span className="text-green-400 font-bold text-lg">
-                            +${(calculatePotentialPayout() - betAmount).toFixed(2)}
+                            +${calculatePotentialProfit()}
                           </span>
                         </div>
                       </div>
