@@ -1,8 +1,9 @@
 "use client"
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Info, Loader2, Search, Copy, ClipboardCheck, Keyboard, Gamepad2, Waves, Zap, Anchor, Gauge, Cloud, Activity, Shield } from 'lucide-react'
+import { Check, ChevronDown, Info, Loader2, Search, Copy, ClipboardCheck, Keyboard, Gamepad2, Waves, Zap, Anchor, Gauge, Cloud, Activity, Shield, Download, Share } from 'lucide-react'
 import { useAfb } from '@/app/hooks/useAfb'
 import { track } from '@/lib/telemetry'
+import html2canvas from 'html2canvas'
 
 type Voice = 'analyst' | 'hype' | 'coach'
 type Variance = 'conservative' | 'standard' | 'longshot'
@@ -364,7 +365,7 @@ export default function AssistedBuilder() {
             )}
 
             {activeTab === 'slips' && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-3">
                 {renderSlips(json, summary)}
               </div>
             )}
@@ -378,56 +379,250 @@ export default function AssistedBuilder() {
 function renderSlips(json: any, summary: string) {
   // Prefer structured JSON; fallback to parse summary heuristically
   let scripts: any[] = []
+  
+  // Debug logging to understand the structure
+  console.log('renderSlips - json:', json)
+  console.log('renderSlips - summary:', summary?.substring(0, 200) + '...')
+  
   if (json && typeof json === 'object' && Array.isArray(json.scripts)) {
     scripts = json.scripts
+  } else if (json && typeof json === 'object' && 'scripts' in json) {
+    scripts = json.scripts || []
   } else {
-    // minimal parser: split by Script blocks
-    const blocks = summary ? summary.split(/\n\s*Script\s+\d+:/i).slice(1) : []
-    scripts = blocks.map((b, idx) => ({
-      title: `Script ${idx + 1}`,
-      legs: b.split(/\n\s*•\s*/).slice(1, 6).map(t => ({ text: t }))
-    }))
+    // Enhanced parser to handle different text formats
+    const blocks = summary ? summary.split(/(?=Script\s+\d+)/i).slice(1) : []
+    scripts = blocks.map((b, idx) => {
+      const titleMatch = b.match(/Script\s+\d+[:\-]?\s*(.+)/i)
+      const title = titleMatch ? titleMatch[1].trim() : `Script ${idx + 1}`
+      
+      // Look for legs in different formats
+      const legMatches = b.match(/•\s*(.+?)(?=\n•|\n\$1|\nNotes:|$)/g) || []
+      const legs = legMatches.map(l => {
+        const cleaned = l.replace(/^•\s*/, '').trim()
+        // Try to parse structured format: "Market: Selection, odds X"
+        const structuredMatch = cleaned.match(/(.+?):\s*(.+?),\s*odds\s*([+-]?\d+)/)
+        if (structuredMatch) {
+          return {
+            market: structuredMatch[1].trim(),
+            selection: structuredMatch[2].trim(),
+            odds: structuredMatch[3].trim(),
+            text: cleaned
+          }
+        }
+        return { text: cleaned }
+      })
+      
+      const mathMatch = b.match(/\$1\s*Parlay\s*Math:\s*([^\n]+)/i)
+      const math = mathMatch ? { steps: mathMatch[1].trim() } : undefined
+      
+      return { title, legs, math }
+    })
   }
 
   if (!scripts || scripts.length === 0) {
     return <p className="text-sm text-muted">No slips yet. Generate first.</p>
   }
 
-  return scripts.slice(0, 3).map((s, i) => (
-    <div key={i} className="rounded-2xl border border-border bg-[#0f0f16] p-4 shadow-soft">
-      <div className="text-xs uppercase tracking-wide text-muted mb-1">Bet Slip</div>
-      <div className="text-sm font-semibold mb-2">{s.title || `Slip ${i+1}`}</div>
-      <div className="space-y-2">
-        {(s.legs || []).slice(0,5).map((l: any, idx: number) => (
-          <div key={idx} className="flex items-start gap-2">
-            <span className="mt-0.5 inline-block h-2 w-2 rounded-full bg-accent"></span>
-            <div className="text-xs leading-5 opacity-90">{l.text || `${l.market}: ${l.selection} (${l.odds ?? '—'})`}</div>
-          </div>
-        ))}
-      </div>
-      {s.math?.steps && (
-        <div className="mt-3 text-xs text-foreground/80">{s.math.steps.replace('product, payout, and profit', 'product; payout; profit')}</div>
-      )}
+  return (
+    <div className="space-y-4">
+      {scripts.slice(0, 3).map((s, i) => (
+        <BetSlipCard key={i} script={s} index={i} />
+      ))}
     </div>
-  ))
+  )
+}
+
+function BetSlipCard({ script, index }: { script: any; index: number }) {
+  const [canShare, setCanShare] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const slipRef = useRef<HTMLDivElement>(null)
+  
+  useEffect(() => {
+    setCanShare('navigator' in window && 'share' in navigator)
+  }, [])
+
+  const handleExportImage = async () => {
+    if (!slipRef.current || isExporting) return
+    
+    setIsExporting(true)
+    try {
+      const canvas = await html2canvas(slipRef.current, {
+        backgroundColor: '#0f0f16',
+        scale: 2,
+        logging: false,
+        useCORS: true,
+      })
+      
+      // Convert to blob and download
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `bet-slip-${script.title?.replace(/[^a-zA-Z0-9]/g, '-') || `script-${index + 1}`}.png`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
+        }
+      }, 'image/png')
+    } catch (error) {
+      console.error('Export failed:', error)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleShare = async () => {
+    if (!canShare) return
+    
+    try {
+      const shareText = `🏈 ${script.title}\n\n${(script.legs || []).map((l: any) => `✓ ${l.text || `${l.market}: ${l.selection} (${l.odds || '—'})`}`).join('\n')}\n\n💰 ${script.math?.steps || 'Parlay calculation not available'}`
+      
+      await navigator.share({
+        title: `AFB Bet Slip: ${script.title}`,
+        text: shareText
+      })
+    } catch (error) {
+      // Fallback to clipboard
+      const fallbackText = `🏈 ${script.title}\n\n${(script.legs || []).map((l: any) => `✓ ${l.text || `${l.market}: ${l.selection} (${l.odds || '—'})`}`).join('\n')}\n\n💰 ${script.math?.steps || 'Parlay calculation not available'}`
+      await navigator.clipboard.writeText(fallbackText)
+    }
+  }
+
+  return (
+    <div className="relative group">
+      <div 
+        ref={slipRef}
+        className="rounded-2xl border border-border bg-gradient-to-br from-[#0f0f16] via-[#1a1a2e] to-[#252540] p-6 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-[1.02] hover:border-accent/30"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-accent via-accent/80 to-accent/60 flex items-center justify-center text-sm font-bold text-white shadow-lg">
+              {index + 1}
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide text-accent font-semibold">AFB Bet Slip</div>
+              <div className="text-xs text-muted">ParlayGPT Generated</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button 
+              onClick={handleExportImage}
+              disabled={isExporting}
+              className="text-xs text-muted hover:text-accent flex items-center gap-1 p-1 rounded"
+              title="Export as image"
+            >
+              {isExporting ? <Loader2 className="animate-spin" size={12} /> : <Download size={12} />}
+            </button>
+            {canShare && (
+              <button 
+                onClick={handleShare}
+                className="text-xs text-muted hover:text-accent flex items-center gap-1 p-1 rounded"
+                title="Share bet slip"
+              >
+                <Share size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+        
+        {/* Title */}
+        <div className="text-lg font-bold mb-4 text-white bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+          {script.title || `Script ${index + 1}`}
+        </div>
+        
+        {/* Legs */}
+        <div className="space-y-3 mb-5">
+          {(script.legs || []).slice(0, 5).map((l: any, idx: number) => {
+            const legText = l.text || `${l.market}: ${l.selection} (${l.odds || '—'})`
+            const [market, rest] = legText.includes(':') ? legText.split(':', 2) : ['', legText]
+            
+            return (
+              <div key={idx} className="relative p-3 rounded-xl bg-gradient-to-r from-white/5 to-white/10 border border-white/20 backdrop-blur-sm hover:bg-gradient-to-r hover:from-white/8 hover:to-white/15 transition-all duration-200">
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 h-3 w-3 rounded-full bg-gradient-to-br from-accent to-accent/70 shrink-0 shadow-sm"></div>
+                  <div className="flex-1 min-w-0">
+                    {market && (
+                      <div className="text-sm font-semibold text-accent mb-1">{market.trim()}</div>
+                    )}
+                    <div className="text-sm leading-relaxed text-white/95">{(rest || legText).trim()}</div>
+                    {l.odds && (
+                      <div className="text-xs text-accent/80 mt-1 font-mono">{l.odds}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        
+        {/* Math */}
+        {script.math?.steps && (
+          <div className="border-t border-gradient-to-r from-white/10 to-transparent pt-4 mb-4">
+            <div className="text-sm text-accent mb-2 flex items-center gap-2">
+              <span>💰</span>
+              <span className="font-semibold">Parlay Calculation</span>
+            </div>
+            <div className="text-sm font-mono text-white bg-gradient-to-r from-accent/20 to-accent/10 rounded-lg p-3 border border-accent/30">
+              {script.math.steps}
+            </div>
+          </div>
+        )}
+        
+        {/* Footer */}
+        <div className="border-t border-white/10 pt-3">
+          <div className="text-xs text-muted/80 text-center">
+            High variance by design • Bet responsibly • AFBParlay.com
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function safeParseTextToScripts(text: string) {
   try {
-    const blocks = text.split(/\n\s*Script\s+\d+\s*[:\-]/i)
-    if (blocks.length <= 1) return null
+    // Try to match the same logic as the enhanced parser in renderSlips
+    const blocks = text.split(/(?=Script\s+\d+)/i).slice(1)
+    if (blocks.length === 0) return null
+    
     const scripts: any[] = []
-    for (let i = 1; i < blocks.length; i++) {
+    for (let i = 0; i < blocks.length; i++) {
       const b = blocks[i]
-      const titleMatch = b.match(/^\s*"?([^\n"]{3,80})"?/)
-      const title = titleMatch ? titleMatch[1].trim() : `Script ${i}`
-      const legs = (b.match(/\n\s*•\s+.*$/gm) || []).slice(0,5).map(l => ({ text: l.replace(/^\s*•\s+/, '').trim() }))
+      const titleMatch = b.match(/Script\s+\d+[:\-]?\s*(.+)/i)
+      const title = titleMatch ? titleMatch[1].trim() : `Script ${i + 1}`
+      
+      // Look for narrative
+      const narrativeMatch = b.match(/Narrative[:\-]?\s*(.*?)(?=\n•|Legs:|$)/is)
+      const narrative = narrativeMatch ? narrativeMatch[1].trim() : ''
+      
+      // Look for legs
+      const legMatches = b.match(/•\s*(.+?)(?=\n•|\n\$1|\nNotes:|$)/g) || []
+      const legs = legMatches.map(l => {
+        const cleaned = l.replace(/^•\s*/, '').trim()
+        // Try to parse structured format
+        const structuredMatch = cleaned.match(/(.+?):\s*(.+?),\s*odds\s*([+-]?\d+)/)
+        if (structuredMatch) {
+          return {
+            market: structuredMatch[1].trim(),
+            selection: structuredMatch[2].trim(),
+            odds: structuredMatch[3].trim(),
+            text: cleaned
+          }
+        }
+        return { text: cleaned }
+      })
+      
       const mathMatch = b.match(/\$1\s*Parlay\s*Math:\s*([^\n]+)/i)
       const math = mathMatch ? { steps: mathMatch[1].trim() } : undefined
-      scripts.push({ title, legs, math })
+      
+      scripts.push({ title, narrative, legs, math })
     }
     return { scripts }
-  } catch {
+  } catch (error) {
+    console.error('Error parsing text to scripts:', error)
     return null
   }
 }
