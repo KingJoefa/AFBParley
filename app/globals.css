@@ -14,6 +14,32 @@ body {
   @apply bg-[color:var(--tw-color-background,#0b0b10)] text-[color:var(--tw-color-foreground,#e6e6eb)];
 }
 
+/* Modern gradient backgrounds */
+.bg-gradient-modern {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Glass morphism effects */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Smooth transitions */
+.transition-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Custom shadows */
+.shadow-soft {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.shadow-glow {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+}
+
 .card {
   @apply bg-card rounded-2xl shadow-soft border border-border;
 }
@@ -39,6 +65,40 @@ body {
 .pill {
   @apply inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs hover:bg-white/5 cursor-pointer select-none;
 }
+
+.pill--disabled {
+  @apply opacity-50 cursor-not-allowed hover:bg-transparent;
+}
+
+/* Share Card (black/silver theme) */
+.share-card {
+  @apply rounded-2xl border border-border bg-[#0b0b10] overflow-hidden shadow-soft relative;
+}
+.share-card__header {
+  background: linear-gradient(180deg, #111217 0%, #0b0b10 100%);
+  @apply px-4 pt-4 pb-3 flex items-center justify-between;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.share-card__title {
+  @apply text-base font-semibold text-white;
+}
+.share-card__badge {
+  @apply text-xs font-semibold rounded-full px-3 py-1;
+  color: #0b0b10;
+  background: linear-gradient(180deg, #d7d7dc 0%, #bfc2c7 100%);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12);
+}
+.share-card__body {
+  @apply p-4;
+}
+.share-card__section-title {
+  @apply text-sm font-semibold text-foreground/90 mb-2;
+}
+.share-card__stats {
+  @apply grid grid-cols-2 gap-x-6 gap-y-2 text-sm;
+}
+.share-card__stat-label { @apply text-muted; }
+.share-card__stat-value { @apply text-foreground; }
 
 .btn-primary {
   @apply inline-flex items-center justify-center gap-2 rounded-lg bg-accent text-white px-4 py-2 text-sm font-medium hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed;

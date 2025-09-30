@@ -5,6 +5,9 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const OpenAI = require('openai');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const { validateAFBRequest } = require('./afbTypes');
 require('dotenv').config();
 
@@ -80,6 +83,24 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static('dist'));
 
+// Focus data storage (for weekly context uploads)
+const DATA_ROOT = path.join(__dirname, 'data', 'focus');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 256 * 1024 } }); // 256KB/file cap
+const FOCUS_KEYS = ['pace', 'redzone', 'explosive', 'pressure', 'ol_dl', 'weather', 'injuries'];
+
+function ensureDirSync(dir) {
+  try { fs.mkdirSync(dir, { recursive: true }); } catch {}
+}
+
+function listWeekAvailability(weekId = 'current') {
+  const dir = path.join(DATA_ROOT, weekId);
+  const availability = {};
+  for (const k of FOCUS_KEYS) {
+    availability[k] = fs.existsSync(path.join(dir, `${k}.txt`));
+  }
+  return { weekId, availability };
+}
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -92,28 +113,67 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Upload weekly focus context
+// Multipart form fields: weekId (optional, defaults to 'current'), category (one of FOCUS_KEYS), file (single)
+app.post('/api/focus/upload', upload.single('file'), (req, res) => {
+  try {
+    const weekId = (req.body.weekId || 'current').toString().trim();
+    const category = (req.body.category || '').toString().trim();
+    if (!FOCUS_KEYS.includes(category)) {
+      return res.status(400).json({ error: `Invalid category. Allowed: ${FOCUS_KEYS.join(', ')}` });
+    }
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ error: 'Missing file' });
+    }
+    const dir = path.join(DATA_ROOT, weekId);
+    ensureDirSync(dir);
+    const target = path.join(dir, `${category}.txt`);
+    fs.writeFileSync(target, req.file.buffer);
+    return res.json({ ok: true, saved: { weekId, category, bytes: req.file.size } });
+  } catch (e) {
+    console.error('focus upload error', e);
+    return res.status(500).json({ error: 'Failed to save focus file' });
+  }
+});
+
+// Query availability for a week (defaults to 'current')
+app.get('/api/focus/status', (req, res) => {
+  try {
+    const weekId = (req.query.weekId || 'current').toString();
+    const status = listWeekAvailability(weekId);
+    return res.json({
+      weekId: status.weekId,
+      availability: status.availability,
+      availableKeys: Object.keys(status.availability).filter(k => status.availability[k])
+    });
+  } catch (e) {
+    console.error('focus status error', e);
+    return res.status(500).json({ error: 'Failed to read focus status' });
+  }
+});
+
 // NFL Schedule endpoint
 app.get('/api/nfl/schedule', (req, res) => {
   try {
-    // Current week's NFL schedule (Week 4, September 28, 2025)
+    // 2025 Regular Season - Week 5 (Sun Oct 5, 2025)
+    // Source: https://www.nfl.com/schedules/2025/REG5/
     const currentWeekGames = [
-      { id: 'vikings-steelers', display: 'Minnesota Vikings @ Pittsburgh Steelers', time: 'Sun 6:30 AM PDT', week: 4, date: '2025-09-28' },
-      { id: 'saints-bills', display: 'New Orleans Saints @ Buffalo Bills', time: 'Sun 10:00 AM PDT', week: 4, date: '2025-09-28' },
-      { id: 'titans-texans', display: 'Tennessee Titans @ Houston Texans', time: 'Sun 10:00 AM PDT', week: 4, date: '2025-09-28' },
-      { id: 'browns-lions', display: 'Cleveland Browns @ Detroit Lions', time: 'Sun 10:00 AM PDT', week: 4, date: '2025-09-28' },
-      { id: 'commanders-falcons', display: 'Washington Commanders @ Atlanta Falcons', time: 'Sun 10:00 AM PDT', week: 4, date: '2025-09-28' },
-      { id: 'eagles-bucs', display: 'Philadelphia Eagles @ Tampa Bay Buccaneers', time: 'Sun 10:00 AM PDT', week: 4, date: '2025-09-28' },
-      { id: 'panthers-patriots', display: 'Carolina Panthers @ New England Patriots', time: 'Sun 10:00 AM PDT', week: 4, date: '2025-09-28' },
-      { id: 'chargers-giants', display: 'Los Angeles Chargers @ New York Giants', time: 'Sun 10:00 AM PDT', week: 4, date: '2025-09-28' },
-      { id: 'jaguars-49ers', display: 'Jacksonville Jaguars @ San Francisco 49ers', time: 'Sun 1:05 PM PDT', week: 4, date: '2025-09-28' },
-      { id: 'colts-rams', display: 'Indianapolis Colts @ Los Angeles Rams', time: 'Sun 1:05 PM PDT', week: 4, date: '2025-09-28' },
-      { id: 'bears-raiders', display: 'Chicago Bears @ Las Vegas Raiders', time: 'Sun 1:25 PM PDT', week: 4, date: '2025-09-28' },
-      { id: 'ravens-chiefs', display: 'Baltimore Ravens @ Kansas City Chiefs', time: 'Sun 1:25 PM PDT', week: 4, date: '2025-09-28' },
-      { id: 'packers-cowboys', display: 'Green Bay Packers @ Dallas Cowboys', time: 'Sun 5:20 PM PDT', week: 4, date: '2025-09-28' }
+      { id: 'vikings-browns', display: 'Minnesota Vikings @ Cleveland Browns', time: 'Sun 6:30 AM PDT', week: 5, date: '2025-10-05' },
+      { id: 'cowboys-jets', display: 'Dallas Cowboys @ New York Jets', time: 'Sun 10:00 AM PDT', week: 5, date: '2025-10-05' },
+      { id: 'broncos-eagles', display: 'Denver Broncos @ Philadelphia Eagles', time: 'Sun 10:00 AM PDT', week: 5, date: '2025-10-05' },
+      { id: 'texans-ravens', display: 'Houston Texans @ Baltimore Ravens', time: 'Sun 10:00 AM PDT', week: 5, date: '2025-10-05' },
+      { id: 'giants-saints', display: 'New York Giants @ New Orleans Saints', time: 'Sun 10:00 AM PDT', week: 5, date: '2025-10-05' },
+      { id: 'raiders-colts', display: 'Las Vegas Raiders @ Indianapolis Colts', time: 'Sun 10:00 AM PDT', week: 5, date: '2025-10-05' },
+      { id: 'dolphins-panthers', display: 'Miami Dolphins @ Carolina Panthers', time: 'Sun 10:00 AM PDT', week: 5, date: '2025-10-05' },
+      { id: 'buccaneers-seahawks', display: 'Tampa Bay Buccaneers @ Seattle Seahawks', time: 'Sun 1:05 PM PDT', week: 5, date: '2025-10-05' },
+      { id: 'titans-cardinals', display: 'Tennessee Titans @ Arizona Cardinals', time: 'Sun 1:05 PM PDT', week: 5, date: '2025-10-05' },
+      { id: 'commanders-chargers', display: 'Washington Commanders @ Los Angeles Chargers', time: 'Sun 1:25 PM PDT', week: 5, date: '2025-10-05' },
+      { id: 'lions-bengals', display: 'Detroit Lions @ Cincinnati Bengals', time: 'Sun 1:25 PM PDT', week: 5, date: '2025-10-05' },
+      { id: 'patriots-bills', display: 'New England Patriots @ Buffalo Bills', time: 'Sun 5:20 PM PDT', week: 5, date: '2025-10-05' }
     ];
 
     // Mark popular games
-    const popularGameIds = ['ravens-chiefs', 'packers-cowboys', 'eagles-bucs', 'jaguars-49ers', 'saints-bills'];
+    const popularGameIds = ['giants-saints','patriots-bills','lions-bengals','cowboys-jets'];
     const gamesWithPopularity = currentWeekGames.map(game => ({
       ...game,
       isPopular: popularGameIds.includes(game.id)
@@ -121,7 +181,7 @@ app.get('/api/nfl/schedule', (req, res) => {
 
     res.json({
       games: gamesWithPopularity,
-      week: 4,
+      week: 5,
       season: 2025,
       lastUpdated: new Date().toISOString(),
       totalGames: currentWeekGames.length
