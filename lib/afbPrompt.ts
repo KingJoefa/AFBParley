@@ -1,30 +1,3 @@
-export const AFB_AGENT_INSTRUCTIONS = `You are "AFB Script Parlay Builder." Your job: generate up to THREE distinct, coherent narratives ("scripts") for a single upcoming AFB matchup and, for each script, output 3–5 CORRELATED Same Game Parlay legs.
-
-OUTPUT — PLAIN TEXT ONLY. Use this exact structure:
-- Assumptions: matchup, line focus, angles, voice.
-- Script 1 (Title)
-  • Narrative: one tight paragraph in the chosen voice.
-  • Legs (3–5): bullet list with market, selection, odds as "illustrative" unless user supplied.
-  • $1 Parlay Math: list leg decimals, product, payout, and profit. Round to 2 decimals exactly.
-  • Notes: include:
-    - No guarantees; high variance by design; bet what you can afford.
-    - If odds not supplied, american odds are illustrative — paste your book's prices to re-price.
-- Script 2 (if applicable)…
-- Script 3 — Super Long (if applicable)
-- Finish with: "Want the other side of this story?"`
-
-export function buildUserPrompt(params: {
-  matchup: string
-  line_focus?: string
-  angles?: string[]
-  voice?: string
-  memory?: Record<string, any>
-}) {
-  const { matchup, line_focus, angles, voice, memory } = params
-  const mem = memory ? `\n\nMemory Context (JSON):\n${JSON.stringify(memory).slice(0, 4000)}` : ''
-  return `Build correlated parlay scripts.\n\nMatchup: ${matchup}\nLine or total of interest: ${line_focus ?? 'unspecified'}\nAngles to emphasize: ${Array.isArray(angles) && angles.length? angles.join(', ') : 'none specified'}\nVoice: ${voice ?? 'analyst'}${mem}`
-}
-
 export const AFB_AGENT_INSTRUCTIONS = `
 You are “AFB Script Parlay Builder.” Your job: generate up to THREE distinct, coherent narratives (“scripts”) for a single upcoming AFB matchup and, for each script, output 3–5 CORRELATED Same Game Parlay legs.
 
@@ -70,8 +43,9 @@ export function buildUserPrompt(input: {
   angles?: string[];
   voice?: "analyst" | "hype" | "coach";
   user_supplied_odds?: Array<{ leg: string; american_odds: number }>;
+  memory?: Record<string, any>;
 }) {
-  const { matchup, line_focus, angles, voice, user_supplied_odds } = input;
+  const { matchup, line_focus, angles, voice, user_supplied_odds, memory } = input;
   const parts: string[] = [];
   parts.push(`Matchup: ${matchup}`);
   if (line_focus) parts.push(`Line focus: ${line_focus}`);
@@ -82,6 +56,9 @@ export function buildUserPrompt(input: {
       .map(o => `${o.leg} -> ${o.american_odds} (user-supplied)`)
       .join(" | ");
     parts.push(`User-supplied odds: ${oddsList}`);
+  }
+  if (memory) {
+    parts.push(`Memory Context (JSON):\n${JSON.stringify(memory).slice(0, 4000)}`)
   }
   parts.push(`Output exactly as spec’d: plain text, sections, bullets, math rounded to 2 decimals.`);
   return parts.join("\n");

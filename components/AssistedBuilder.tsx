@@ -44,7 +44,6 @@ export default function AssistedBuilder() {
   const [variance, setVariance] = useState<Variance>('standard')
   const [focusAreas, setFocusAreas] = useState<string[]>([])
   const [advancedAngles, setAdvancedAngles] = useState('')
-  const [byoaFiles, setByoaFiles] = useState<{ filename: string; content: string; size: number }[]>([])
   const [summary, setSummary] = useState<string>('')
   const [json, setJson] = useState<any>(null)
   const [copied, setCopied] = useState(false)
@@ -54,24 +53,13 @@ export default function AssistedBuilder() {
   const comboRef = useRef<HTMLInputElement>(null)
   const comboWrapRef = useRef<HTMLDivElement>(null)
   const [focusAvailability, setFocusAvailability] = useState<Record<string, boolean>>({})
-  const dirInputRef = useRef<HTMLInputElement>(null)
   const [games, setGames] = useState<{ id: string; display: string; isPopular?: boolean }[]>([])
 
   useEffect(() => {
     track('ui_view_loaded')
   }, [])
 
-  // Enable folder selection for BYOA on supported browsers
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const el = dirInputRef.current
-    if (el) {
-      try {
-        el.setAttribute('webkitdirectory', '')
-        el.setAttribute('directory', '')
-      } catch {}
-    }
-  }, [])
+  // BYOA removed
 
   // Fetch weekly focus availability from backend
   useEffect(() => {
@@ -145,7 +133,7 @@ export default function AssistedBuilder() {
       
       // Convert to blob for better sharing
       return new Promise<string>((resolve) => {
-        canvas.toBlob((blob) => {
+        canvas.toBlob((blob: Blob | null) => {
           if (blob) {
             const url = URL.createObjectURL(blob)
             resolve(url)
@@ -231,8 +219,6 @@ export default function AssistedBuilder() {
         lineFocus: lineFocus || undefined,
         angles: [...focusAreas, ...chips],
         voice,
-        wantJson: true,
-        byoa: byoaFiles.map(f => ({ filename: f.filename, content: f.content })),
       }
       const data = await build(req)
 
@@ -579,60 +565,7 @@ export default function AssistedBuilder() {
             </div>
           </div>
 
-          {/* BYOA - Collapsible Section */}
-          <details className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white/5 to-white/5 backdrop-blur-xl border border-white/10">
-            <summary className="p-4 cursor-pointer text-slate-300 hover:text-white transition-colors">
-              <div className="flex items-center gap-3">
-                <Cloud className="text-slate-400" size={18} />
-                <span className="font-medium">Bring Your Own Analytics (Advanced)</span>
-                <span className="ml-auto text-xs text-slate-400">
-                  {byoaFiles.length > 0 ? `${byoaFiles.length} files` : 'Optional'}
-                </span>
-              </div>
-            </summary>
-            <div className="px-4 pb-4 space-y-3">
-              <input
-                id="byoa"
-                type="file"
-                accept=".csv,.tsv,.txt,.md,.json"
-                multiple
-                className="block w-full text-xs text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-white/10 file:text-white hover:file:bg-white/15"
-                onChange={async (e) => {
-                  const inputEl = e.currentTarget
-                  const files = Array.from(inputEl?.files || [])
-                  const next: { filename: string; content: string; size: number }[] = []
-                  for (const f of files) {
-                    const text = await f.text()
-                    const capped = text.length > 64 * 1024 ? text.slice(0, 64 * 1024) : text
-                    next.push({ filename: f.name, content: capped, size: f.size })
-                  }
-                  setByoaFiles(prev => [...prev, ...next].slice(0, 5))
-                  if (inputEl) inputEl.value = ''
-                }}
-              />
-              {byoaFiles.length > 0 && (
-                <div className="space-y-2">
-                  {byoaFiles.map((f, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-xs rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                      <span className="truncate max-w-[70%] text-slate-200">{f.filename}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-400">{Math.round(f.size/1024)} KB</span>
-                        <button 
-                          className="text-red-400 hover:text-red-300" 
-                          onClick={() => setByoaFiles(files => files.filter((_, i) => i !== idx))}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <p className="text-xs text-slate-400">
-                Upload your own data files for enhanced analysis. Supports CSV, TXT, MD, JSON formats.
-              </p>
-            </div>
-          </details>
+          {/* BYOA removed */}
         </section>
 
         {/* Results Section */}

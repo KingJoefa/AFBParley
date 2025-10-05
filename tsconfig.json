@@ -27,6 +27,12 @@
       ],
       "@/app/*": [
         "app/*"
+      ],
+      "@/packages/*": [
+        "packages/*"
+      ],
+      "@/types/*": [
+        "types/*"
       ]
     },
     "plugins": [

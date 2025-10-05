@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server'
-import { z } from 'zod'
 import { getMemory, setMemory } from '@/packages/sdk/memory'
 import { MemorySchema } from '@/types/afb'
 
