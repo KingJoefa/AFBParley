@@ -5,7 +5,15 @@ export const AfbRequestSchema = z.object({
   line_focus: z.string().optional(),
   angles: z.array(z.string()).optional(),
   voice: z.enum(['analyst', 'hype', 'coach']).default('analyst').optional(),
-  profile: z.string().default('default').optional()
+  profile: z.string().default('default').optional(),
+  user_supplied_odds: z
+    .array(
+      z.object({
+        leg: z.string().min(1),
+        american_odds: z.number()
+      })
+    )
+    .optional()
 })
 
 export type AfbRequest = z.infer<typeof AfbRequestSchema>

@@ -1,6 +1,6 @@
-# ParlayGPT • AFB Builder
+# ParlayGPT • AFB Builder (Next-only)
 
-A Next.js 14 web UI for generating Assisted Football Betting (AFB) scripts, backed by a Node/Express server calling the OpenAI API. Includes bet slip sharing, BYOA context upload (files or folder of .md), and a weekly NFL schedule feed.
+Generate correlated same‑game parlay “scripts” with a Next.js 14 app and Route Handlers (no separate Express server). UI includes a modern builder flow and shareable bet slips. The server keeps a small, bounded profile memory you can read/write.
 
 ## Requirements
 - Node.js 18+
@@ -11,38 +11,33 @@ A Next.js 14 web UI for generating Assisted Football Betting (AFB) scripts, back
 ```bash
 npm install
 ```
-2) Start backend (8080):
+2) Start dev server (3000):
 ```bash
-cd my-parlaygpt
 export OPENAI_API_KEY=sk-...
-export PORT=8080
-npm start
-```
-3) Start frontend (3000):
-```bash
-cd ..
 npm run dev
 ```
-- Next proxies `/api/*` → `http://localhost:8080` (see `next.config.mjs`).
+- All APIs are served by Next Route Handlers.
 
 ## Features
 - Assisted Builder: voice/variance/focus areas, optional line focus
-- BYOA: upload files or pick a folder (loads `.md` recursively)
-  - Caps: 100 files, 100 MB total; per-file soft cap 256 KB
 - Bet slips: single-card view with script switcher, download/share image
 - NFL schedule: dropdown fed by backend (2025 Wk 5 seed, Giants @ Saints 2025‑10‑05)
 
-## Backend endpoints (selected)
-- `POST /api/afb` → generate AFB scripts (JSON preferred; text fallback)
-- `POST /api/chat` → general chat
+## API
+- `POST /api/afb` → generate AFB scripts (plain text; deterministic sample if no OPENAI_API_KEY)
 - `GET  /api/nfl/schedule` → week data
-- `POST /api/focus/upload` (multipart): `weekId`, `category` (pace|redzone|explosive|pressure|ol_dl|weather|injuries), `file`
-- `GET  /api/focus/status?weekId=current` → availability booleans
+- `GET/POST /api/memory` → profile memory (guarded by API key and allowlist)
 
 ## Config
 - Tailwind theme: `tailwind.config.ts`, styles: `app/globals.css`
 - Minimal telemetry: `lib/telemetry.ts`
 - Cursor MCP: `.cursor/mcp.json` includes LocalFiles for `/Users/zfarleymacstudio/agents`
+
+### Memory & Security
+- Dev-only in-memory store with LRU bounds: `MEMORY_MAX_PROFILES` (default 100) and `MEMORY_MAX_BYTES` (~1MB). Resets on restart.
+- Set `MEMORY_API_KEY` and include `x-api-key` header for access control.
+- Restrict profile IDs with `ALLOWED_PROFILES` (comma-separated).
+- Only whitelisted fields are forwarded into prompts (currently `house_rules`, `angles_preferred`).
 
 ## Troubleshooting
 - Port in use (8080): `lsof -ti tcp:8080 | xargs kill -9`

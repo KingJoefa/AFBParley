@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import OpenAI from 'openai'
 import { AfbRequestSchema } from '@/types/afb'
-import { getMemory } from '@/packages/sdk/memory'
+import { getMemory, sanitizeMemoryForPrompt } from '@/packages/sdk/memory'
 import { AFB_AGENT_INSTRUCTIONS, buildUserPrompt } from '@/lib/afbPrompt'
 
 // Client will be created lazily inside the handler to avoid import-time env errors
@@ -17,7 +17,8 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ code: 'BAD_REQUEST', message: 'Invalid AFB request', details: parsed.error.flatten() }), { status: 400, headers: { 'Content-Type': 'application/json' } })
     }
     const { matchup, line_focus, angles, voice, profile } = parsed.data
-    const memory = await getMemory(profile || 'default')
+    const rawMemory = await getMemory(profile || 'default')
+    const memory = sanitizeMemoryForPrompt(rawMemory)
     const userPrompt = buildUserPrompt({ matchup, line_focus, angles, voice, memory })
 
     // Call model; require server-side key

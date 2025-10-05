@@ -788,19 +788,21 @@ function renderSlipSingle(
 
 function safeParseTextToScripts(text: string) {
   try {
-    const blocks = text.split(/\n\s*Script\s+\d+\s*[:\-]/i)
-    if (blocks.length <= 1) return null
+    const pattern = /(?:^|\n)(Script\s+\d+[^\n]*)([\s\S]*?)(?=(?:\nScript\s+\d+)|$)/gi
     const scripts: any[] = []
-    for (let i = 1; i < blocks.length; i++) {
-      const b = blocks[i]
-      const titleMatch = b.match(/^\s*"?([^\n"]{3,80})"?/)
-      const title = titleMatch ? titleMatch[1].trim() : `Script ${i}`
-      const legs = (b.match(/\n\s*•\s+.*$/gm) || []).slice(0,5).map(l => ({ text: l.replace(/^\s*•\s+/, '').trim() }))
-      const mathMatch = b.match(/\$1\s*Parlay\s*Math:\s*([^\n]+)/i)
+    let match: RegExpExecArray | null
+    while ((match = pattern.exec(text)) !== null) {
+      const heading = match[1]?.trim() ?? ''
+      const body = match[2] ?? ''
+      const titleMatch = heading.match(/^Script\s+\d+\s*[-:\u2013\u2014]?\s*(.*)$/i) || heading.match(/^Script\s+\d+\s*\((.*)\)$/i)
+      const rawTitle = titleMatch && titleMatch[1] ? titleMatch[1].trim() : heading
+      const title = rawTitle || heading || 'Script'
+      const legs = (body.match(/\n\s*•\s+.*$/gm) || []).slice(0, 5).map(l => ({ text: l.replace(/^\s*•\s+/, '').trim() }))
+      const mathMatch = body.match(/\$1\s*Parlay\s*Math:\s*([^\n]+)/i)
       const math = mathMatch ? { steps: mathMatch[1].trim() } : undefined
       scripts.push({ title, legs, math })
     }
-    return { scripts }
+    return scripts.length ? { scripts } : null
   } catch {
     return null
   }

@@ -80,10 +80,5 @@ out/
 # FuseBox cache
 .fusebox/
 
-# Node
-.next
-node_modules
-*.log
-
 # TypeScript
 *.tsbuildinfo
