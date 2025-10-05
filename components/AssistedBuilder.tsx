@@ -310,7 +310,7 @@ export default function AssistedBuilder() {
       <main className="mx-auto max-w-4xl px-4 pb-8 space-y-6">
         {/* Game Selection - Hero Section */}
         <section className="space-y-6">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 p-6">
+          <div className="relative z-50 overflow-visible rounded-3xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 p-6">
             <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10"></div>
             <div className="relative">
               <div className="flex items-center gap-3 mb-4">
@@ -320,8 +320,8 @@ export default function AssistedBuilder() {
                 <h2 className="text-xl font-semibold text-white">Choose Your Game</h2>
               </div>
               
-              <div ref={comboWrapRef} className="relative" role="combobox" aria-expanded={comboOpen} aria-controls="game-list">
-                <div className="relative">
+              <div ref={comboWrapRef} className="relative z-50" role="combobox" aria-expanded={comboOpen} aria-controls="game-list">
+                <div className="relative z-50">
                   <input
                     ref={comboRef}
                     id="game"
@@ -354,9 +354,9 @@ export default function AssistedBuilder() {
                 </div>
                 
                 {comboOpen && (
-                  <div className="absolute z-20 mt-3 w-full max-h-64 overflow-auto rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl">
+                  <div className="absolute z-50 mt-3 w-full max-h-80 overflow-auto overscroll-contain rounded-2xl bg-slate-900 text-slate-100 border border-slate-700 shadow-2xl">
                     {filteredGames.length === 0 && (
-                      <div className="px-6 py-4 text-slate-300">No matches found</div>
+                      <div className="px-6 py-4 text-slate-400">No matches found</div>
                     )}
                     {filteredGames.map((g, idx) => (
                       <button
@@ -364,7 +364,7 @@ export default function AssistedBuilder() {
                         id={`game-opt-${idx}`}
                         role="option"
                         aria-selected={idx===highlight}
-                        className={`w-full text-left px-6 py-3 text-white hover:bg-white/10 transition-colors first:rounded-t-2xl last:rounded-b-2xl ${idx===highlight?'bg-white/15':''}`}
+                        className={`w-full text-left px-6 py-3 hover:bg-slate-800/70 transition-colors first:rounded-t-2xl last:rounded-b-2xl ${idx===highlight?'bg-slate-800':''}`}
                         onMouseEnter={() => setHighlight(idx)}
                         onClick={() => { setSelectedGame(g); setGameQuery(g); setComboOpen(false) }}
                       >
@@ -391,73 +391,7 @@ export default function AssistedBuilder() {
             </div>
           </div>
 
-          {/* Focus Areas - Visual Grid */}
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 p-6">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10"></div>
-            <div className="relative">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500">
-                  <Activity className="text-white" size={20} />
-                </div>
-                <h2 className="text-xl font-semibold text-white">Focus Areas</h2>
-                <div className="ml-auto text-sm text-slate-300">
-                  {focusAreas.length} selected
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3">
-                {FOCUS_ITEMS.map(item => {
-                  const selected = focusAreas.includes(item.key)
-                  const available = !!focusAvailability[item.key]
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => { if (available) onToggleFocus(item.key, !selected) }}
-                      className={`relative overflow-hidden rounded-2xl p-4 transition-all duration-200 ${
-                        selected 
-                          ? 'bg-gradient-to-br from-purple-500/30 to-blue-500/30 border-2 border-purple-400/50' 
-                          : available 
-                            ? 'bg-white/10 border border-white/20 hover:bg-white/15' 
-                            : 'bg-white/5 border border-white/10 opacity-50'
-                      }`}
-                      aria-pressed={selected}
-                      aria-disabled={!available}
-                      title={available ? item.hint : 'No active data uploaded for this week'}
-                      disabled={!available}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-xl ${
-                          selected 
-                            ? 'bg-white/20' 
-                            : 'bg-white/10'
-                        }`}>
-                          {item.icon}
-                        </div>
-                        <div className="flex-1 text-left">
-                          <p className={`font-medium ${
-                            selected ? 'text-white' : 'text-slate-200'
-                          }`}>
-                            {item.label}
-                          </p>
-                          <p className={`text-xs ${
-                            selected ? 'text-white/80' : 'text-slate-400'
-                          }`}>
-                            {item.hint}
-                          </p>
-                        </div>
-                        {selected && (
-                          <div className="p-1 rounded-lg bg-green-500/20">
-                            <Check className="text-green-400" size={16} />
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
+          
 
           {/* Quick Settings */}
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 p-6">
@@ -532,6 +466,75 @@ export default function AssistedBuilder() {
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Focus Areas - moved below Quick Settings and always selectable */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 p-6">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10"></div>
+            <div className="relative">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500">
+                  <Activity className="text-white" size={20} />
+                </div>
+                <h2 className="text-xl font-semibold text-white">Focus Areas</h2>
+                <div className="ml-auto text-sm text-slate-300">
+                  {focusAreas.length} selected
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                {FOCUS_ITEMS.map(item => {
+                  const selected = focusAreas.includes(item.key)
+                  const available = !!focusAvailability[item.key]
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => onToggleFocus(item.key, !selected)}
+                      className={`relative overflow-hidden rounded-2xl p-4 transition-all duration-200 ${
+                        selected 
+                          ? 'bg-gradient-to-br from-purple-500/30 to-blue-500/30 border-2 border-purple-400/50' 
+                          : 'bg-white/10 border border-white/20 hover:bg-white/15'
+                      }`}
+                      aria-pressed={selected}
+                      title={item.hint}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-xl ${
+                          selected 
+                            ? 'bg-white/20' 
+                            : 'bg-white/10'
+                        }`}>
+                          {item.icon}
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className={`font-medium ${
+                            selected ? 'text-white' : 'text-slate-200'
+                          }`}>
+                            {item.label}
+                          </p>
+                          <p className={`text-xs ${
+                            selected ? 'text-white/80' : 'text-slate-400'
+                          }`}>
+                            {item.hint}
+                          </p>
+                        </div>
+                        {selected && (
+                          <div className="p-1 rounded-lg bg-green-500/20">
+                            <Check className="text-green-400" size={16} />
+                          </div>
+                        )}
+                        {!selected && available && (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] border border-emerald-400/30 bg-emerald-400/15 text-emerald-300">
+                            Recommended
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </div>
