@@ -6,6 +6,13 @@ function rid() {
   return Math.random().toString(36).slice(2, 10)
 }
 
+function isMemoryApiEnabled() {
+  const flag = process.env.ENABLE_MEMORY_API
+  if (typeof flag === 'string') return flag === 'true'
+  // Default: enabled in dev, disabled in production unless explicitly turned on
+  return process.env.NODE_ENV !== 'production'
+}
+
 function isProfileAllowed(profile: string) {
   const idOk = /^[a-zA-Z0-9_-]{1,32}$/.test(profile)
   if (!idOk) return false
@@ -25,6 +32,9 @@ function requireApiKey(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const id = rid()
   try {
+    if (!isMemoryApiEnabled()) {
+      return Response.json({ code: 'DISABLED', message: 'Memory API disabled' }, { status: 404 })
+    }
     const { searchParams } = new URL(req.url)
     const profile = searchParams.get('profile') || 'default'
     if (!isProfileAllowed(profile)) {
@@ -44,6 +54,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const id = rid()
   try {
+    if (!isMemoryApiEnabled()) {
+      return Response.json({ code: 'DISABLED', message: 'Memory API disabled' }, { status: 404 })
+    }
     if (!requireApiKey(req)) {
       return Response.json({ code: 'UNAUTHORIZED', message: 'Missing or invalid API key' }, { status: 401 })
     }
