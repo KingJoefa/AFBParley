@@ -727,60 +727,79 @@ function renderSlipSingle(
   const s = scripts[i]
   const slipTitle = s.title || `Slip ${i+1}`
   const legCount = (s.legs || []).length
+
+  function parseProductAndAmerican(steps?: string): { product?: number; american?: number } {
+    if (!steps) return {}
+    const m = steps.match(/=\s*([0-9]+(?:\.[0-9]{1,2})?)/)
+    if (!m) return {}
+    const product = Number(m[1])
+    if (!isFinite(product)) return { product }
+    const american = Math.round((product - 1) * 100)
+    return { product, american }
+  }
+
+  function parseLegFields(leg: any): { market: string; selection: string; odds?: string } {
+    if (leg && leg.market) return { market: String(leg.market), selection: String(leg.selection ?? ''), odds: leg.odds ? String(leg.odds) : undefined }
+    const t = String(leg?.text ?? '')
+    const m = t.match(/^\s*([^:]+):\s*(.+?)(?:\s*\((?:odds\s*)?([^\)]+)\))?\s*$/i)
+    if (m) {
+      return { market: m[1].trim(), selection: m[2].trim(), odds: m[3]?.trim() }
+    }
+    return { market: t, selection: '', odds: undefined }
+  }
+
+  const { product, american } = parseProductAndAmerican(s.math?.steps)
   return (
       <div className="share-card">
-        {/* Action buttons */}
-        <div className="absolute top-2 right-2 flex gap-1 opacity-60 hover:opacity-100 transition-opacity">
-          <button
-            onClick={(e) => onDownload(e.currentTarget.closest('.share-card') as HTMLElement, slipTitle)}
-            disabled={imageGenerating === slipTitle}
-            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Download as image"
-            aria-label={`Download ${slipTitle} as image`}
-          >
-            {imageGenerating === slipTitle ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-          </button>
-          <button
-            onClick={() => setScriptIndex((i + 1) % scripts.length)}
-            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
-            title="Switch script"
-            aria-label="Switch script"
-          >
-            <Shuffle size={14} />
-          </button>
-          <button
-            onClick={(e) => onShare(e.currentTarget.closest('.share-card') as HTMLElement, slipTitle)}
-            disabled={imageGenerating === slipTitle}
-            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Share image"
-            aria-label={`Share ${slipTitle} image`}
-          >
-            {imageGenerating === slipTitle ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
-          </button>
-        </div>
         {/* Header */}
         <div className="share-card__header">
-          <div className="share-card__title">{slipTitle}</div>
-          <div className="share-card__badge">{legCount} legs</div>
+          <div className="flex justify-between items-center bg-gradient-to-r from-emerald-700/20 to-transparent rounded-xl px-3 py-2 w-full">
+            <div className="share-card__title">{slipTitle}</div>
+            <div className="share-card__badge">{product ? `+${Math.max(0, american ?? 0)} (${product.toFixed(2)}×)` : `${legCount} legs`}</div>
+          </div>
         </div>
+        <div className="share-card__divider" />
 
         {/* Body */}
         <div className="share-card__body">
-          <div className="space-y-2 mb-4">
-            {(s.legs || []).slice(0,5).map((l: any, idx: number) => (
-              <div key={idx} className="flex items-start gap-2">
-                <span className="mt-0.5 inline-block h-2 w-2 rounded-full bg-accent"></span>
-                <div className="text-xs leading-5 opacity-90">{l.text || `${l.market}: ${l.selection} (${l.odds ?? '—'})`}</div>
-              </div>
-            ))}
-          </div>
+          {/* Outcome Summary (optional) */}
+          {/* We don't have explicit summary fields; keep space for future */}
+
+          <ul className="divide-y divide-white/5 mb-3 fade-in">
+            {(s.legs || []).slice(0,5).map((l: any, idx: number) => {
+              const { market, selection, odds } = parseLegFields(l)
+              return (
+                <li key={idx} className="py-2 grid grid-cols-12 items-center text-sm">
+                  <span className="col-span-5 text-gray-100 font-medium truncate">{market}</span>
+                  <span className="col-span-5 text-gray-400 truncate">{selection}</span>
+                  <span className="col-span-2 justify-self-end bg-neutral-800 text-gray-200 text-xs px-2 rounded-full">{odds ?? '—'}</span>
+                </li>
+              )
+            })}
+          </ul>
 
           {s.math?.steps && (
-            <div>
-              <div className="share-card__section-title">$1 Parlay Math</div>
-              <div className="text-xs text-foreground/80">{s.math.steps.replace('product, payout, and profit', 'product; payout; profit')}</div>
-            </div>
+            <div className="math-strip">{s.math.steps.replaceAll(';', '  •  ')}</div>
           )}
+
+          {/* Notes - show if we can infer from text blocks; here we keep standard notes in design */}
+          <p className="text-xs text-gray-400 italic mt-2">No guarantees; high variance by design; bet what you can afford.</p>
+
+          {/* Actions */}
+          <div className="flex justify-end gap-2 pt-2 border-t border-white/5">
+            <button
+              onClick={(e) => onDownload(e.currentTarget.closest('.share-card') as HTMLElement, slipTitle)}
+              className="btn-subtle"
+            >
+              <Download size={14} /> Download
+            </button>
+            <button
+              onClick={(e) => onShare(e.currentTarget.closest('.share-card') as HTMLElement, slipTitle)}
+              className="btn-subtle"
+            >
+              <Share2 size={14} /> Share
+            </button>
+          </div>
         </div>
       </div>
   )
@@ -794,9 +813,13 @@ function safeParseTextToScripts(text: string) {
     while ((match = pattern.exec(text)) !== null) {
       const heading = match[1]?.trim() ?? ''
       const body = match[2] ?? ''
-      const titleMatch = heading.match(/^Script\s+\d+\s*[-:\u2013\u2014]?\s*(.*)$/i) || heading.match(/^Script\s+\d+\s*\((.*)\)$/i)
-      const rawTitle = titleMatch && titleMatch[1] ? titleMatch[1].trim() : heading
-      const title = rawTitle || heading || 'Script'
+      // Prefer explicit parentheses capture first, then general suffix
+      const paren = heading.match(/^Script\s+\d+\s*\(([^)]+)\)/i)
+      const general = heading.match(/^Script\s+\d+\s*[-:\u2013\u2014]?\s*(.*)$/i)
+      let rawTitle = paren?.[1]?.trim() ?? general?.[1]?.trim() ?? heading
+      // Strip surrounding quotes/parentheses/extra spaces if any remain
+      rawTitle = rawTitle.replace(/^\s*["'()]+/, '').replace(/["'()]+\s*$/, '').trim()
+      const title = rawTitle || 'Script'
       const legs = (body.match(/\n\s*•\s+.*$/gm) || []).slice(0, 5).map(l => ({ text: l.replace(/^\s*•\s+/, '').trim() }))
       const mathMatch = body.match(/\$1\s*Parlay\s*Math:\s*([^\n]+)/i)
       const math = mathMatch ? { steps: mathMatch[1].trim() } : undefined
