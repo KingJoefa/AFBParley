@@ -409,10 +409,16 @@ export default function AssistedBuilder() {
                   <input 
                     id="line" 
                     className="w-full rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-3 text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-200" 
-                    placeholder="e.g., Over 54.5, -3.5 spread" 
+                    placeholder="e.g., Lean under on total, run-heavy pace — or expect high pressure rate and short fields" 
+                    aria-describedby="line-help"
+                    title="Tell the Builder what to emphasize in this matchup — pace, red-zone trends, O-line vs D-line mismatches, or travel/rest angles. Leave blank for a balanced script."
                     value={lineFocus} 
                     onChange={(e) => setLineFocus(e.target.value)} 
                   />
+                  <p id="line-help" className="mt-2 text-xs text-slate-400">
+                    Tell the Builder what to emphasize in this matchup — things like pace, red-zone trends,
+                    O-line vs D-line mismatches, or travel/rest angles. Leave blank for a balanced script.
+                  </p>
                 </div>
               </div>
             </div>
