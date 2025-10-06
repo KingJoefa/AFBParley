@@ -403,9 +403,9 @@ export default function AssistedBuilder() {
               </div>
               
               <div className="space-y-4">
-                {/* Line Focus */}
+                {/* Line Focus (renamed) */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-200 mb-2">Line Focus (Optional)</label>
+                  <label className="block text-sm font-medium text-slate-200 mb-2">Focus or Game Plan (Optional)</label>
                   <input 
                     id="line" 
                     className="w-full rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-3 text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-200" 
