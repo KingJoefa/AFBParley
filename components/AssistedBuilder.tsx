@@ -78,20 +78,12 @@ export const FOCUS_AREAS: FocusArea[] = [
     retrievalTags: ['ol', 'dl', 'trenches'],
   },
   {
-    id: 'weather',
-    label: 'Weather conditions',
-    hint: 'Wind, rain, temperature',
+    id: 'weather_rest',
+    label: 'Weather / Rest',
+    hint: 'Wind, travel, rest',
     promptSnippet:
-      'Integrate weather (esp. wind) on pass depth, kicking, and totals; prefer correlated legs accordingly.',
-    retrievalTags: ['weather', 'wind', 'rain', 'temperature'],
-  },
-  {
-    id: 'rest',
-    label: 'Injuries/Rest',
-    hint: 'Inactives, rest, travel',
-    promptSnippet:
-      'Factor inactives, travel, rest/short week effects; expect fatigue-driven pace/efficiency changes.',
-    retrievalTags: ['injuries', 'rest', 'travel'],
+      'Integrate weather (esp. wind) and situational factors (travel, rest/short week) on pass depth, kicking, pace, and efficiency; prefer correlated legs accordingly.',
+    retrievalTags: ['weather', 'wind', 'rain', 'temperature', 'rest', 'travel', 'injuries'],
   },
 ]
 
@@ -590,21 +582,8 @@ export default function AssistedBuilder() {
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10"></div>
             <div className="relative">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-white">Focus Areas</h3>
+                <h3 className="text-sm font-semibold text-white">Advanced metrics</h3>
                 <span className="text-[11px] text-white/60">{focusAreas.length} selected</span>
-              </div>
-
-              {/* Combo chips */}
-              <div className="flex flex-wrap gap-2 mb-3">
-                {FOCUS_COMBOS.map((c) => (
-                  <button
-                    key={c.id}
-                    className="text-xs px-3 py-1 rounded-full bg-purple-600/20 hover:bg-purple-600/30 text-purple-100"
-                    onClick={() => applyCombo(c)}
-                  >
-                    {c.label}
-                  </button>
-                ))}
               </div>
 
               {/* Areas grid */}
