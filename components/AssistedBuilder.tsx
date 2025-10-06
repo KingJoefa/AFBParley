@@ -512,7 +512,7 @@ export default function AssistedBuilder() {
                 <div className="p-2 rounded-xl bg-gradient-to-r from-slate-500 to-gray-500">
                   <Gauge className="text-white" size={20} />
                 </div>
-                <h2 className="text-xl font-semibold text-white">Quick Settings</h2>
+                <h2 className="text-xl font-semibold text-white">Focus or Game Plan (Optional)</h2>
               </div>
               
               <div className="space-y-4">
