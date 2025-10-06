@@ -10,6 +10,12 @@ type Voice = 'analyst' | 'hype' | 'coach'
 
 type FocusItem = { key: string, label: string, icon: React.ReactNode, hint: string }
 
+const PLAN_EXAMPLES: string[] = [
+  'Lean under on total, run-heavy pace',
+  'Expect high pressure rate and short fields',
+  'Win in trenches: OL > DL; grind clock; red-zone TD% up',
+]
+
 const FOCUS_ITEMS: FocusItem[] = [
   { key: 'pace', label: 'Pace of play', icon: <Waves size={18} />, hint: 'Tempo, seconds/play, no-huddle rate' },
   { key: 'redzone', label: 'Red zone efficiency', icon: <Shield size={18} />, hint: 'TD% inside the 20' },
@@ -215,7 +221,11 @@ export default function AssistedBuilder() {
       const req = {
         matchup,
         lineFocus: lineFocus || undefined,
-        angles: [...focusAreas, ...chips],
+        angles: [
+          ...(lineFocus && lineFocus.trim() ? [lineFocus.trim()] : []),
+          ...focusAreas,
+          ...chips,
+        ],
         voice: fixedVoice,
       }
       const data = await build(req)
@@ -415,10 +425,31 @@ export default function AssistedBuilder() {
                     value={lineFocus} 
                     onChange={(e) => setLineFocus(e.target.value)} 
                   />
-                  <p id="line-help" className="mt-2 text-xs text-slate-400">
+                  <p id="line-help" className="mt-2 text-xs text-purple-300/70">
                     Tell the Builder what to emphasize in this matchup — things like pace, red-zone trends,
                     O-line vs D-line mismatches, or travel/rest angles. Leave blank for a balanced script.
                   </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {PLAN_EXAMPLES.map(example => (
+                      <button
+                        key={example}
+                        type="button"
+                        className="bg-purple-600/20 hover:bg-purple-600/30 text-purple-100 text-xs rounded-full px-3 py-1 transition-colors"
+                        onClick={() => {
+                          setLineFocus(prev => {
+                            const v = (prev || '').trim()
+                            if (!v) return example
+                            // Append with comma separation if not already included
+                            if (v.toLowerCase().includes(example.toLowerCase())) return v
+                            return `${v}, ${example}`
+                          })
+                        }}
+                        aria-label={`Insert example: ${example}`}
+                      >
+                        {example}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
