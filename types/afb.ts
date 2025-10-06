@@ -6,6 +6,7 @@ export const AfbRequestSchema = z.object({
   angles: z.array(z.string()).optional(),
   voice: z.enum(['analyst', 'hype', 'coach']).default('analyst').optional(),
   profile: z.string().default('default').optional(),
+  retrieval_tags: z.array(z.string()).optional(),
   user_supplied_odds: z
     .array(
       z.object({

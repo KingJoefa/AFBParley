@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return new Response(JSON.stringify({ code: 'BAD_REQUEST', message: 'Invalid AFB request', details: parsed.error.flatten() }), { status: 400, headers: { 'Content-Type': 'application/json' } })
     }
-    const { matchup, line_focus, angles, voice, profile } = parsed.data
+    const { matchup, line_focus, angles, voice, profile, retrieval_tags } = parsed.data
     const rawMemory = await getMemory(profile || 'default')
     const memory = sanitizeMemoryForPrompt(rawMemory)
     const userPrompt = buildUserPrompt({ matchup, line_focus, angles, voice, memory })

@@ -7,6 +7,7 @@ export interface AfbRequest {
   lineFocus?: string
   angles?: string[]
   voice?: Voice
+  retrievalTags?: string[]
   userSuppliedOdds?: Array<{ leg: string; americanOdds: number }>
   profile?: string
   signal?: AbortSignal
@@ -24,6 +25,7 @@ export function useAfb() {
         matchup: req.matchup,
         line_focus: req.lineFocus,
         angles: req.angles,
+        retrieval_tags: req.retrievalTags,
         voice: req.voice,
         profile: req.profile,
         user_supplied_odds: req.userSuppliedOdds?.map(o => ({

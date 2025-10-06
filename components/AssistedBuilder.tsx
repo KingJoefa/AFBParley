@@ -8,7 +8,14 @@ const html2canvas = typeof window !== 'undefined' ? require('html2canvas') : nul
 
 type Voice = 'analyst' | 'hype' | 'coach'
 
-type FocusItem = { key: string, label: string, icon: React.ReactNode, hint: string }
+export type FocusArea = {
+  id: string
+  label: string
+  hint: string
+  promptSnippet: string
+  retrievalTags: string[]
+  icon?: string
+}
 
 const PLAN_EXAMPLES: string[] = [
   'Lean under on total, run-heavy pace',
@@ -16,14 +23,77 @@ const PLAN_EXAMPLES: string[] = [
   'Win in trenches: OL > DL; grind clock; red-zone TD% up',
 ]
 
-const FOCUS_ITEMS: FocusItem[] = [
-  { key: 'pace', label: 'Pace of play', icon: <Waves size={18} />, hint: 'Tempo, seconds/play, no-huddle rate' },
-  { key: 'redzone', label: 'Red zone efficiency', icon: <Shield size={18} />, hint: 'TD% inside the 20' },
-  { key: 'explosive', label: 'Explosive plays', icon: <Zap size={18} />, hint: '20+ yard plays rate' },
-  { key: 'pressure', label: 'Pressure rate', icon: <Gauge size={18} />, hint: 'Pass rush pressure and sacks' },
-  { key: 'ol_dl', label: 'OL/DL matchups', icon: <Anchor size={18} />, hint: 'Trench mismatches' },
-  { key: 'weather', label: 'Weather conditions', icon: <Cloud size={18} />, hint: 'Wind, rain, temperature' },
-  { key: 'injuries', label: 'Injuries/Rest', icon: <Activity size={18} />, hint: 'Inactives, rest, travel' },
+export const FOCUS_AREAS: FocusArea[] = [
+  {
+    id: 'pace',
+    label: 'Pace of play',
+    hint: 'Tempo, seconds/play, no-huddle',
+    promptSnippet:
+      'Emphasize pace effects: projected tempo profile, seconds per play, no-huddle likelihood, and how pace shifts correlation with totals.',
+    retrievalTags: ['pace', 'tempo', 'seconds_per_play'],
+  },
+  {
+    id: 'redzone',
+    label: 'Red zone efficiency',
+    hint: 'TD% inside the 20',
+    promptSnippet:
+      'Weigh red-zone TD% (offense/defense) and finishing drives over yardage; link to alt totals and TD ladders.',
+    retrievalTags: ['red_zone', 'td_rate'],
+  },
+  {
+    id: 'explosive',
+    label: 'Explosive plays',
+    hint: '20+ yard rate',
+    promptSnippet:
+      'Model explosive play rate (20+ yards) and volatility; bias toward alt totals and long TD props.',
+    retrievalTags: ['explosive_plays', 'xpl'],
+  },
+  {
+    id: 'pressure',
+    label: 'Pressure rate',
+    hint: 'Pass rush & sacks',
+    promptSnippet:
+      'Account for pressure rate vs protection; sacks/short fields/turnover-driven totals.',
+    retrievalTags: ['pressure_rate', 'sacks'],
+  },
+  {
+    id: 'trenches',
+    label: 'OL/DL matchups',
+    hint: 'Trench mismatches',
+    promptSnippet:
+      'Highlight OL vs DL mismatches and run/pass success shifts; tie to RB rush yards or QB scramble props.',
+    retrievalTags: ['ol', 'dl', 'trenches'],
+  },
+  {
+    id: 'weather',
+    label: 'Weather conditions',
+    hint: 'Wind, rain, temperature',
+    promptSnippet:
+      'Integrate weather (esp. wind) on pass depth, kicking, and totals; prefer correlated legs accordingly.',
+    retrievalTags: ['weather', 'wind', 'rain', 'temperature'],
+  },
+  {
+    id: 'rest',
+    label: 'Injuries/Rest',
+    hint: 'Inactives, rest, travel',
+    promptSnippet:
+      'Factor inactives, travel, rest/short week effects; expect fatigue-driven pace/efficiency changes.',
+    retrievalTags: ['injuries', 'rest', 'travel'],
+  },
+]
+
+export type FocusCombo = {
+  id: string
+  label: string
+  include: string[]
+  extraAngle?: string
+}
+
+export const FOCUS_COMBOS: FocusCombo[] = [
+  { id: 'fast_shots', label: 'Fast tempo, deep shots', include: ['pace','explosive'] },
+  { id: 'grind_under', label: 'Defensive grind, under pace', include: ['pace','trenches','redzone'], extraAngle: 'Lean under; field position game.' },
+  { id: 'qb_duel', label: 'Explosive plays, QB duel', include: ['explosive','pressure'], extraAngle: 'Expect aggressive pass rate early.' },
+  { id: 'short_week_sloppy', label: 'Short week, tired legs', include: ['rest','pace'], extraAngle: 'Slower pace, more run fits, kicking variance.' },
 ]
 
 function useKeyShortcut(key: string, handler: (e: KeyboardEvent) => void) {
@@ -56,6 +126,7 @@ export default function AssistedBuilder() {
   const comboRef = useRef<HTMLInputElement>(null)
   const comboWrapRef = useRef<HTMLDivElement>(null)
   const [focusAvailability, setFocusAvailability] = useState<Record<string, boolean>>({})
+  const [appliedCombo, setAppliedCombo] = useState<FocusCombo | null>(null)
   const [games, setGames] = useState<{ id: string; display: string; isPopular?: boolean }[]>([])
 
   useEffect(() => {
@@ -115,6 +186,30 @@ export default function AssistedBuilder() {
     setCopied(true)
     setTimeout(() => setCopied(false), 1200)
   }, [activeTab, summary, json])
+
+  function isSelected(id: string) {
+    return focusAreas.includes(id)
+  }
+
+  function toggle(id: string) {
+    setFocusAreas(prev => {
+      return prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    })
+  }
+
+  function applyCombo(c: FocusCombo) {
+    setFocusAreas(prev => Array.from(new Set([...prev, ...c.include])))
+    setAppliedCombo(c)
+    // Also append its extraAngle into the text box for visibility
+    if (c.extraAngle) {
+      setLineFocus(v => {
+        const t = (v || '').trim()
+        if (!t) return c.extraAngle as string
+        if (t.toLowerCase().includes(c.extraAngle!.toLowerCase())) return t
+        return `${t}, ${c.extraAngle}`
+      })
+    }
+  }
 
   const generateBetSlipImage = useCallback(async (slipElement: HTMLElement, slipTitle: string) => {
     try {
@@ -218,14 +313,22 @@ export default function AssistedBuilder() {
     const fixedVoice: Voice = 'analyst' // Optimistic Analyst
     track('ui_build_clicked', { voice: fixedVoice, focusAreasCount: focusAreas.length })
     try {
+      const selectedIds = focusAreas
+      const anglesFromBoxes = selectedIds
+        .map(id => FOCUS_AREAS.find(x => x.id === id)?.promptSnippet)
+        .filter((v): v is string => Boolean(v))
+      const retrievalTags = selectedIds
+        .flatMap(id => FOCUS_AREAS.find(x => x.id === id)?.retrievalTags || [])
+
       const req = {
         matchup,
         lineFocus: lineFocus || undefined,
         angles: [
+          ...anglesFromBoxes,
           ...(lineFocus && lineFocus.trim() ? [lineFocus.trim()] : []),
-          ...focusAreas,
-          ...chips,
+          ...(appliedCombo?.extraAngle ? [appliedCombo.extraAngle] : []),
         ],
+        retrievalTags,
         voice: fixedVoice,
       }
       const data = await build(req)
@@ -260,7 +363,7 @@ export default function AssistedBuilder() {
     } catch (e) {
       track('ui_build_error', { message: (e as any)?.message })
     }
-  }, [selectedGame, lineFocus, focusAreas, chips, build])
+  }, [selectedGame, lineFocus, focusAreas, appliedCombo, build])
 
   useKeyShortcut('mod+enter', () => { if (!isLoading) onBuild() })
   useKeyShortcut('/', (e) => { e.preventDefault(); comboRef.current?.focus() })
@@ -455,68 +558,42 @@ export default function AssistedBuilder() {
             </div>
           </div>
 
-          {/* Focus Areas - moved below Quick Settings and always selectable */}
+          {/* Focus Areas - compact grid with combos */}
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 p-6">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10"></div>
             <div className="relative">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500">
-                  <Activity className="text-white" size={20} />
-                </div>
-                <h2 className="text-xl font-semibold text-white">Focus Areas</h2>
-                <div className="ml-auto text-sm text-slate-300">
-                  {focusAreas.length} selected
-                </div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-white">Focus Areas</h3>
+                <span className="text-[11px] text-white/60">{focusAreas.length} selected</span>
               </div>
-              
-              <div className="grid grid-cols-2 gap-3">
-                {FOCUS_ITEMS.map(item => {
-                  const selected = focusAreas.includes(item.key)
-                  const available = !!focusAvailability[item.key]
+
+              {/* Combo chips */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                {FOCUS_COMBOS.map((c) => (
+                  <button
+                    key={c.id}
+                    className="text-xs px-3 py-1 rounded-full bg-purple-600/20 hover:bg-purple-600/30 text-purple-100"
+                    onClick={() => applyCombo(c)}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Areas grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {FOCUS_AREAS.map((a) => {
+                  const selected = isSelected(a.id)
                   return (
                     <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => onToggleFocus(item.key, !selected)}
-                      className={`relative overflow-hidden rounded-2xl p-4 transition-all duration-200 ${
-                        selected 
-                          ? 'bg-gradient-to-br from-purple-500/30 to-blue-500/30 border-2 border-purple-400/50' 
-                          : 'bg-white/10 border border-white/20 hover:bg-white/15'
-                      }`}
+                      key={a.id}
+                      onClick={() => toggle(a.id)}
+                      className={`text-left rounded-xl p-3 border transition ${selected ? 'bg-emerald-500/15 border-emerald-400/30' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
                       aria-pressed={selected}
-                      title={item.hint}
+                      title={a.hint}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-xl ${
-                          selected 
-                            ? 'bg-white/20' 
-                            : 'bg-white/10'
-                        }`}>
-                          {item.icon}
-                        </div>
-                        <div className="flex-1 text-left">
-                          <p className={`font-medium ${
-                            selected ? 'text-white' : 'text-slate-200'
-                          }`}>
-                            {item.label}
-                          </p>
-                          <p className={`text-xs ${
-                            selected ? 'text-white/80' : 'text-slate-400'
-                          }`}>
-                            {item.hint}
-                          </p>
-                        </div>
-                        {selected && (
-                          <div className="p-1 rounded-lg bg-green-500/20">
-                            <Check className="text-green-400" size={16} />
-                          </div>
-                        )}
-                        {!selected && available && (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] border border-emerald-400/30 bg-emerald-400/15 text-emerald-300">
-                            Recommended
-                          </span>
-                        )}
-                      </div>
+                      <div className="text-sm font-semibold text-white">{a.label}</div>
+                      <div className="text-[11px] text-white/60">{a.hint}</div>
                     </button>
                   )
                 })}
