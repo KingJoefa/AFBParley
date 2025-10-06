@@ -1,13 +1,12 @@
 "use client"
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Info, Loader2, Search, Copy, ClipboardCheck, Keyboard, Gamepad2, Waves, Zap, Anchor, Gauge, Cloud, Activity, Shield, Download, Share2, Shuffle } from 'lucide-react'
+import { Check, ChevronDown, Loader2, Search, Copy, ClipboardCheck, Keyboard, Gamepad2, Waves, Zap, Anchor, Gauge, Cloud, Activity, Shield, Download, Share2, Shuffle } from 'lucide-react'
 import { useAfb } from '@/app/hooks/useAfb'
 import { track } from '@/lib/telemetry'
 // Dynamic import for html2canvas to avoid SSR issues
 const html2canvas = typeof window !== 'undefined' ? require('html2canvas') : null
 
 type Voice = 'analyst' | 'hype' | 'coach'
-type Variance = 'conservative' | 'standard' | 'longshot'
 
 type FocusItem = { key: string, label: string, icon: React.ReactNode, hint: string }
 
@@ -40,8 +39,6 @@ export default function AssistedBuilder() {
   const [comboOpen, setComboOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
   const [lineFocus, setLineFocus] = useState('')
-  const [voice, setVoice] = useState<Voice>('analyst')
-  const [variance, setVariance] = useState<Variance>('standard')
   const [focusAreas, setFocusAreas] = useState<string[]>([])
   const [advancedAngles, setAdvancedAngles] = useState('')
   const [summary, setSummary] = useState<string>('')
@@ -212,13 +209,14 @@ export default function AssistedBuilder() {
   const onBuild = useCallback(async () => {
     const matchup = selectedGame || gameQuery
     if (!matchup) return
-    track('ui_build_clicked', { voice, variance, focusAreasCount: focusAreas.length })
+    const fixedVoice: Voice = 'analyst' // Optimistic Analyst
+    track('ui_build_clicked', { voice: fixedVoice, focusAreasCount: focusAreas.length })
     try {
       const req = {
         matchup,
         lineFocus: lineFocus || undefined,
         angles: [...focusAreas, ...chips],
-        voice,
+        voice: fixedVoice,
       }
       const data = await build(req)
 
@@ -233,7 +231,7 @@ export default function AssistedBuilder() {
         const d: any = data
         normalizedJson = d
         normalizedSummary = [
-          `Assumptions: matchup ${d?.assumptions?.matchup ?? matchup}${d?.assumptions?.lineFocus ? `; line ${d.assumptions.lineFocus}` : ''}; voice ${d?.assumptions?.voice ?? voice}.`,
+          `Assumptions: matchup ${d?.assumptions?.matchup ?? matchup}${d?.assumptions?.lineFocus ? `; line ${d.assumptions.lineFocus}` : ''}; voice ${d?.assumptions?.voice ?? fixedVoice}.`,
           ...d.scripts.map((s: any, i: number) => `Script ${i + 1}: ${s.title}\n${s.narrative}\nLegs:\n${s.legs.map((l: any) => `• ${l.market}: ${l.selection}, odds ${l.odds} (${l.oddsLabel})`).join('\n')}\n$1 Parlay Math: ${s.math?.steps}\nNotes: ${s.notes?.join(' ')}`)
         ].join('\n\n')
       } else if (data && typeof data === 'object' && 'raw' in (data as any)) {
@@ -252,7 +250,7 @@ export default function AssistedBuilder() {
     } catch (e) {
       track('ui_build_error', { message: (e as any)?.message })
     }
-  }, [selectedGame, lineFocus, focusAreas, chips, voice, build])
+  }, [selectedGame, lineFocus, focusAreas, chips, build])
 
   useKeyShortcut('mod+enter', () => { if (!isLoading) onBuild() })
   useKeyShortcut('/', (e) => { e.preventDefault(); comboRef.current?.focus() })
@@ -415,56 +413,6 @@ export default function AssistedBuilder() {
                     value={lineFocus} 
                     onChange={(e) => setLineFocus(e.target.value)} 
                   />
-                </div>
-
-                {/* Voice Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-200 mb-2">Analysis Style</label>
-                  <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Voice">
-                    {(['analyst','hype','coach'] as Voice[]).map(v => (
-                      <button 
-                        key={v} 
-                        role="radio" 
-                        aria-checked={voice === v} 
-                        onClick={() => setVoice(v)} 
-                        className={`px-4 py-3 rounded-xl border transition-all duration-200 ${
-                          voice === v 
-                            ? 'bg-gradient-to-r from-purple-500/30 to-blue-500/30 border-purple-400/50 text-white' 
-                            : 'bg-white/10 border-white/20 text-slate-200 hover:bg-white/15'
-                        }`}
-                      >
-                        {v.charAt(0).toUpperCase()+v.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Variance */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-slate-200">Risk Level</label>
-                    <div className="flex items-center gap-1 text-xs text-slate-400">
-                      <Info size={14} />
-                      <span>2-3 scripts always generated</span>
-                    </div>
-                  </div>
-                  <div className="inline-flex rounded-xl border border-white/20 p-1 bg-white/5" role="tablist" aria-label="Variance">
-                    {(['conservative','standard','longshot'] as Variance[]).map(v => (
-                      <button 
-                        key={v} 
-                        role="tab" 
-                        aria-selected={variance === v} 
-                        onClick={() => setVariance(v)} 
-                        className={`px-4 py-2 rounded-lg text-sm transition-all duration-200 ${
-                          variance === v 
-                            ? 'bg-gradient-to-r from-purple-500/30 to-blue-500/30 text-white' 
-                            : 'text-slate-300 hover:text-white'
-                        }`}
-                      >
-                        {v.charAt(0).toUpperCase()+v.slice(1)}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
             </div>
