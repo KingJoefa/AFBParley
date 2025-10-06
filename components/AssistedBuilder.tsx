@@ -508,30 +508,29 @@ export default function AssistedBuilder() {
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 p-6">
             <div className="absolute inset-0 bg-gradient-to-r from-slate-500/10 to-gray-500/10"></div>
             <div className="relative">
-              <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 rounded-xl bg-gradient-to-r from-slate-500 to-gray-500">
                   <Gauge className="text-white" size={20} />
                 </div>
                 <h2 className="text-xl font-semibold text-white">Focus or Game Plan (Optional)</h2>
               </div>
+              <p id="focus-help" className="mb-3 text-xs text-purple-300/70">
+                Tell the Builder what to emphasize in this matchup — for example, slow grind and clock control, explosive passing plays, heavy run game, strong pass rush, or sloppy short-week conditions. Leave blank for a balanced script.
+              </p>
               
               <div className="space-y-4">
                 {/* Line Focus (renamed) */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-200 mb-2">Focus or Game Plan (Optional)</label>
+                  <label className="block text-sm font-medium text-slate-200 mb-2 sr-only">Focus or Game Plan (Optional)</label>
                   <input 
                     id="line" 
                     className="w-full rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-3 text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-200" 
                     placeholder="e.g., Lean under on total, run-heavy pace — or expect high pressure rate and short fields" 
-                    aria-describedby="line-help"
+                    aria-describedby="focus-help"
                     title="Tell the Builder what to emphasize in this matchup — pace, red-zone trends, O-line vs D-line mismatches, or travel/rest angles. Leave blank for a balanced script."
                     value={lineFocus} 
                     onChange={(e) => setLineFocus(e.target.value)} 
                   />
-                  <p id="line-help" className="mt-2 text-xs text-purple-300/70">
-                    Tell the Builder what to emphasize in this matchup — things like pace, red-zone trends,
-                    O-line vs D-line mismatches, or travel/rest angles. Leave blank for a balanced script.
-                  </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {PLAN_EXAMPLES.map(example => (
                       <button
