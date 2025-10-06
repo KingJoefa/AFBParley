@@ -17,11 +17,24 @@ export type FocusArea = {
   icon?: string
 }
 
-const PLAN_EXAMPLES: string[] = [
-  'Lean under on total, run-heavy pace',
-  'Expect high pressure rate and short fields',
-  'Win in trenches: OL > DL; grind clock; red-zone TD% up',
-]
+// Compact chips under the text box
+const CHIP_LABELS = [
+  'Lean Under',
+  'Lean Over',
+  'Run Heavy',
+  'Long Passes',
+  'Shootout',
+  'Blowout',
+] as const
+
+const CHIP_SNIPPETS: Record<string, string> = {
+  'Lean Under': 'Bias toward a lower-total script: slower pace, field position, sustained drives; prefer correlated unders and conservative alt totals.',
+  'Lean Over': 'Bias toward a higher-total script: faster pace, more possessions, explosive plays; consider correlated overs and alt totals.',
+  'Run Heavy': 'Expect run-rate tilt and trench influence; emphasize RB yardage, attempts, and clock bleed correlations.',
+  'Long Passes': 'Expect deeper aDOT and explosive pass rate; bias to WR long receptions, QB yards ladders, and alt total overs.',
+  'Shootout': 'High-tempo exchange with short drives and quick scores; prioritize passing ladders, multiple TD legs, and alt over ladders.',
+  'Blowout': 'Lopsided game script; favor alt spread ladders, leading team RB attempts/unders for trailing rushers, and low late-pass efficiency for the leader.',
+}
 
 export const FOCUS_AREAS: FocusArea[] = [
   {
@@ -127,6 +140,7 @@ export default function AssistedBuilder() {
   const comboWrapRef = useRef<HTMLDivElement>(null)
   const [focusAvailability, setFocusAvailability] = useState<Record<string, boolean>>({})
   const [appliedCombo, setAppliedCombo] = useState<FocusCombo | null>(null)
+  const [selectedChips, setSelectedChips] = useState<string[]>([])
   const [games, setGames] = useState<{ id: string; display: string; isPopular?: boolean }[]>([])
 
   useEffect(() => {
@@ -186,6 +200,20 @@ export default function AssistedBuilder() {
     setCopied(true)
     setTimeout(() => setCopied(false), 1200)
   }, [activeTab, summary, json])
+
+  function isChipSelected(label: string) {
+    return selectedChips.includes(label)
+  }
+
+  function toggleChip(label: string) {
+    setSelectedChips(prev => prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label])
+    setLineFocus(prev => {
+      const v = (prev || '').trim()
+      if (!v) return label
+      if (v.toLowerCase().includes(label.toLowerCase())) return v
+      return `${v}, ${label}`
+    })
+  }
 
   function isSelected(id: string) {
     return focusAreas.includes(id)
@@ -320,10 +348,13 @@ export default function AssistedBuilder() {
       const retrievalTags = selectedIds
         .flatMap(id => FOCUS_AREAS.find(x => x.id === id)?.retrievalTags || [])
 
+      const chipAngles = selectedChips.map(label => CHIP_SNIPPETS[label]).filter(Boolean)
+
       const req = {
         matchup,
         lineFocus: lineFocus || undefined,
         angles: [
+          ...chipAngles,
           ...anglesFromBoxes,
           ...(lineFocus && lineFocus.trim() ? [lineFocus.trim()] : []),
           ...(appliedCombo?.extraAngle ? [appliedCombo.extraAngle] : []),
@@ -363,7 +394,7 @@ export default function AssistedBuilder() {
     } catch (e) {
       track('ui_build_error', { message: (e as any)?.message })
     }
-  }, [selectedGame, lineFocus, focusAreas, appliedCombo, build])
+  }, [selectedGame, lineFocus, focusAreas, appliedCombo, selectedChips, build])
 
   useKeyShortcut('mod+enter', () => { if (!isLoading) onBuild() })
   useKeyShortcut('/', (e) => { e.preventDefault(); comboRef.current?.focus() })
@@ -531,26 +562,23 @@ export default function AssistedBuilder() {
                     value={lineFocus} 
                     onChange={(e) => setLineFocus(e.target.value)} 
                   />
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {PLAN_EXAMPLES.map(example => (
-                      <button
-                        key={example}
-                        type="button"
-                        className="bg-purple-600/20 hover:bg-purple-600/30 text-purple-100 text-xs rounded-full px-3 py-1 transition-colors"
-                        onClick={() => {
-                          setLineFocus(prev => {
-                            const v = (prev || '').trim()
-                            if (!v) return example
-                            // Append with comma separation if not already included
-                            if (v.toLowerCase().includes(example.toLowerCase())) return v
-                            return `${v}, ${example}`
-                          })
-                        }}
-                        aria-label={`Insert example: ${example}`}
-                      >
-                        {example}
-                      </button>
-                    ))}
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {CHIP_LABELS.map(label => {
+                      const selected = isChipSelected(label)
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          data-selected={selected || undefined}
+                          className={`${selected ? 'bg-emerald-500/15 border-emerald-400/30 text-emerald-200' : 'bg-white/8 hover:bg-white/12 text-white/90 border-white/10'} text-xs px-3 py-1 rounded-full border transition-colors`}
+                          onClick={() => toggleChip(label)}
+                          aria-pressed={selected}
+                          aria-label={`Toggle: ${label}`}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               </div>
