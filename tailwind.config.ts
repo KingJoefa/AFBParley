@@ -11,11 +11,11 @@ export default {
     extend: {
       colors: {
         background: '#0b0b10',
-        foreground: '#e6e6eb',
-        muted: '#8a8aa0',
+        foreground: '#e5e7eb',
+        muted: '#9ca3af',
         card: '#12121a',
-        border: '#222232',
-        accent: '#6e85ff',
+        border: '#1f2735',
+        accent: '#3a7bfd',
         success: '#22c55e',
         danger: '#ef4444'
       },

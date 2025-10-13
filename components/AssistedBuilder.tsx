@@ -421,17 +421,17 @@ export default function AssistedBuilder() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Hero Header */}
       <header className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-blue-600/20 to-purple-600/20"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-700/20 via-slate-800/20 to-blue-700/20"></div>
         <div className="relative mx-auto max-w-4xl px-4 py-8">
           <div className="text-center">
             <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="p-3 rounded-2xl bg-gradient-to-r from-purple-500 to-blue-500 shadow-lg">
+              <div className="p-3 rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 shadow-lg">
                 <Gamepad2 className="text-white" size={24} />
               </div>
-              <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
+              <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
                 ParlayGPT
               </h1>
             </div>
@@ -445,10 +445,10 @@ export default function AssistedBuilder() {
         {/* Game Selection - Hero Section */}
         <section className="space-y-6">
           <div className="relative z-50 overflow-visible rounded-3xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 p-6">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/15 to-cyan-500/15"></div>
             <div className="relative">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500">
+                <div className="p-2 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500">
                   <Search className="text-white" size={20} />
                 </div>
                 <h2 className="text-xl font-semibold text-white">Choose Your Game</h2>
@@ -459,7 +459,7 @@ export default function AssistedBuilder() {
                   <input
                     ref={comboRef}
                     id="game"
-                    className="w-full rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 px-6 py-4 text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-200 text-lg"
+                    className="w-full rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 px-6 py-4 text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200 text-lg"
                     placeholder="Search for this week's games..."
                     value={gameQuery}
                     onChange={(e) => { setGameQuery(e.target.value); setComboOpen(true); setHighlight(0) }}
@@ -537,7 +537,7 @@ export default function AssistedBuilder() {
                 </div>
                 <h2 className="text-xl font-semibold text-white">Focus or Game Plan (Optional)</h2>
               </div>
-              <p id="focus-help" className="mb-3 text-xs text-purple-300/70">
+              <p id="focus-help" className="mb-3 text-xs text-blue-300/70">
                 Tell the Builder what to emphasize in this matchup — for example, slow grind and clock control, explosive passing plays, heavy run game, strong pass rush, or sloppy short-week conditions. Leave blank for a balanced script.
               </p>
               
@@ -547,7 +547,7 @@ export default function AssistedBuilder() {
                   <label className="block text-sm font-medium text-slate-200 mb-2 sr-only">Focus or Game Plan (Optional)</label>
                   <input 
                     id="line" 
-                    className="w-full rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-3 text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-200" 
+                    className="w-full rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-3 text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200" 
                     placeholder="e.g., Lean under on total, run-heavy pace — or expect high pressure rate and short fields" 
                     aria-describedby="focus-help"
                     title="Tell the Builder what to emphasize in this matchup — pace, red-zone trends, O-line vs D-line mismatches, or travel/rest angles. Leave blank for a balanced script."
@@ -579,7 +579,7 @@ export default function AssistedBuilder() {
 
           {/* Focus Areas - compact grid with combos */}
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 p-6">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-cyan-500/10"></div>
             <div className="relative">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-semibold text-white">Advanced metrics</h3>
@@ -608,13 +608,13 @@ export default function AssistedBuilder() {
           </div>
 
           {/* Generate Button - Hero CTA */}
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-purple-600/20 to-blue-600/20 backdrop-blur-xl border border-purple-400/30 p-6">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10"></div>
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-700/20 to-cyan-600/20 backdrop-blur-xl border border-blue-400/30 p-6">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-cyan-500/10"></div>
             <div className="relative text-center">
               <button 
                 onClick={onBuild} 
                 disabled={isLoading || !(selectedGame || gameQuery)} 
-                className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:from-slate-500 disabled:to-slate-600 text-white font-semibold px-8 py-4 text-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl hover:scale-105 disabled:hover:scale-100"
+                className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:from-slate-500 disabled:to-slate-600 text-white font-semibold px-8 py-4 text-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl hover:scale-105 disabled:hover:scale-100"
               >
                 <div className="flex items-center justify-center gap-3">
                   {isLoading ? (
