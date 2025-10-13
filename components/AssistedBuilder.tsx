@@ -436,7 +436,7 @@ export default function AssistedBuilder() {
               </h1>
             </div>
             <p className="text-lg text-slate-300 mb-2">AI-Powered Football Picks</p>
-            <p className="text-sm text-slate-400">Generate correlated same-game parlays with professional analysis</p>
+            <p className="text-sm text-slate-400">Build parlay scripts powered by advanced analytics and sharp betting narratives.</p>
           </div>
         </div>
       </header>
