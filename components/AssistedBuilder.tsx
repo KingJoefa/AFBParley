@@ -158,7 +158,7 @@ export default function AssistedBuilder() {
     return () => { cancelled = true }
   }, [])
 
-  // Fetch NFL schedule (2025 Week 5 per backend seed)
+  // Fetch NFL schedule (2025 Week 7 per backend seed)
   useEffect(() => {
     let cancelled = false
     async function loadSchedule() {
@@ -398,8 +398,8 @@ export default function AssistedBuilder() {
       return games.map(g => g.display.replace('@', 'vs'))
     }
     return [
-      'Browns vs Ravens', 'Bengals vs Cowboys', 'Saints vs Chiefs', 'Bills vs Raiders', 'Lions vs Broncos',
-      'Jets vs Vikings', 'Bears vs Panthers', 'Texans vs Falcons', 'Colts vs Jaguars', 'Cardinals vs 49ers'
+      'Chargers vs Chiefs', 'Jets vs Bills', 'Cowboys vs Eagles', 'Steelers vs Raiders', 'Texans vs Jaguars',
+      'Patriots vs Dolphins', 'Packers vs Bears', 'Ravens vs Giants', 'Lions vs Vikings', 'Rams vs Cardinals'
     ]
   }, [games])
 

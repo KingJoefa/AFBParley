@@ -3,29 +3,33 @@
  * Fetches current week's NFL games with fallback to manual data
  */
 
-// Current week's actual NFL schedule (Week 5, October 5, 2025)
+// Current week's actual NFL schedule (Week 7, October 19, 2025)
 const CURRENT_WEEK_GAMES = [
-  { id: 'jets-vikings', display: 'New York Jets @ Minnesota Vikings', time: 'Sun 9:30 AM EDT' },
-  { id: 'bears-panthers', display: 'Chicago Bears @ Carolina Panthers', time: 'Sun 1:00 PM EDT' },
-  { id: 'texans-falcons', display: 'Houston Texans @ Atlanta Falcons', time: 'Sun 1:00 PM EDT' },
-  { id: 'colts-jaguars', display: 'Indianapolis Colts @ Jacksonville Jaguars', time: 'Sun 1:00 PM EDT' },
-  { id: 'browns-ravens', display: 'Cleveland Browns @ Baltimore Ravens', time: 'Sun 1:00 PM EDT' },
-  { id: 'bills-raiders', display: 'Buffalo Bills @ Las Vegas Raiders', time: 'Sun 4:05 PM EDT' },
-  { id: 'cardinals-49ers', display: 'Arizona Cardinals @ San Francisco 49ers', time: 'Sun 4:05 PM EDT' },
-  { id: 'bengals-cowboys', display: 'Cincinnati Bengals @ Dallas Cowboys', time: 'Sun 4:25 PM EDT' },
-  { id: 'saints-chiefs', display: 'New Orleans Saints @ Kansas City Chiefs', time: 'Sun 4:25 PM EDT' },
-  { id: 'giants-packers', display: 'New York Giants @ Green Bay Packers', time: 'Sun 4:25 PM EDT' },
-  { id: 'steelers-commanders', display: 'Pittsburgh Steelers @ Washington Commanders', time: 'Sun 8:20 PM EDT' },
-  { id: 'lions-broncos', display: 'Detroit Lions @ Denver Broncos', time: 'Mon 8:15 PM EDT' }
+  { id: 'chargers-chiefs', display: 'Los Angeles Chargers @ Kansas City Chiefs', time: 'Thu 8:15 PM EDT' },
+  { id: 'patriots-dolphins', display: 'New England Patriots @ Miami Dolphins', time: 'Sun 1:00 PM EDT' },
+  { id: 'packers-bears', display: 'Green Bay Packers @ Chicago Bears', time: 'Sun 1:00 PM EDT' },
+  { id: 'lions-vikings', display: 'Detroit Lions @ Minnesota Vikings', time: 'Sun 1:00 PM EDT' },
+  { id: 'jets-bills', display: 'New York Jets @ Buffalo Bills', time: 'Sun 1:00 PM EDT' },
+  { id: 'panthers-buccaneers', display: 'Carolina Panthers @ Tampa Bay Buccaneers', time: 'Sun 1:00 PM EDT' },
+  { id: 'titans-colts', display: 'Tennessee Titans @ Indianapolis Colts', time: 'Sun 1:00 PM EDT' },
+  { id: 'ravens-giants', display: 'Baltimore Ravens @ New York Giants', time: 'Sun 1:00 PM EDT' },
+  { id: 'browns-bengals', display: 'Cleveland Browns @ Cincinnati Bengals', time: 'Sun 1:00 PM EDT' },
+  { id: 'commanders-broncos', display: 'Washington Commanders @ Denver Broncos', time: 'Sun 4:05 PM EDT' },
+  { id: 'seahawks-49ers', display: 'Seattle Seahawks @ San Francisco 49ers', time: 'Sun 4:05 PM EDT' },
+  { id: 'rams-cardinals', display: 'Los Angeles Rams @ Arizona Cardinals', time: 'Sun 4:05 PM EDT' },
+  { id: 'cowboys-eagles', display: 'Dallas Cowboys @ Philadelphia Eagles', time: 'Sun 4:25 PM EDT' },
+  { id: 'falcons-saints', display: 'Atlanta Falcons @ New Orleans Saints', time: 'Sun 4:25 PM EDT' },
+  { id: 'steelers-raiders', display: 'Pittsburgh Steelers @ Las Vegas Raiders', time: 'Sun 8:20 PM EDT' },
+  { id: 'texans-jaguars', display: 'Houston Texans @ Jacksonville Jaguars', time: 'Mon 8:15 PM EDT' }
 ];
 
 // Popular/high-profile games that are always good for parlays
 const POPULAR_GAMES = [
-  'browns-ravens',
-  'bengals-cowboys',
-  'saints-chiefs',
-  'bills-raiders',
-  'lions-broncos'
+  'chargers-chiefs',
+  'jets-bills',
+  'cowboys-eagles',
+  'steelers-raiders',
+  'texans-jaguars'
 ];
 
 /**
