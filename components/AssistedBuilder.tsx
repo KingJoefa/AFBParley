@@ -435,8 +435,8 @@ export default function AssistedBuilder() {
                 ParlayGPT
               </h1>
             </div>
-            <p className="text-lg text-slate-300 mb-2">AI-Powered Football Picks</p>
-            <p className="text-sm text-slate-400">Build parlay scripts powered by advanced analytics and sharp betting narratives.</p>
+            <p className="text-lg text-slate-300 mb-2">Craft winning scripts where advanced analytics unlock the story within every game.</p>
+            <p className="text-sm text-slate-400">Powered by an AI analytics engine that reveals the why behind every matchup.</p>
           </div>
         </div>
       </header>
