@@ -155,28 +155,32 @@ app.get('/api/focus/status', (req, res) => {
 // NFL Schedule endpoint
 app.get('/api/nfl/schedule', (req, res) => {
   try {
-    // 2025 Regular Season - Week 7 (Thu Oct 16 - Mon Oct 20, 2025)
+    // 2025 Regular Season - Week 17 (Thu Dec 25 - Mon Dec 29, 2025)
     const currentWeekGames = [
-      { id: 'chargers-chiefs', display: 'Los Angeles Chargers @ Kansas City Chiefs', time: 'Thu 5:15 PM PDT', week: 7, date: '2025-10-16' },
-      { id: 'patriots-dolphins', display: 'New England Patriots @ Miami Dolphins', time: 'Sun 10:00 AM PDT', week: 7, date: '2025-10-19' },
-      { id: 'packers-bears', display: 'Green Bay Packers @ Chicago Bears', time: 'Sun 10:00 AM PDT', week: 7, date: '2025-10-19' },
-      { id: 'lions-vikings', display: 'Detroit Lions @ Minnesota Vikings', time: 'Sun 10:00 AM PDT', week: 7, date: '2025-10-19' },
-      { id: 'jets-bills', display: 'New York Jets @ Buffalo Bills', time: 'Sun 10:00 AM PDT', week: 7, date: '2025-10-19' },
-      { id: 'panthers-buccaneers', display: 'Carolina Panthers @ Tampa Bay Buccaneers', time: 'Sun 10:00 AM PDT', week: 7, date: '2025-10-19' },
-      { id: 'titans-colts', display: 'Tennessee Titans @ Indianapolis Colts', time: 'Sun 10:00 AM PDT', week: 7, date: '2025-10-19' },
-      { id: 'ravens-giants', display: 'Baltimore Ravens @ New York Giants', time: 'Sun 10:00 AM PDT', week: 7, date: '2025-10-19' },
-      { id: 'browns-bengals', display: 'Cleveland Browns @ Cincinnati Bengals', time: 'Sun 10:00 AM PDT', week: 7, date: '2025-10-19' },
-      { id: 'commanders-broncos', display: 'Washington Commanders @ Denver Broncos', time: 'Sun 1:05 PM PDT', week: 7, date: '2025-10-19' },
-      { id: 'seahawks-49ers', display: 'Seattle Seahawks @ San Francisco 49ers', time: 'Sun 1:05 PM PDT', week: 7, date: '2025-10-19' },
-      { id: 'rams-cardinals', display: 'Los Angeles Rams @ Arizona Cardinals', time: 'Sun 1:05 PM PDT', week: 7, date: '2025-10-19' },
-      { id: 'cowboys-eagles', display: 'Dallas Cowboys @ Philadelphia Eagles', time: 'Sun 1:25 PM PDT', week: 7, date: '2025-10-19' },
-      { id: 'falcons-saints', display: 'Atlanta Falcons @ New Orleans Saints', time: 'Sun 1:25 PM PDT', week: 7, date: '2025-10-19' },
-      { id: 'steelers-raiders', display: 'Pittsburgh Steelers @ Las Vegas Raiders', time: 'Sun 5:20 PM PDT', week: 7, date: '2025-10-19' },
-      { id: 'texans-jaguars', display: 'Houston Texans @ Jacksonville Jaguars', time: 'Mon 5:15 PM PDT', week: 7, date: '2025-10-20' }
+      // Thursday, Dec 25
+      { id: 'cowboys-commanders', display: 'Dallas Cowboys @ Washington Commanders', time: 'Thu 1:00 PM ET', week: 17, date: '2025-12-25' },
+      { id: 'lions-vikings', display: 'Detroit Lions @ Minnesota Vikings', time: 'Thu 4:30 PM ET', week: 17, date: '2025-12-25' },
+      { id: 'broncos-chiefs', display: 'Denver Broncos @ Kansas City Chiefs', time: 'Thu 8:15 PM ET', week: 17, date: '2025-12-25' },
+      // Saturday, Dec 27
+      { id: 'texans-chargers', display: 'Houston Texans @ Los Angeles Chargers', time: 'Sat 4:30 PM ET', week: 17, date: '2025-12-27' },
+      { id: 'ravens-packers', display: 'Baltimore Ravens @ Green Bay Packers', time: 'Sat 8:00 PM ET', week: 17, date: '2025-12-27' },
+      // Sunday, Dec 28
+      { id: 'cardinals-bengals', display: 'Arizona Cardinals @ Cincinnati Bengals', time: 'Sun 1:00 PM ET', week: 17, date: '2025-12-28' },
+      { id: 'steelers-browns', display: 'Pittsburgh Steelers @ Cleveland Browns', time: 'Sun 1:00 PM ET', week: 17, date: '2025-12-28' },
+      { id: 'saints-titans', display: 'New Orleans Saints @ Tennessee Titans', time: 'Sun 1:00 PM ET', week: 17, date: '2025-12-28' },
+      { id: 'jaguars-colts', display: 'Jacksonville Jaguars @ Indianapolis Colts', time: 'Sun 1:00 PM ET', week: 17, date: '2025-12-28' },
+      { id: 'buccaneers-dolphins', display: 'Tampa Bay Buccaneers @ Miami Dolphins', time: 'Sun 1:00 PM ET', week: 17, date: '2025-12-28' },
+      { id: 'patriots-jets', display: 'New England Patriots @ New York Jets', time: 'Sun 1:00 PM ET', week: 17, date: '2025-12-28' },
+      { id: 'seahawks-panthers', display: 'Seattle Seahawks @ Carolina Panthers', time: 'Sun 1:00 PM ET', week: 17, date: '2025-12-28' },
+      { id: 'giants-raiders', display: 'New York Giants @ Las Vegas Raiders', time: 'Sun 4:05 PM ET', week: 17, date: '2025-12-28' },
+      { id: 'eagles-bills', display: 'Philadelphia Eagles @ Buffalo Bills', time: 'Sun 4:25 PM ET', week: 17, date: '2025-12-28' },
+      { id: 'bears-49ers', display: 'Chicago Bears @ San Francisco 49ers', time: 'Sun 8:20 PM ET', week: 17, date: '2025-12-28' },
+      // Monday, Dec 29
+      { id: 'rams-falcons', display: 'Los Angeles Rams @ Atlanta Falcons', time: 'Mon 8:15 PM ET', week: 17, date: '2025-12-29' }
     ];
 
     // Mark popular games
-    const popularGameIds = ['chargers-chiefs','jets-bills','cowboys-eagles','steelers-raiders'];
+    const popularGameIds = ['broncos-chiefs','eagles-bills','bears-49ers','patriots-jets','cowboys-commanders'];
     const gamesWithPopularity = currentWeekGames.map(game => ({
       ...game,
       isPopular: popularGameIds.includes(game.id)
@@ -184,7 +188,7 @@ app.get('/api/nfl/schedule', (req, res) => {
 
     res.json({
       games: gamesWithPopularity,
-      week: 7,
+      week: 17,
       season: 2025,
       lastUpdated: new Date().toISOString(),
       totalGames: currentWeekGames.length

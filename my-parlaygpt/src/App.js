@@ -253,7 +253,7 @@ const App = () => {
                     {nflGames.length > 0 && (
                       <div className="schedule-info">
                         <span className="schedule-status">
-                          📅 Showing {nflGames.length} games for Week 4 • Updated for Sep 28, 2025
+                          📅 Showing {nflGames.length} games for Week 11 • Updated for Nov 16, 2025
                         </span>
                       </div>
                     )}

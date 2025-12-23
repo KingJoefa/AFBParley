@@ -43,11 +43,10 @@ export function useAfb() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => null)
-        throw new Error(data?.error || `AFB error ${res.status}`)
+        throw new Error(data?.message || data?.error || `AFB error ${res.status}`)
       }
 
-      const text = await res.text()
-      return text
+      return await res.json()
     } catch (e: any) {
       setError(e?.message ?? 'Unknown error')
       throw e
