@@ -38,6 +38,7 @@ export default function SwantailBuilderForm({
 		const [customMode, setCustomMode] = useState(false)
 	const [autoAnchor, setAutoAnchor] = useState(false)
 	const [anchorSuggestions, setAnchorSuggestions] = useState<string[]>([])
+	const [anchorMeta, setAnchorMeta] = useState<{ source?: string; timestamp?: number } | null>(null)
 
   const angleList = useMemo(() => {
     const combined = [...angles]
@@ -86,13 +87,19 @@ export default function SwantailBuilderForm({
 		setCustomMode(false)
 		// Use the raw display text, e.g. "Cowboys @ Commanders"
 		onChangeMatchup(value)
+		// Reset anchor on matchup change so the new game's line is applied
+		if (autoAnchor) {
+			onChangeLineFocus('')
+			setAnchorSuggestions([])
+			setAnchorMeta(null)
+		}
 	}
 
 	// Fetch market anchor suggestions when autoAnchor is enabled and matchup present
 	useEffect(() => {
 		let cancelled = false
 		async function load() {
-			if (!autoAnchor || !matchup.trim()) { setAnchorSuggestions([]); return }
+			if (!autoAnchor || !matchup.trim()) { setAnchorSuggestions([]); setAnchorMeta(null); return }
 			try {
 				const u = new URL('/api/market/suggest', window.location.origin)
 				u.searchParams.set('matchup', matchup)
@@ -101,12 +108,13 @@ export default function SwantailBuilderForm({
 				const json = await res.json()
 				if (cancelled) return
 				setAnchorSuggestions(Array.isArray(json?.suggestions) ? json.suggestions : [])
+				setAnchorMeta(json?.meta || null)
 				// If we have at least one suggestion and input is empty, prefill
 				if (!lineFocus && Array.isArray(json?.suggestions) && json.suggestions.length > 0) {
 					onChangeLineFocus(json.suggestions[0])
 				}
 			} catch {
-				if (!cancelled) setAnchorSuggestions([])
+				if (!cancelled) { setAnchorSuggestions([]); setAnchorMeta(null) }
 			}
 		}
 		load()
@@ -214,6 +222,19 @@ export default function SwantailBuilderForm({
 								</div>
 							)}
 						</div>
+						{autoAnchor && anchorMeta && (
+							<div className="mt-1 text-[11px] text-white/50">
+								{(() => {
+									const ts = anchorMeta.timestamp
+									let when = ''
+									if (typeof ts === 'number' && ts > 0) {
+										const ms = ts > 1e12 ? ts : ts * 1000
+										when = new Date(ms).toLocaleString()
+									}
+									return `Source: ${anchorMeta.source ?? 'lines'}${when ? ` • ${when}` : ''}`
+								})()}
+							</div>
+						)}
             <input
               className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-400/40"
               placeholder="Over 41.5 · Eagles -3.5 · First Half Under"

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { fetchSelectionCombos } from '@/lib/xo/client'
 import { extractTeamCodesFromMatchup } from '@/lib/nfl/teams'
+import { fetchDirectLines } from '@/lib/lines/client'
 
 export async function GET(req: NextRequest) {
 	try {
@@ -22,7 +23,34 @@ export async function GET(req: NextRequest) {
 			}
 		} catch {}
 
-		// Pull combos; filter to matchup teams when possible
+		// Prefer direct game lines if available
+		const direct = await fetchDirectLines({ year, week, matchup })
+		const suggestions: string[] = []
+		const meta: Record<string, unknown> = {}
+		if (direct?.total && isFinite(direct.total)) {
+			suggestions.push(`Over ${direct.total.toFixed(1)}`)
+			suggestions.push(`Under ${direct.total.toFixed(1)}`)
+		}
+		// Render team-specific spread with home/away parsing from matchup
+		const raw = matchup.split('(')[0].trim()
+		const [awayName, homeName] = raw.includes('@')
+			? [raw.split('@')[0]?.trim(), raw.split('@')[1]?.trim()]
+			: [undefined, undefined]
+		if (typeof direct?.spreadHome === 'number' && homeName) {
+			const sign = direct.spreadHome >= 0 ? '+' : ''
+			suggestions.push(`${homeName} ${sign}${direct.spreadHome.toFixed(1)}`)
+		}
+		if (typeof direct?.spreadAway === 'number' && awayName) {
+			const sign = direct.spreadAway >= 0 ? '+' : ''
+			suggestions.push(`${awayName} ${sign}${direct.spreadAway.toFixed(1)}`)
+		}
+		if (suggestions.length) {
+			meta.source = direct?.source || 'lines'
+			meta.timestamp = direct?.timestamp
+			return Response.json({ year, week, sourceId: meta.source, suggestions: suggestions.slice(0, limit), meta })
+		}
+
+		// Fallback to combos; filter to matchup teams when possible
 		const combos = await fetchSelectionCombos({ year, week, sourceId })
 		const codes = matchup ? extractTeamCodesFromMatchup(matchup) : new Set<string>()
 
@@ -49,7 +77,6 @@ export async function GET(req: NextRequest) {
 			}
 		}
 
-		const suggestions: string[] = []
 		function median(nums: number[]): number {
 			const a = [...nums].sort((x, y) => x - y)
 			const mid = Math.floor(a.length / 2)
