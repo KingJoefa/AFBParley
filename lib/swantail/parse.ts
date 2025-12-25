@@ -127,6 +127,25 @@ function parseScriptBlock(block: string[]) {
   }
 }
 
+function fillLegs(legs: ReturnType<typeof parseLegLine>[], lineFocus?: string) {
+  const next = [...legs]
+  const fillers: Array<ReturnType<typeof parseLegLine>> = []
+  if (lineFocus && lineFocus.trim()) {
+    fillers.push({ market: 'Market Anchor', selection: lineFocus.trim(), american_odds: -110, odds_source: 'illustrative' })
+  }
+  fillers.push(
+    { market: 'Game Total', selection: 'Over 41.5', american_odds: -110, odds_source: 'illustrative' },
+    { market: 'Team Total (Home)', selection: 'Over 20.5', american_odds: -110, odds_source: 'illustrative' },
+    { market: 'Team Total (Away)', selection: 'Under 20.5', american_odds: -110, odds_source: 'illustrative' },
+  )
+  for (const fill of fillers) {
+    if (next.length >= 3) break
+    const exists = next.some(l => l.selection.toLowerCase() === fill.selection.toLowerCase())
+    if (!exists) next.push(fill)
+  }
+  return next.slice(0, 5)
+}
+
 export function parseSwantailOutputText(text: string, fallback: SwantailResponse['assumptions']): SwantailResponse {
   const rawLines = text.split(/\r?\n/).map(l => l.trim())
   const lines = rawLines.filter(l => l.length > 0)
@@ -143,8 +162,19 @@ export function parseSwantailOutputText(text: string, fallback: SwantailResponse
     return parseScriptBlock(block)
   })
 
+  const normalizedScripts = (scripts.length ? scripts.slice(0, 3) : [parseScriptBlock(['Script 1'])]).map(script => {
+    const filledLegs = fillLegs(script.legs, assumptions.line_focus)
+    const narrative = script.narrative || 'Tail outcome script based on the wrapper output.'
+    const math = computeParlayMath(filledLegs.map(l => l.american_odds))
+    const notes = script.notes?.length ? script.notes : [...REQUIRED_NOTES]
+    for (const req of REQUIRED_NOTES) {
+      if (!notes.some(n => n.toLowerCase() === req.toLowerCase())) notes.push(req)
+    }
+    return { ...script, narrative, legs: filledLegs, parlay_math: math, notes }
+  })
+
   return {
     assumptions,
-    scripts: scripts.length ? scripts.slice(0, 3) : [parseScriptBlock(['Script 1'])]
+    scripts: normalizedScripts
   }
 }

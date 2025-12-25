@@ -1,3 +1,7 @@
+import fs from 'fs'
+import path from 'path'
+import { teamNameToCode } from '@/lib/nfl/teams'
+
 export type DirectLine = {
 	total?: number
 	spreadHome?: number
@@ -39,6 +43,29 @@ export async function fetchDirectLines(params: {
 			spreadAway: pick(Number((json as any).spreadAway)),
 			source: typeof (json as any).source === 'string' ? (json as any).source : 'lines',
 			timestamp: pick(Number((json as any).timestamp)),
+		}
+	} catch {
+		// fall through to local file below
+	}
+
+	// Local manual override fallback: my-parlaygpt/data/lines/{year}/week-XX.json
+	try {
+		const [awayRaw, homeRaw] = params.matchup.split('@').map(s => s.trim())
+		const awayCode = teamNameToCode[awayRaw] || Object.entries(teamNameToCode).find(([name]) => awayRaw?.includes(name))?.[1]
+		const homeCode = teamNameToCode[homeRaw] || Object.entries(teamNameToCode).find(([name]) => homeRaw?.includes(name))?.[1]
+		if (!awayCode || !homeCode) return null
+		const w = String(params.week).padStart(2, '0')
+		const file = path.join(process.cwd(), 'my-parlaygpt', 'data', 'lines', String(params.year), `week-${w}.json`)
+		if (!fs.existsSync(file)) return null
+		const arr = JSON.parse(fs.readFileSync(file, 'utf8')) as Array<any>
+		const rec = arr.find(r => (r.awayCode === awayCode && r.homeCode === homeCode))
+		if (!rec) return null
+		return {
+			total: pick(Number(rec.total)),
+			spreadHome: pick(Number(rec.spreadHome)),
+			spreadAway: pick(Number(rec.spreadAway)),
+			source: String(rec.source || 'manual'),
+			timestamp: pick(Number(rec.timestamp)),
 		}
 	} catch {
 		return null
