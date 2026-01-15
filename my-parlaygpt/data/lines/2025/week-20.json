@@ -1,0 +1,35 @@
+[
+  {
+    "awayCode": "BUF",
+    "homeCode": "DEN",
+    "total": 43.5,
+    "spreadAway": -2.5,
+    "spreadHome": 2.5,
+    "source": "manual"
+  },
+  {
+    "awayCode": "SF",
+    "homeCode": "SEA",
+    "total": 45.5,
+    "spreadAway": -1.5,
+    "spreadHome": 1.5,
+    "source": "manual"
+  },
+  {
+    "awayCode": "HOU",
+    "homeCode": "NE",
+    "total": 41.5,
+    "spreadAway": 3.0,
+    "spreadHome": -3.0,
+    "source": "manual"
+  },
+  {
+    "awayCode": "LA",
+    "homeCode": "CHI",
+    "total": 44.5,
+    "spreadAway": -3.5,
+    "spreadHome": 3.5,
+    "source": "manual"
+  }
+]
+

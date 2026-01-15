@@ -16,7 +16,7 @@ const GAMES = [
   { id: "rams-bears", display: "Los Angeles Rams @ Chicago Bears", time: "Sun 6:30 PM ET", week: WEEK, date: "2026-01-18" },
 ]
 
-// With only 6 games, treat them all as featured.
+// With only 4 games, treat them all as featured.
 const POPULAR = new Set(GAMES.map(g => g.id))
 
 export async function GET() {

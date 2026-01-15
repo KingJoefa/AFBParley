@@ -14,7 +14,7 @@ const CURRENT_WEEK_GAMES = [
 ];
 
 // Popular/high-profile games that are always good for parlays
-// With only 6 playoff games, treat them all as featured.
+// With only 4 playoff games, treat them all as featured.
 const POPULAR_GAMES = CURRENT_WEEK_GAMES.map(g => g.id);
 
 /**

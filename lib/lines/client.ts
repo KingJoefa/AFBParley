@@ -10,8 +10,8 @@ export type DirectLine = {
 	timestamp?: number
 }
 
-function pick<T>(value: T | undefined | null): T | undefined {
-	return value == null ? undefined : value
+function pick(value: number | undefined | null): number | undefined {
+	return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 /**

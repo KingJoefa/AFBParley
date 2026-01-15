@@ -1,0 +1,51 @@
+[
+  {
+    "awayCode": "LA",
+    "homeCode": "CAR",
+    "total": 46.5,
+    "spreadAway": -10.5,
+    "spreadHome": 10.5,
+    "source": "sharpfootballanalysis"
+  },
+  {
+    "awayCode": "GB",
+    "homeCode": "CHI",
+    "total": 45.5,
+    "spreadAway": -1.5,
+    "spreadHome": 1.5,
+    "source": "sharpfootballanalysis"
+  },
+  {
+    "awayCode": "BUF",
+    "homeCode": "JAX",
+    "total": 52.5,
+    "spreadAway": -1.5,
+    "spreadHome": 1.5,
+    "source": "sharpfootballanalysis"
+  },
+  {
+    "awayCode": "SF",
+    "homeCode": "PHI",
+    "total": 44.5,
+    "spreadAway": 4.5,
+    "spreadHome": -4.5,
+    "source": "sharpfootballanalysis"
+  },
+  {
+    "awayCode": "LAC",
+    "homeCode": "NE",
+    "total": 46.5,
+    "spreadAway": 3.5,
+    "spreadHome": -3.5,
+    "source": "sharpfootballanalysis"
+  },
+  {
+    "awayCode": "HOU",
+    "homeCode": "PIT",
+    "total": 39.5,
+    "spreadAway": -3,
+    "spreadHome": 3,
+    "source": "sharpfootballanalysis"
+  }
+]
+

@@ -6,6 +6,8 @@ const REQUIRED_NOTES = [
   'If odds not supplied, american_odds are illustrative — paste your book’s prices to re-price.'
 ]
 
+const OFFER_OPPOSITE = 'Want the other side of this story?' as const
+
 function cleanLine(value: string) {
   return value.replace(/\s+/g, ' ').trim()
 }
@@ -123,7 +125,7 @@ function parseScriptBlock(block: string[]) {
     legs: legs.slice(0, 5),
     parlay_math: math,
     notes,
-    offer_opposite: 'Want the other side of this story?'
+    offer_opposite: OFFER_OPPOSITE
   }
 }
 
@@ -170,7 +172,7 @@ export function parseSwantailOutputText(text: string, fallback: SwantailResponse
     for (const req of REQUIRED_NOTES) {
       if (!notes.some(n => n.toLowerCase() === req.toLowerCase())) notes.push(req)
     }
-    return { ...script, narrative, legs: filledLegs, parlay_math: math, notes }
+    return { ...script, narrative, legs: filledLegs, parlay_math: math, notes, offer_opposite: OFFER_OPPOSITE }
   })
 
   return {
