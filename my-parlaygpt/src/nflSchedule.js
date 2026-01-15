@@ -3,38 +3,19 @@
  * Fetches current week's NFL games with fallback to manual data
  */
 
-// Current week's actual NFL schedule (Week 17, December 25–29, 2025)
+// Current slate: 2025 Season - Divisional Round (Sat Jan 17 - Sun Jan 18, 2026)
 const CURRENT_WEEK_GAMES = [
-  // Thu, Dec 25
-  { id: 'cowboys-commanders', display: 'Dallas Cowboys @ Washington Commanders', time: 'Thu 1:00 PM ET' },
-  { id: 'lions-vikings', display: 'Detroit Lions @ Minnesota Vikings', time: 'Thu 4:30 PM ET' },
-  { id: 'broncos-chiefs', display: 'Denver Broncos @ Kansas City Chiefs', time: 'Thu 8:15 PM ET' },
-  // Sat, Dec 27
-  { id: 'texans-chargers', display: 'Houston Texans @ Los Angeles Chargers', time: 'Sat 4:30 PM ET' },
-  { id: 'ravens-packers', display: 'Baltimore Ravens @ Green Bay Packers', time: 'Sat 8:00 PM ET' },
-  // Sun, Dec 28
-  { id: 'cardinals-bengals', display: 'Arizona Cardinals @ Cincinnati Bengals', time: 'Sun 1:00 PM ET' },
-  { id: 'steelers-browns', display: 'Pittsburgh Steelers @ Cleveland Browns', time: 'Sun 1:00 PM ET' },
-  { id: 'saints-titans', display: 'New Orleans Saints @ Tennessee Titans', time: 'Sun 1:00 PM ET' },
-  { id: 'jaguars-colts', display: 'Jacksonville Jaguars @ Indianapolis Colts', time: 'Sun 1:00 PM ET' },
-  { id: 'buccaneers-dolphins', display: 'Tampa Bay Buccaneers @ Miami Dolphins', time: 'Sun 1:00 PM ET' },
-  { id: 'patriots-jets', display: 'New England Patriots @ New York Jets', time: 'Sun 1:00 PM ET' },
-  { id: 'seahawks-panthers', display: 'Seattle Seahawks @ Carolina Panthers', time: 'Sun 1:00 PM ET' },
-  { id: 'giants-raiders', display: 'New York Giants @ Las Vegas Raiders', time: 'Sun 4:05 PM ET' },
-  { id: 'eagles-bills', display: 'Philadelphia Eagles @ Buffalo Bills', time: 'Sun 4:25 PM ET' },
-  { id: 'bears-49ers', display: 'Chicago Bears @ San Francisco 49ers', time: 'Sun 8:20 PM ET' },
-  // Mon, Dec 29
-  { id: 'rams-falcons', display: 'Los Angeles Rams @ Atlanta Falcons', time: 'Mon 8:15 PM ET' }
+  // Sat, Jan 17
+  { id: 'bills-broncos', display: 'Buffalo Bills @ Denver Broncos', time: 'Sat 4:30 PM ET' },
+  { id: '49ers-seahawks', display: 'San Francisco 49ers @ Seattle Seahawks', time: 'Sat 8:00 PM ET' },
+  // Sun, Jan 18
+  { id: 'texans-patriots', display: 'Houston Texans @ New England Patriots', time: 'Sun 3:00 PM ET' },
+  { id: 'rams-bears', display: 'Los Angeles Rams @ Chicago Bears', time: 'Sun 6:30 PM ET' }
 ];
 
 // Popular/high-profile games that are always good for parlays
-const POPULAR_GAMES = [
-  'broncos-chiefs',
-  'eagles-bills',
-  'bears-49ers',
-  'patriots-jets',
-  'cowboys-commanders'
-];
+// With only 6 playoff games, treat them all as featured.
+const POPULAR_GAMES = CURRENT_WEEK_GAMES.map(g => g.id);
 
 /**
  * Get current week's NFL games
