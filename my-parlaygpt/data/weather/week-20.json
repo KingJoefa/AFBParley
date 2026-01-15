@@ -1,0 +1,9 @@
+{
+  "ts": 1737052800,
+  "games": [
+    { "matchup": "BUF @ DEN", "gameId": "bills-broncos", "temp_f": 32, "wind_mph": 8, "precip": "clear", "indoor": false },
+    { "matchup": "SF @ SEA", "gameId": "49ers-seahawks", "temp_f": 45, "wind_mph": 12, "precip": "rain", "indoor": false },
+    { "matchup": "HOU @ NE", "gameId": "texans-patriots", "temp_f": 28, "wind_mph": 15, "precip": "snow", "indoor": false },
+    { "matchup": "LA @ CHI", "gameId": "rams-bears", "temp_f": 18, "wind_mph": 20, "precip": "clear", "indoor": false }
+  ]
+}

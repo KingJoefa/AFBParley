@@ -14,7 +14,9 @@ export const AfbRequestSchema = z.object({
         american_odds: z.number()
       })
     )
-    .optional()
+    .optional(),
+  // BYOA: User-provided analytics (request-scoped, not stored on server)
+  byoa_data: z.string().max(4000).optional(),
 })
 
 export type AfbRequest = z.infer<typeof AfbRequestSchema>

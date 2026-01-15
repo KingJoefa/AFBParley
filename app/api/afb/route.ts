@@ -3,8 +3,13 @@ import { AfbRequestSchema } from '@/types/afb'
 import { getMemory, sanitizeMemoryForPrompt } from '@/packages/sdk/memory'
 import { SwantailResponseSchema } from '@/lib/swantail/schema'
 import { parseSwantailOutputText } from '@/lib/swantail/parse'
+import { buildGameContext, getContextSummary } from '@/lib/context'
 
 export const runtime = 'nodejs'
+
+// Current season/week - updated manually or via API
+const CURRENT_SEASON = 2025
+const CURRENT_WEEK = 20 // Divisional Round
 
 type WrapperResponse = {
   outputText?: string
@@ -33,28 +38,36 @@ function buildWrapperPayload(input: {
   angles?: string[]
   voice?: 'analyst' | 'hype' | 'coach'
   memory?: Record<string, any>
+  gameContext?: { instruction: string; context: string; tokenCount: number }
 }) {
-  const { matchup, line_focus, angles, voice, memory } = input
+  const { matchup, line_focus, angles, voice, memory, gameContext } = input
   const promptParts: string[] = []
+
+  // Inject game context first (lines, injuries, weather, stats)
+  if (gameContext?.context) {
+    promptParts.push(gameContext.instruction)
+    promptParts.push(gameContext.context)
+  }
+
   if (line_focus) promptParts.push(`Line focus: ${line_focus}`)
   if (angles?.length) promptParts.push(`Angles: ${angles.join(', ')}`)
   if (memory && Object.keys(memory).length) {
-    promptParts.push(`Memory: ${JSON.stringify(memory).slice(0, 1200)}`)
+    promptParts.push(`Memory: ${JSON.stringify(memory).slice(0, 800)}`)
   }
 
   return {
     product: 'afb-script-parlay',
-    version: '1.0',
+    version: '1.1', // Bumped for context injection
     input: {
       matchup,
       league: 'NFL',
-      user_prompt: promptParts.join(' | '),
+      user_prompt: promptParts.join('\n\n'),
       voice: voice ?? 'analyst',
       script_count: 3,
     },
     options: {
       temperature: 0.7,
-      max_tokens: 900,
+      max_tokens: 1100, // Increased for richer context-aware output
     },
   }
 }
@@ -70,12 +83,24 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { matchup, line_focus, angles, voice, profile } = parsed.data
+    const { matchup, line_focus, angles, voice, profile, byoa_data } = parsed.data
     const rawMemory = await getMemory(profile || 'default')
     const memory = sanitizeMemoryForPrompt(rawMemory)
 
+    // Build game context with lines, injuries, weather, stats, and BYOA
+    const gameContext = await buildGameContext({
+      year: CURRENT_SEASON,
+      week: CURRENT_WEEK,
+      matchup,
+      byoaData: byoa_data,
+    })
+
+    // Log context summary for debugging
+    const contextSummary = getContextSummary(gameContext)
+    console.log('[AFB] Context summary:', JSON.stringify(contextSummary))
+
     const config = getWrapperConfig()
-    const payload = buildWrapperPayload({ matchup, line_focus, angles, voice, memory })
+    const payload = buildWrapperPayload({ matchup, line_focus, angles, voice, memory, gameContext })
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs)

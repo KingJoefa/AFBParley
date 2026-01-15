@@ -1,0 +1,24 @@
+{
+  "matchup": "Houston Texans @ New England Patriots",
+  "teams": ["HOU", "NE"],
+  "lines": {
+    "type": "lines",
+    "source": "manual",
+    "ts": 1736966400,
+    "age_min": 90,
+    "status": "STALE",
+    "data": {
+      "total": 42.5,
+      "spread_home": -1.5,
+      "spread_away": 1.5
+    }
+  },
+  "injuries": {
+    "type": "injuries",
+    "ts": 1737052800,
+    "status": "FRESH",
+    "data": [
+      { "player": "Nico Collins", "team": "HOU", "status": "OUT", "injury": "hamstring" }
+    ]
+  }
+}

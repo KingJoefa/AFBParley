@@ -1,0 +1,631 @@
+{
+  "ts": 1768519641,
+  "source": "FantasyPros Week 20 Rankings",
+  "note": "Rankings-based; lower rank = higher priority",
+  "players": [
+    {
+      "name": "Matthew Stafford",
+      "team": "LA",
+      "pos": "QB",
+      "rank": 1
+    },
+    {
+      "name": "Josh Allen",
+      "team": "BUF",
+      "pos": "QB",
+      "rank": 2
+    },
+    {
+      "name": "Caleb Williams",
+      "team": "CHI",
+      "pos": "QB",
+      "rank": 3
+    },
+    {
+      "name": "Sam Darnold",
+      "team": "SEA",
+      "pos": "QB",
+      "rank": 4
+    },
+    {
+      "name": "Drake Maye",
+      "team": "NE",
+      "pos": "QB",
+      "rank": 5
+    },
+    {
+      "name": "Puka Nacua",
+      "team": "LA",
+      "pos": "WR",
+      "rank": 6
+    },
+    {
+      "name": "Bo Nix",
+      "team": "DEN",
+      "pos": "QB",
+      "rank": 7
+    },
+    {
+      "name": "Christian McCaffrey",
+      "team": "SF",
+      "pos": "RB",
+      "rank": 8
+    },
+    {
+      "name": "Brock Purdy",
+      "team": "SF",
+      "pos": "QB",
+      "rank": 9
+    },
+    {
+      "name": "Jaxon Smith-Njigba",
+      "team": "SEA",
+      "pos": "WR",
+      "rank": 10
+    },
+    {
+      "name": "James Cook III",
+      "team": "BUF",
+      "pos": "RB",
+      "rank": 11
+    },
+    {
+      "name": "Kyren Williams",
+      "team": "LA",
+      "pos": "RB",
+      "rank": 12
+    },
+    {
+      "name": "RJ Harvey",
+      "team": "DEN",
+      "pos": "RB",
+      "rank": 13
+    },
+    {
+      "name": "D'Andre Swift",
+      "team": "CHI",
+      "pos": "RB",
+      "rank": 14
+    },
+    {
+      "name": "Davante Adams",
+      "team": "LA",
+      "pos": "WR",
+      "rank": 15
+    },
+    {
+      "name": "Kenneth Walker III",
+      "team": "SEA",
+      "pos": "RB",
+      "rank": 16
+    },
+    {
+      "name": "C.J. Stroud",
+      "team": "HOU",
+      "pos": "QB",
+      "rank": 17
+    },
+    {
+      "name": "Rhamondre Stevenson",
+      "team": "NE",
+      "pos": "RB",
+      "rank": 18
+    },
+    {
+      "name": "Colston Loveland",
+      "team": "CHI",
+      "pos": "TE",
+      "rank": 19
+    },
+    {
+      "name": "Zach Charbonnet",
+      "team": "SEA",
+      "pos": "RB",
+      "rank": 20
+    },
+    {
+      "name": "Courtland Sutton",
+      "team": "DEN",
+      "pos": "WR",
+      "rank": 21
+    },
+    {
+      "name": "Woody Marks",
+      "team": "HOU",
+      "pos": "RB",
+      "rank": 22
+    },
+    {
+      "name": "Khalil Shakir",
+      "team": "BUF",
+      "pos": "WR",
+      "rank": 23
+    },
+    {
+      "name": "TreVeyon Henderson",
+      "team": "NE",
+      "pos": "RB",
+      "rank": 24
+    },
+    {
+      "name": "Luther Burden III",
+      "team": "CHI",
+      "pos": "WR",
+      "rank": 25
+    },
+    {
+      "name": "Jauan Jennings",
+      "team": "SF",
+      "pos": "WR",
+      "rank": 26
+    },
+    {
+      "name": "Dalton Kincaid",
+      "team": "BUF",
+      "pos": "TE",
+      "rank": 27
+    },
+    {
+      "name": "Stefon Diggs",
+      "team": "NE",
+      "pos": "WR",
+      "rank": 28
+    },
+    {
+      "name": "Blake Corum",
+      "team": "LA",
+      "pos": "RB",
+      "rank": 29
+    },
+    {
+      "name": "DJ Moore",
+      "team": "CHI",
+      "pos": "WR",
+      "rank": 30
+    },
+    {
+      "name": "Jake Tonges",
+      "team": "SF",
+      "pos": "TE",
+      "rank": 31
+    },
+    {
+      "name": "Kyle Monangai",
+      "team": "CHI",
+      "pos": "RB",
+      "rank": 32
+    },
+    {
+      "name": "Christian Kirk",
+      "team": "HOU",
+      "pos": "WR",
+      "rank": 33
+    },
+    {
+      "name": "Rome Odunze",
+      "team": "CHI",
+      "pos": "WR",
+      "rank": 34
+    },
+    {
+      "name": "AJ Barner",
+      "team": "SEA",
+      "pos": "TE",
+      "rank": 35
+    },
+    {
+      "name": "Hunter Henry",
+      "team": "NE",
+      "pos": "TE",
+      "rank": 36
+    },
+    {
+      "name": "Dalton Schultz",
+      "team": "HOU",
+      "pos": "TE",
+      "rank": 37
+    },
+    {
+      "name": "Jayden Higgins",
+      "team": "HOU",
+      "pos": "WR",
+      "rank": 38
+    },
+    {
+      "name": "Troy Franklin",
+      "team": "DEN",
+      "pos": "WR",
+      "rank": 39
+    },
+    {
+      "name": "Kayshon Boutte",
+      "team": "NE",
+      "pos": "WR",
+      "rank": 40
+    },
+    {
+      "name": "Demarcus Robinson",
+      "team": "SF",
+      "pos": "WR",
+      "rank": 41
+    },
+    {
+      "name": "Ricky Pearsall",
+      "team": "SF",
+      "pos": "WR",
+      "rank": 42
+    },
+    {
+      "name": "Cooper Kupp",
+      "team": "SEA",
+      "pos": "WR",
+      "rank": 43
+    },
+    {
+      "name": "Brandin Cooks",
+      "team": "BUF",
+      "pos": "WR",
+      "rank": 44
+    },
+    {
+      "name": "Tyler Higbee",
+      "team": "LA",
+      "pos": "TE",
+      "rank": 45
+    },
+    {
+      "name": "Colby Parkinson",
+      "team": "LA",
+      "pos": "TE",
+      "rank": 46
+    },
+    {
+      "name": "Rashid Shaheed",
+      "team": "SEA",
+      "pos": "WR",
+      "rank": 47
+    },
+    {
+      "name": "Dawson Knox",
+      "team": "BUF",
+      "pos": "TE",
+      "rank": 48
+    },
+    {
+      "name": "Marvin Mims Jr.",
+      "team": "DEN",
+      "pos": "WR",
+      "rank": 49
+    },
+    {
+      "name": "Evan Engram",
+      "team": "DEN",
+      "pos": "TE",
+      "rank": 50
+    },
+    {
+      "name": "Nick Chubb",
+      "team": "HOU",
+      "pos": "RB",
+      "rank": 51
+    },
+    {
+      "name": "Xavier Hutchinson",
+      "team": "HOU",
+      "pos": "WR",
+      "rank": 52
+    },
+    {
+      "name": "Keon Coleman",
+      "team": "BUF",
+      "pos": "WR",
+      "rank": 53
+    },
+    {
+      "name": "Cole Kmet",
+      "team": "CHI",
+      "pos": "TE",
+      "rank": 54
+    },
+    {
+      "name": "Olamide Zaccheaus",
+      "team": "CHI",
+      "pos": "WR",
+      "rank": 55
+    },
+    {
+      "name": "Brian Robinson Jr.",
+      "team": "SF",
+      "pos": "RB",
+      "rank": 56
+    },
+    {
+      "name": "Pat Bryant",
+      "team": "DEN",
+      "pos": "WR",
+      "rank": 57
+    },
+    {
+      "name": "Kyle Williams",
+      "team": "NE",
+      "pos": "WR",
+      "rank": 58
+    },
+    {
+      "name": "Nico Collins",
+      "team": "HOU",
+      "pos": "WR",
+      "rank": 59
+    },
+    {
+      "name": "Kyle Juszczyk",
+      "team": "SF",
+      "pos": "RB",
+      "rank": 60
+    },
+    {
+      "name": "Kendrick Bourne",
+      "team": "SF",
+      "pos": "WR",
+      "rank": 61
+    },
+    {
+      "name": "Jimmy Garoppolo",
+      "team": "LA",
+      "pos": "QB",
+      "rank": 62
+    },
+    {
+      "name": "Terrance Ferguson",
+      "team": "LA",
+      "pos": "TE",
+      "rank": 63
+    },
+    {
+      "name": "Ray Davis",
+      "team": "BUF",
+      "pos": "RB",
+      "rank": 64
+    },
+    {
+      "name": "Konata Mumpfield",
+      "team": "LA",
+      "pos": "WR",
+      "rank": 65
+    },
+    {
+      "name": "Jaylin Noel",
+      "team": "HOU",
+      "pos": "WR",
+      "rank": 66
+    },
+    {
+      "name": "Austin Hooper",
+      "team": "NE",
+      "pos": "TE",
+      "rank": 67
+    },
+    {
+      "name": "Ty Johnson",
+      "team": "BUF",
+      "pos": "RB",
+      "rank": 68
+    },
+    {
+      "name": "Tutu Atwell",
+      "team": "LA",
+      "pos": "WR",
+      "rank": 69
+    },
+    {
+      "name": "Mitchell Trubisky",
+      "team": "BUF",
+      "pos": "QB",
+      "rank": 70
+    },
+    {
+      "name": "Xavier Smith",
+      "team": "LA",
+      "pos": "WR",
+      "rank": 71
+    },
+    {
+      "name": "Tyson Bagent",
+      "team": "CHI",
+      "pos": "QB",
+      "rank": 72
+    },
+    {
+      "name": "DeMario Douglas",
+      "team": "NE",
+      "pos": "WR",
+      "rank": 73
+    },
+    {
+      "name": "Luke Farrell",
+      "team": "SF",
+      "pos": "TE",
+      "rank": 74
+    },
+    {
+      "name": "Davis Allen",
+      "team": "LA",
+      "pos": "TE",
+      "rank": 75
+    },
+    {
+      "name": "Tyrell Shavers",
+      "team": "BUF",
+      "pos": "WR",
+      "rank": 76
+    },
+    {
+      "name": "Cade Stover",
+      "team": "HOU",
+      "pos": "TE",
+      "rank": 77
+    },
+    {
+      "name": "Adam Trautman",
+      "team": "DEN",
+      "pos": "TE",
+      "rank": 78
+    },
+    {
+      "name": "Jackson Hawes",
+      "team": "BUF",
+      "pos": "TE",
+      "rank": 79
+    },
+    {
+      "name": "Jaleel McLaughlin",
+      "team": "DEN",
+      "pos": "RB",
+      "rank": 80
+    },
+    {
+      "name": "Ronnie Rivers",
+      "team": "LA",
+      "pos": "RB",
+      "rank": 81
+    },
+    {
+      "name": "Mac Jones",
+      "team": "SF",
+      "pos": "QB",
+      "rank": 82
+    },
+    {
+      "name": "Davis Mills",
+      "team": "HOU",
+      "pos": "QB",
+      "rank": 83
+    },
+    {
+      "name": "Jawhar Jordan",
+      "team": "HOU",
+      "pos": "RB",
+      "rank": 84
+    },
+    {
+      "name": "Efton Chism III",
+      "team": "NE",
+      "pos": "WR",
+      "rank": 85
+    },
+    {
+      "name": "Devin Duvernay",
+      "team": "CHI",
+      "pos": "WR",
+      "rank": 86
+    },
+    {
+      "name": "Eric Saubert",
+      "team": "SEA",
+      "pos": "TE",
+      "rank": 87
+    },
+    {
+      "name": "Curtis Samuel",
+      "team": "BUF",
+      "pos": "WR",
+      "rank": 88
+    },
+    {
+      "name": "Gabe Davis",
+      "team": "BUF",
+      "pos": "WR",
+      "rank": 89
+    },
+    {
+      "name": "Skyy Moore",
+      "team": "SF",
+      "pos": "WR",
+      "rank": 91
+    },
+    {
+      "name": "Travis Homer",
+      "team": "CHI",
+      "pos": "RB",
+      "rank": 92
+    },
+    {
+      "name": "Jarquez Hunter",
+      "team": "LA",
+      "pos": "RB",
+      "rank": 93
+    },
+    {
+      "name": "Reggie Gilliam",
+      "team": "BUF",
+      "pos": "RB",
+      "rank": 94
+    },
+    {
+      "name": "Jordan James",
+      "team": "SF",
+      "pos": "RB",
+      "rank": 95
+    },
+    {
+      "name": "Jacob Cowing",
+      "team": "SF",
+      "pos": "WR",
+      "rank": 96
+    },
+    {
+      "name": "Durham Smythe",
+      "team": "CHI",
+      "pos": "TE",
+      "rank": 97
+    },
+    {
+      "name": "Lil'Jordan Humphrey",
+      "team": "DEN",
+      "pos": "WR",
+      "rank": 98
+    },
+    {
+      "name": "Tyler Badie",
+      "team": "DEN",
+      "pos": "RB",
+      "rank": 99
+    },
+    {
+      "name": "Adam Prentice",
+      "team": "DEN",
+      "pos": "RB",
+      "rank": 100
+    },
+    {
+      "name": "Frank Gore Jr.",
+      "team": "BUF",
+      "pos": "RB",
+      "rank": 101
+    },
+    {
+      "name": "Jordan Whittington",
+      "team": "LA",
+      "pos": "WR",
+      "rank": 102
+    },
+    {
+      "name": "Jahdae Walker",
+      "team": "CHI",
+      "pos": "WR",
+      "rank": 103
+    },
+    {
+      "name": "Michael Bandy",
+      "team": "DEN",
+      "pos": "WR",
+      "rank": 104
+    },
+    {
+      "name": "Dare Ogunbowale",
+      "team": "HOU",
+      "pos": "RB",
+      "rank": 105
+    }
+  ]
+}

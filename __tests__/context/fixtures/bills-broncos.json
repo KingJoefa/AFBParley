@@ -1,0 +1,57 @@
+{
+  "matchup": "Buffalo Bills @ Denver Broncos",
+  "teams": ["BUF", "DEN"],
+  "lines": {
+    "type": "lines",
+    "source": "consensus",
+    "ts": 1737052800,
+    "age_min": 5,
+    "status": "FRESH",
+    "data": {
+      "total": 44.5,
+      "spread_home": 3.5,
+      "spread_away": -3.5
+    }
+  },
+  "injuries": {
+    "type": "injuries",
+    "ts": 1737052800,
+    "status": "FRESH",
+    "data": [
+      { "player": "Javonte Williams", "team": "DEN", "status": "QUESTIONABLE", "injury": "knee" }
+    ]
+  },
+  "weather": {
+    "type": "weather",
+    "ts": 1737052800,
+    "data": {
+      "temp_f": 32,
+      "wind_mph": 8,
+      "precip": "clear",
+      "indoor": false
+    }
+  },
+  "teamStats": [
+    {
+      "type": "team_stats",
+      "team": "BUF",
+      "ts": 1737052800,
+      "data": { "epa": 0.18, "pace": 68.2, "pass_rate": 0.58, "rz_td_rate": 0.68, "pressure_rate": 0.28 }
+    },
+    {
+      "type": "team_stats",
+      "team": "DEN",
+      "ts": 1737052800,
+      "data": { "epa": 0.05, "pace": 62.5, "pass_rate": 0.52, "rz_td_rate": 0.55, "pressure_rate": 0.32 }
+    }
+  ],
+  "projections": {
+    "type": "projections",
+    "ts": 1737052800,
+    "data": [
+      { "name": "Josh Allen", "team": "BUF", "pos": "QB", "pass_yds": 285, "pass_tds": 2.2, "rush_yds": 48, "proj_pts": 24.5 },
+      { "name": "James Cook", "team": "BUF", "pos": "RB", "rush_yds": 78, "rush_tds": 0.6, "rec_yds": 28, "proj_pts": 14.2 },
+      { "name": "Javonte Williams", "team": "DEN", "pos": "RB", "rush_yds": 65, "rush_tds": 0.5, "rec_yds": 22, "proj_pts": 11.5 }
+    ]
+  }
+}

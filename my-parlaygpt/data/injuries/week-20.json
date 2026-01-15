@@ -1,0 +1,9 @@
+{
+  "ts": 1737052800,
+  "injuries": [
+    { "player": "Javonte Williams", "team": "DEN", "status": "QUESTIONABLE", "injury": "knee" },
+    { "player": "Deebo Samuel", "team": "SF", "status": "QUESTIONABLE", "injury": "shoulder" },
+    { "player": "Nico Collins", "team": "HOU", "status": "OUT", "injury": "hamstring" },
+    { "player": "Puka Nacua", "team": "LA", "status": "QUESTIONABLE", "injury": "knee" }
+  ]
+}

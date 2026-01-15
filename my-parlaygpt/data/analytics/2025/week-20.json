@@ -1,0 +1,13 @@
+{
+  "ts": 1737052800,
+  "teams": [
+    { "teamCode": "BUF", "epa": 0.18, "pace": 68.2, "pass_rate": 0.58, "rz_td_rate": 0.68, "pressure_rate": 0.28 },
+    { "teamCode": "DEN", "epa": 0.05, "pace": 62.5, "pass_rate": 0.52, "rz_td_rate": 0.55, "pressure_rate": 0.32 },
+    { "teamCode": "SF", "epa": 0.12, "pace": 65.8, "pass_rate": 0.54, "rz_td_rate": 0.62, "pressure_rate": 0.30 },
+    { "teamCode": "SEA", "epa": 0.08, "pace": 64.2, "pass_rate": 0.56, "rz_td_rate": 0.58, "pressure_rate": 0.26 },
+    { "teamCode": "HOU", "epa": 0.10, "pace": 66.5, "pass_rate": 0.60, "rz_td_rate": 0.60, "pressure_rate": 0.34 },
+    { "teamCode": "NE", "epa": 0.02, "pace": 61.8, "pass_rate": 0.48, "rz_td_rate": 0.52, "pressure_rate": 0.38 },
+    { "teamCode": "LA", "epa": 0.14, "pace": 67.0, "pass_rate": 0.62, "rz_td_rate": 0.65, "pressure_rate": 0.25 },
+    { "teamCode": "CHI", "epa": 0.06, "pace": 63.5, "pass_rate": 0.50, "rz_td_rate": 0.56, "pressure_rate": 0.30 }
+  ]
+}
