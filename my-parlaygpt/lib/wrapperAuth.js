@@ -8,4 +8,8 @@ function checkWrapperAuth(req, { headerName, token }) {
   return { ok: true }
 }
 
-module.exports = { checkWrapperAuth }
+function shouldBypassAuth(pathname) {
+  return pathname === '/api/health'
+}
+
+module.exports = { checkWrapperAuth, shouldBypassAuth }
