@@ -43,34 +43,25 @@ function buildWrapperPayload(input: {
   gameContext?: { instruction: string; context: string; tokenCount: number }
 }) {
   const { matchup, line_focus, angles, voice, memory, gameContext } = input
-  const promptParts: string[] = []
 
-  // Inject game context first (lines, injuries, weather, stats)
+  // Build BYOA context from game context and memory
+  const byoaParts: string[] = []
   if (gameContext?.context) {
-    promptParts.push(gameContext.instruction)
-    promptParts.push(gameContext.context)
+    byoaParts.push(gameContext.instruction)
+    byoaParts.push(gameContext.context)
   }
-
-  if (line_focus) promptParts.push(`Line focus: ${line_focus}`)
-  if (angles?.length) promptParts.push(`Angles: ${angles.join(', ')}`)
   if (memory && Object.keys(memory).length) {
-    promptParts.push(`Memory: ${JSON.stringify(memory).slice(0, 800)}`)
+    byoaParts.push(`User memory: ${JSON.stringify(memory).slice(0, 800)}`)
   }
 
+  // Return flat structure matching wrapper's expected format
   return {
-    product: 'afb-script-parlay',
-    version: '1.1', // Bumped for context injection
-    input: {
-      matchup,
-      league: 'NFL',
-      user_prompt: promptParts.join('\n\n'),
-      voice: voice ?? 'analyst',
-      script_count: 3,
-    },
-    options: {
-      temperature: 0.7,
-      max_tokens: 1100, // Increased for richer context-aware output
-    },
+    matchup,
+    lineFocus: line_focus,
+    angles: angles ?? [],
+    voice: voice ?? 'analyst',
+    wantJson: true,
+    byoa: byoaParts.length > 0 ? byoaParts.join('\n\n') : undefined,
   }
 }
 
