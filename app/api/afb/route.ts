@@ -18,6 +18,88 @@ type WrapperResponse = {
   [key: string]: any
 }
 
+// Transform wrapper response format to match SwantailResponseSchema
+function transformWrapperResponse(raw: any): any {
+  const assumptions = raw.assumptions || raw.Assumptions
+  const scripts = raw.scripts || raw.Scripts
+
+  // Parse American odds string to number (e.g., "-110" -> -110, "+120" -> 120, "illustrative -110" -> -110)
+  function parseOdds(oddsStr: string | number): number {
+    if (typeof oddsStr === 'number') return oddsStr
+    if (!oddsStr) return -110 // default
+    // Extract number from strings like "illustrative -110" or "-110" or "+120"
+    const match = String(oddsStr).match(/([+-]?\d+)/)
+    return match ? parseInt(match[1], 10) : -110
+  }
+
+  // Parse currency string to number (e.g., "$7.26" -> 7.26)
+  function parseCurrency(val: string | number): number {
+    if (typeof val === 'number') return val
+    if (!val) return 0
+    return parseFloat(String(val).replace(/[$,]/g, '')) || 0
+  }
+
+  // Transform assumptions
+  const rawAngles = assumptions?.angles || assumptions?.Angles || []
+  const transformedAssumptions = {
+    matchup: assumptions?.matchup || assumptions?.Matchup || '',
+    line_focus: assumptions?.line_focus || assumptions?.['line focus'] || assumptions?.lineFocus || '',
+    // Handle angles as string or array
+    angles: Array.isArray(rawAngles) ? rawAngles : (rawAngles ? [rawAngles] : []),
+    voice: (assumptions?.voice || assumptions?.Voice || 'analyst').toLowerCase() as 'analyst' | 'hype' | 'coach',
+  }
+
+  // Transform scripts
+  const transformedScripts = (scripts || []).map((script: any) => {
+    const legs = (script.legs || script.Legs || []).map((leg: any) => {
+      const oddsRaw = leg.american_odds || leg.odds || leg.Odds || '-110'
+      const oddsStr = String(oddsRaw).toLowerCase()
+      return {
+        market: leg.market || leg.Market || '',
+        selection: leg.selection || leg.Selection || '',
+        american_odds: parseOdds(oddsRaw),
+        // Check if "user" appears in odds string or type field
+        odds_source: (oddsStr.includes('user') || (leg.odds_source || leg.type || leg.Type || '').toLowerCase().includes('user'))
+          ? 'user_supplied' as const
+          : 'illustrative' as const,
+      }
+    })
+
+    const mathRaw = script.parlay_math || script['$1 Parlay Math'] || script.parlayMath || {}
+    const stepsStr = mathRaw.steps || mathRaw.Steps || ''
+    // Extract decimals from steps string like "1.91 × 1.95 × 1.95 = 7.26"
+    const decimalMatches = stepsStr.match(/[\d.]+(?=\s*[×x])/g) || []
+    const legDecimals = decimalMatches.map((d: string) => parseFloat(d))
+
+    const parlay_math = {
+      stake: 1,
+      leg_decimals: legDecimals.length > 0 ? legDecimals : [1.91, 1.91, 1.91],
+      product_decimal: parseCurrency(mathRaw.product || mathRaw.Product) || legDecimals.reduce((a: number, b: number) => a * b, 1) || 1,
+      payout: parseCurrency(mathRaw.payout || mathRaw.Payout),
+      profit: parseCurrency(mathRaw.profit || mathRaw.Profit),
+      steps: stepsStr,
+    }
+
+    // Transform notes - can be array of strings or array of {text: string}
+    const notesRaw = script.notes || script.Notes || []
+    const notes = notesRaw.map((n: any) => typeof n === 'string' ? n : n?.text || '')
+
+    return {
+      title: script.title || script.Title || '',
+      narrative: script.narrative || script.Narrative || '',
+      legs,
+      parlay_math,
+      notes: notes.length >= 2 ? notes : ['No guarantees; high variance by design.', 'Odds are illustrative.'],
+      offer_opposite: 'Want the other side of this story?' as const,
+    }
+  })
+
+  return {
+    assumptions: transformedAssumptions,
+    scripts: transformedScripts,
+  }
+}
+
 function requiredEnv(name: string): string {
   const v = process.env[name]
   if (!v) throw new Error(`Missing required env var: ${name}`)
@@ -128,10 +210,18 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      // If wrapper already returns structured Swantail JSON, pass it through.
-      if (wrapperPayload?.assumptions && wrapperPayload?.scripts) {
-        const check = SwantailResponseSchema.safeParse(wrapperPayload)
+      // If wrapper already returns structured Swantail JSON, transform and pass it through.
+      // Handle both lowercase (assumptions/scripts) and capitalized (Assumptions/Scripts) keys
+      const hasAssumptions = wrapperPayload?.assumptions || wrapperPayload?.Assumptions
+      const hasScripts = wrapperPayload?.scripts || wrapperPayload?.Scripts
+
+      if (hasAssumptions && hasScripts) {
+        // Transform wrapper response to match schema format
+        const transformedPayload = transformWrapperResponse(wrapperPayload)
+        const check = SwantailResponseSchema.safeParse(transformedPayload)
         if (!check.success) {
+          console.error('[AFB] Schema validation failed:', JSON.stringify(check.error.flatten()))
+          console.error('[AFB] Transformed payload:', JSON.stringify(transformedPayload).slice(0, 1000))
           return new Response(
             JSON.stringify({ code: 'BAD_WRAPPER_SCHEMA', details: check.error.flatten() }),
             { status: 502, headers: { 'Content-Type': 'application/json' } }
@@ -148,8 +238,10 @@ export async function POST(req: NextRequest) {
 
       const outputText = wrapperPayload.outputText
       if (!outputText) {
+        // Log the actual response for debugging
+        console.error('[AFB] Unexpected wrapper response format:', JSON.stringify(wrapperPayload).slice(0, 500))
         return new Response(
-          JSON.stringify({ code: 'BAD_WRAPPER_RESPONSE', message: 'Missing outputText in wrapper response' }),
+          JSON.stringify({ code: 'BAD_WRAPPER_RESPONSE', message: 'Missing outputText in wrapper response', keys: Object.keys(wrapperPayload) }),
           { status: 502, headers: { 'Content-Type': 'application/json' } }
         )
       }
