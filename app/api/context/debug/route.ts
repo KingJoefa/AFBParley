@@ -6,6 +6,7 @@
 
 import { NextRequest } from 'next/server'
 import { buildGameContext, getContextSummary, parseMatchupTeams } from '@/lib/context'
+import { CONTEXT_VERSION, hashContextPayload } from '@/lib/context/hash'
 
 export const runtime = 'nodejs'
 
@@ -34,6 +35,12 @@ export async function GET(req: NextRequest) {
     })
 
     const summary = getContextSummary(context)
+    const contextPayload = {
+      context_version: CONTEXT_VERSION,
+      instruction: context.instruction,
+      context: context.context,
+    }
+    const contextHash = hashContextPayload(contextPayload)
 
     return Response.json({
       matchup,
@@ -46,6 +53,8 @@ export async function GET(req: NextRequest) {
         statusByType: summary.statusByType,
         truncatedTypes: summary.truncatedTypes,
       },
+      contextVersion: CONTEXT_VERSION,
+      contextHash,
       instruction: context.instruction,
       rawContext: context.context,
       blocks: context.blocks,
