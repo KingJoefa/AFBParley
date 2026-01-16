@@ -339,9 +339,8 @@ Respond in ${wantJson ? "JSON ONLY matching the Output Contract schema" : "plain
           input: [
             { role: "system", content: getAFBSystemPrompt() },
             { role: "user", content: userPrompt }
-          ],
-          signal: controller.signal
-        });
+          ]
+        }, { signal: controller.signal });
       } else {
         throw new Error("Responses API not available");
       }
@@ -361,9 +360,8 @@ Respond in ${wantJson ? "JSON ONLY matching the Output Contract schema" : "plain
         temperature: 0.8,
         top_p: 0.9,
         frequency_penalty: 0.1,
-        presence_penalty: 0.1,
-        signal: controller.signal
-      });
+        presence_penalty: 0.1
+      }, { signal: controller.signal });
     } finally {
       clearTimeout(timeout);
     }
