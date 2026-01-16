@@ -52,5 +52,13 @@ npm start        # Next start (prod)
 ```
 (Backend runs separately: `cd my-parlaygpt && npm start`)
 
+## Smoke Tests (Local)
+```bash
+npx playwright install
+npx playwright test
+```
+Notes:
+- Tests mock `/api/afb`, so no external services are called.
+
 ## License
 MIT
