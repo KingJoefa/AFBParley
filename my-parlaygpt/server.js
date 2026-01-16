@@ -9,6 +9,8 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { validateAFBRequest } = require('./afbTypes');
+const { checkWrapperAuth } = require('./lib/wrapperAuth');
+const crypto = require('crypto');
 require('dotenv').config();
 
 // Initialize OpenAI with enhanced configuration (matches your original design)
@@ -21,6 +23,54 @@ if (!apiKey) {
 }
 
 const openai = new OpenAI({ apiKey, baseURL });
+
+const wrapperAuthHeaderRaw = process.env.WRAPPER_AUTH_HEADER || 'Authorization';
+const wrapperAuthHeader = wrapperAuthHeaderRaw.toLowerCase();
+const wrapperAuthToken = process.env.WRAPPER_AUTH_TOKEN || '';
+const wrapperTimeoutMs = Number(process.env.WRAPPER_TIMEOUT_MS || 25000);
+
+const allowedOrigins = new Set();
+const rawOrigins = (process.env.WRAPPER_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+for (const origin of rawOrigins) {
+  allowedOrigins.add(origin);
+}
+if (process.env.CLIENT_URL) {
+  allowedOrigins.add(process.env.CLIENT_URL);
+}
+allowedOrigins.add('http://localhost:3000');
+
+const corsAllowedHeaders = ['Content-Type', 'X-Request-Id', wrapperAuthHeaderRaw];
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.size === 0 || allowedOrigins.has(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'POST'],
+  allowedHeaders: corsAllowedHeaders,
+};
+
+const apiAllowlist = new Map([
+  ['/api/health', ['GET']],
+  ['/api/afb', ['POST']],
+  ['/api/focus/upload', ['POST']],
+  ['/api/focus/status', ['GET']],
+  ['/api/nfl/schedule', ['GET']],
+  ['/api/chat', ['POST']],
+]);
+
+function checkApiAllowlist(req) {
+  const allowedMethods = apiAllowlist.get(req.path);
+  if (!allowedMethods) return { ok: false, status: 404, message: 'Not found' };
+  if (req.method === 'OPTIONS') return { ok: true, preflight: true };
+  if (!allowedMethods.includes(req.method)) {
+    return { ok: false, status: 405, message: 'Method not allowed' };
+  }
+  return { ok: true };
+}
 
 // Enhanced AFB Script Parlay Builder System Prompt (matches your original specification exactly)
 function getAFBSystemPrompt() {
@@ -59,9 +109,12 @@ Finish every set of scripts with: "Want the other side of this story?"`.trim();
 
 const app = express();
 const server = http.createServer(app);
+const socketOrigins = allowedOrigins.size > 0
+  ? Array.from(allowedOrigins)
+  : [process.env.CLIENT_URL || "http://localhost:3000"];
 const io = socketIo(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    origin: socketOrigins,
     methods: ["GET", "POST"]
   }
 });
@@ -79,9 +132,29 @@ app.use(helmet({
   }
 }));
 
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static('dist'));
+
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/')) return next();
+  const check = checkApiAllowlist(req);
+  if (!check.ok) {
+    return res.status(check.status).json({ error: check.message });
+  }
+  if (check.preflight) return res.sendStatus(204);
+  return next();
+});
+
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/')) return next();
+  if (!wrapperAuthToken) return next();
+  const result = checkWrapperAuth(req, { headerName: wrapperAuthHeader, token: wrapperAuthToken });
+  if (!result.ok) {
+    return res.status(401).json({ error: 'Unauthorized', message: result.reason });
+  }
+  return next();
+});
 
 // Focus data storage (for weekly context uploads)
 const DATA_ROOT = path.join(__dirname, 'data', 'focus');
@@ -198,6 +271,11 @@ app.post('/api/afb', async (req, res) => {
       wantJson = true,
       byoa
     } = req.body;
+    const headerRequestId = req.headers['x-request-id'];
+    const requestId = (
+      Array.isArray(headerRequestId) ? headerRequestId[0] : headerRequestId
+    ) || req.body?.request_id || crypto.randomUUID();
+    res.set('x-request-id', requestId);
 
     // Validate request using your original validation logic
     const validation = validateAFBRequest({ matchup, lineFocus, angles, voice, wantJson });
@@ -248,6 +326,8 @@ Respond in ${wantJson ? "JSON ONLY matching the Output Contract schema" : "plain
 
     // Try to use Responses API if available, fall back to Chat Completions
     let completion;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), wrapperTimeoutMs);
     try {
       // Attempt your original Responses API approach
       if (openai.responses && typeof openai.responses.create === 'function') {
@@ -258,12 +338,16 @@ Respond in ${wantJson ? "JSON ONLY matching the Output Contract schema" : "plain
           input: [
             { role: "system", content: getAFBSystemPrompt() },
             { role: "user", content: userPrompt }
-          ]
+          ],
+          signal: controller.signal
         });
       } else {
         throw new Error("Responses API not available");
       }
     } catch (responsesError) {
+      if (responsesError?.name === 'AbortError') {
+        throw responsesError;
+      }
       console.log("Responses API unavailable, falling back to Chat Completions");
       // Fall back to standard Chat Completions API
       completion = await openai.chat.completions.create({
@@ -276,8 +360,11 @@ Respond in ${wantJson ? "JSON ONLY matching the Output Contract schema" : "plain
         temperature: 0.8,
         top_p: 0.9,
         frequency_penalty: 0.1,
-        presence_penalty: 0.1
+        presence_penalty: 0.1,
+        signal: controller.signal
       });
+    } finally {
+      clearTimeout(timeout);
     }
 
     // Extract content (handles both API formats)
@@ -296,9 +383,9 @@ Respond in ${wantJson ? "JSON ONLY matching the Output Contract schema" : "plain
     if (wantJson) {
       try {
         const parsed = JSON.parse(content);
-        return res.json(parsed);
+        return res.json({ request_id: requestId, ...parsed });
       } catch (parseError) {
-        return res.json({ raw: content }, { status: 200 });
+        return res.json({ request_id: requestId, raw: content }, { status: 200 });
       }
     }
 
@@ -307,6 +394,12 @@ Respond in ${wantJson ? "JSON ONLY matching the Output Contract schema" : "plain
 
   } catch (error) {
     console.error('AFB error:', error);
+    if (error?.name === 'AbortError') {
+      return res.status(504).json({
+        error: 'Wrapper timeout',
+        message: 'Wrapper request exceeded deadline',
+      });
+    }
     res.status(500).json({ 
       error: error?.message ?? 'Unknown error',
       message: 'An error occurred generating AFB scripts.'
