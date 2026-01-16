@@ -12,3 +12,9 @@ test('accepts Bearer tokens', () => {
   const result = checkWrapperAuth(req, { headerName: 'authorization', token: 'secret' })
   expect(result.ok).toBe(true)
 })
+
+test('bypasses auth for health endpoint', () => {
+  const { shouldBypassAuth } = require('../lib/wrapperAuth')
+  expect(shouldBypassAuth('/api/health')).toBe(true)
+  expect(shouldBypassAuth('/api/afb')).toBe(false)
+})

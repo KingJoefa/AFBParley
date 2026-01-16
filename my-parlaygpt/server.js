@@ -9,7 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { validateAFBRequest } = require('./afbTypes');
-const { checkWrapperAuth } = require('./lib/wrapperAuth');
+const { checkWrapperAuth, shouldBypassAuth } = require('./lib/wrapperAuth');
 const crypto = require('crypto');
 require('dotenv').config();
 
@@ -148,6 +148,7 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
   if (!req.path.startsWith('/api/')) return next();
+  if (shouldBypassAuth(req.path)) return next();
   if (!wrapperAuthToken) return next();
   const result = checkWrapperAuth(req, { headerName: wrapperAuthHeader, token: wrapperAuthToken });
   if (!result.ok) {
