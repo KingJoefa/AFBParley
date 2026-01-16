@@ -82,3 +82,6 @@ out/
 
 # TypeScript
 *.tsbuildinfo
+
+# Worktrees
+.worktrees/
