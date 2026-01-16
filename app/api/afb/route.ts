@@ -1,9 +1,11 @@
 import { NextRequest } from 'next/server'
+import { randomUUID } from 'crypto'
 import { AfbRequestSchema } from '@/types/afb'
 import { getMemory, sanitizeMemoryForPrompt } from '@/packages/sdk/memory'
 import { SwantailResponseSchema } from '@/lib/swantail/schema'
 import { parseSwantailOutputText } from '@/lib/swantail/parse'
 import { buildGameContext, getContextSummary } from '@/lib/context'
+import { CONTEXT_VERSION, hashContextPayload } from '@/lib/context/hash'
 
 export const runtime = 'nodejs'
 
@@ -84,6 +86,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { matchup, line_focus, angles, voice, profile, byoa_data } = parsed.data
+    const requestId = randomUUID()
     const rawMemory = await getMemory(profile || 'default')
     const memory = sanitizeMemoryForPrompt(rawMemory)
 
@@ -97,7 +100,13 @@ export async function POST(req: NextRequest) {
 
     // Log context summary for debugging
     const contextSummary = getContextSummary(gameContext)
-    console.log('[AFB] Context summary:', JSON.stringify(contextSummary))
+    const contextPayload = {
+      context_version: CONTEXT_VERSION,
+      instruction: gameContext.instruction,
+      context: gameContext.context,
+    }
+    const contextHash = hashContextPayload(contextPayload)
+    console.log('[AFB] request_id:', requestId, 'Context summary:', JSON.stringify(contextSummary))
 
     const config = getWrapperConfig()
     const payload = buildWrapperPayload({ matchup, line_focus, angles, voice, memory, gameContext })
@@ -111,6 +120,7 @@ export async function POST(req: NextRequest) {
         headers: {
           'Content-Type': 'application/json',
           [config.authHeader]: config.authToken,
+          'x-request-id': requestId,
         },
         body: JSON.stringify(payload),
         signal: controller.signal,
@@ -136,7 +146,13 @@ export async function POST(req: NextRequest) {
             { status: 502, headers: { 'Content-Type': 'application/json' } }
           )
         }
-        return Response.json(check.data)
+        return Response.json({
+          ...check.data,
+          request_id: requestId,
+          context_version: CONTEXT_VERSION,
+          context_hash: contextHash,
+          data_provenance: contextSummary,
+        })
       }
 
       const outputText = wrapperPayload.outputText
@@ -162,7 +178,13 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      return Response.json(validated.data)
+      return Response.json({
+        ...validated.data,
+        request_id: requestId,
+        context_version: CONTEXT_VERSION,
+        context_hash: contextHash,
+        data_provenance: contextSummary,
+      })
     } finally {
       clearTimeout(timeout)
     }
