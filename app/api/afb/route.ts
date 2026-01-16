@@ -210,6 +210,19 @@ export async function POST(req: NextRequest) {
         )
       }
 
+      // Check if wrapper returned an error (not a success response)
+      if (wrapperPayload?.error || wrapperPayload?.message?.includes('error') || wrapperPayload?.message?.includes('aborted')) {
+        console.error('[AFB] Wrapper returned error:', JSON.stringify(wrapperPayload))
+        return new Response(
+          JSON.stringify({
+            code: 'WRAPPER_ERROR',
+            message: wrapperPayload.message || wrapperPayload.error || 'Wrapper returned an error',
+            details: wrapperPayload
+          }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
       // If wrapper already returns structured Swantail JSON, transform and pass it through.
       // Handle both lowercase (assumptions/scripts) and capitalized (Assumptions/Scripts) keys
       const hasAssumptions = wrapperPayload?.assumptions || wrapperPayload?.Assumptions
