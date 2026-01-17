@@ -1,35 +1,38 @@
 [
   {
     "awayCode": "BUF",
-    "homeCode": "DEN",
-    "total": 43.5,
-    "spreadAway": -2.5,
-    "spreadHome": 2.5,
-    "source": "manual"
+    "homeCode": "KC",
+    "total": 47.5,
+    "spreadHome": -2.5,
+    "spreadAway": 2.5,
+    "source": "fixture",
+    "timestamp": 1737072000
   },
   {
-    "awayCode": "SF",
-    "homeCode": "SEA",
-    "total": 45.5,
-    "spreadAway": -1.5,
-    "spreadHome": 1.5,
-    "source": "manual"
+    "awayCode": "BAL",
+    "homeCode": "HOU",
+    "total": 44.0,
+    "spreadHome": 3.5,
+    "spreadAway": -3.5,
+    "source": "fixture",
+    "timestamp": 1737072000
   },
   {
-    "awayCode": "HOU",
-    "homeCode": "NE",
-    "total": 41.5,
-    "spreadAway": 3.0,
-    "spreadHome": -3.0,
-    "source": "manual"
+    "awayCode": "PHI",
+    "homeCode": "DET",
+    "total": 48.0,
+    "spreadHome": -4.0,
+    "spreadAway": 4.0,
+    "source": "fixture",
+    "timestamp": 1737072000
   },
   {
     "awayCode": "LA",
-    "homeCode": "CHI",
-    "total": 44.5,
-    "spreadAway": -3.5,
-    "spreadHome": 3.5,
-    "source": "manual"
+    "homeCode": "SF",
+    "total": 45.5,
+    "spreadHome": -5.5,
+    "spreadAway": 5.5,
+    "source": "fixture",
+    "timestamp": 1737072000
   }
 ]
-
