@@ -4,6 +4,7 @@ import { useAfb } from '@/app/hooks/useAfb'
 import SwantailBuilderForm from '@/components/SwantailBuilderForm'
 import SwantailOddsPaste from '@/components/SwantailOddsPaste'
 import SwantailScriptsView from '@/components/SwantailScriptsView'
+import SwantailTerminalPanel, { type SwantailSystemStatus } from '@/components/SwantailTerminalPanel'
 import { matchOdds, parseOddsPaste } from '@/lib/swantail/odds'
 import type { SwantailResponse } from '@/lib/swantail/schema'
 import { track } from '@/lib/telemetry'
@@ -25,6 +26,8 @@ export default function AssistedBuilder() {
   const voice: 'analyst' = 'analyst'
   const [oddsPaste, setOddsPaste] = useState('')
   const [data, setData] = useState<SwantailResponse | null>(null)
+  const [rightTab, setRightTab] = useState<'terminal' | 'scripts' | 'stats'>('terminal')
+  const [systemStatus, setSystemStatus] = useState<SwantailSystemStatus | null>(null)
 
   const oddsEntries = useMemo(() => parseOddsPaste(oddsPaste), [oddsPaste])
 
@@ -41,6 +44,8 @@ export default function AssistedBuilder() {
         userSuppliedOdds: oddsEntries.map(o => ({ leg: o.selectionText, americanOdds: o.americanOdds }))
       })
       setData(res as SwantailResponse)
+      // After a successful build, move the user to results immediately.
+      setRightTab('scripts')
       track('ui_build_success')
     } catch (e) {
       track('ui_build_error', { message: (e as any)?.message })
@@ -66,6 +71,8 @@ export default function AssistedBuilder() {
         userSuppliedOdds: oddsEntries.map(o => ({ leg: o.selectionText, americanOdds: o.americanOdds }))
       })
       setData(res as SwantailResponse)
+      // After a successful build, move the user to results immediately.
+      setRightTab('scripts')
       track('ui_build_success')
     } catch (e) {
       track('ui_build_error', { message: (e as any)?.message })
@@ -114,7 +121,87 @@ export default function AssistedBuilder() {
                 {error}
               </div>
             )}
-            <SwantailScriptsView data={data} oddsEntries={oddsEntries} onOpposite={onOpposite} />
+
+            {/* Right panel tabs */}
+            <div className="flex items-center gap-2">
+              {(['terminal', 'scripts', 'stats'] as const).map(tab => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setRightTab(tab)}
+                  className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                    rightTab === tab
+                      ? 'bg-white/15 text-white'
+                      : 'border border-white/10 bg-white/5 text-white/60 hover:bg-white/10'
+                  }`}
+                >
+                  {tab === 'terminal' ? 'Terminal' : tab === 'scripts' ? 'Scripts' : 'Stats'}
+                </button>
+              ))}
+            </div>
+
+            {rightTab === 'terminal' && (
+              <SwantailTerminalPanel
+                matchup={matchup}
+                lineFocus={lineFocus}
+                angles={angles}
+                isLoading={isLoading}
+                error={error}
+                data={data}
+                onChangeMatchup={setMatchup}
+                onBuild={onBuild}
+                onStatus={(s) => setSystemStatus(s)}
+              />
+            )}
+
+            {rightTab === 'scripts' && (
+              <SwantailScriptsView data={data} oddsEntries={oddsEntries} onOpposite={onOpposite} />
+            )}
+
+            {rightTab === 'stats' && (
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
+                <div className="text-xs uppercase tracking-wide text-white/50">System status</div>
+                {!systemStatus ? (
+                  <div className="mt-3 text-white/60">Open Terminal to run preflights.</div>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                        <div className="text-[11px] uppercase tracking-wide text-white/50">Schedule</div>
+                        <div className="mt-1 text-white/80">
+                          {systemStatus.schedule.state.toUpperCase()}
+                          {typeof systemStatus.schedule.games === 'number' ? ` • ${systemStatus.schedule.games} games` : ''}
+                        </div>
+                        <div className="mt-1 text-[12px] text-white/50">
+                          {systemStatus.schedule.season ? `Season ${systemStatus.schedule.season}` : ''}{systemStatus.schedule.week ? ` • Week ${systemStatus.schedule.week}` : ''}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                        <div className="text-[11px] uppercase tracking-wide text-white/50">Lines</div>
+                        <div className="mt-1 text-white/80">
+                          {systemStatus.lines.state.toUpperCase()}
+                          {systemStatus.lines.mode ? ` • ${systemStatus.lines.mode}` : ''}
+                        </div>
+                        <div className="mt-1 text-[12px] text-white/50">
+                          {systemStatus.lines.state === 'degraded' ? 'Using fallback/manual pricing.' : ''}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                      <div className="text-[11px] uppercase tracking-wide text-white/50">Builder</div>
+                      <div className="mt-1 text-white/80">
+                        {systemStatus.backend.state.toUpperCase()}
+                        {typeof systemStatus.backend.configured === 'boolean' ? ` • configured: ${systemStatus.backend.configured ? 'yes' : 'no'}` : ''}
+                        {typeof systemStatus.backend.probeOk === 'boolean' ? ` • health: ${systemStatus.backend.probeOk ? 'ok' : 'no'}` : ''}
+                      </div>
+                      <div className="mt-1 text-[12px] text-white/50">
+                        {systemStatus.backend.state === 'degraded' ? 'Health probe failed; builds may still work.' : ''}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

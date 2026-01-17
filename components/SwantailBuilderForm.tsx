@@ -64,14 +64,16 @@ export default function SwantailBuilderForm({
 				if (cancelled) return
 				const list = Array.isArray(json?.games) ? json.games : []
 				setGames(list)
-				setHasSchedule(list.length > 0)
+				const ok = list.length > 0
+				setHasSchedule(ok)
+				// If schedule is available, default to schedule picker; otherwise force custom mode.
+				setCustomMode(!ok)
 			} catch {
 				setHasSchedule(false)
+				setCustomMode(true)
 			}
 		}
 		load()
-		// if schedule is not available, force custom mode
-		if (!hasSchedule) setCustomMode(true)
 		return () => {
 			cancelled = true
 		}
