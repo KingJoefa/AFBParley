@@ -30,7 +30,10 @@ import { isActionEnabled } from '@/lib/terminal/feature-flags'
  */
 
 const ParlayRequestSchema = z.object({
-  matchups: z.array(z.string().min(3)).min(2).max(10),
+  // Allow missing matchups and promote single matchup into matchups[] downstream.
+  matchups: z.array(z.string().min(3)).min(1).max(10).optional().default([]),
+  // Back-compat: allow single matchup string and promote to matchups[]
+  matchup: z.string().min(3).optional(),
   signals: z.array(z.string()).optional(),
   options: z.object({
     legs_target: z.number().min(4).max(10).default(6),
@@ -336,12 +339,25 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { matchups, signals, options } = parsed.data
+    const { matchups, matchup, signals, options } = parsed.data
     const legsTarget = options?.legs_target ?? 6
     const maxHighExposure = options?.max_high_exposure ?? 2
 
     // Parse all matchups
-    const parsedMatchups = matchups.map(m => ({
+    const normalizedMatchups = matchups.length ? matchups : (matchup ? [matchup] : [])
+    if (normalizedMatchups.length === 0) {
+      return Response.json(
+        buildErrorResponse({
+          mode: 'parlay',
+          requestId,
+          error: 'Invalid request: matchups required',
+          recoverable: false,
+        }),
+        { status: 400 }
+      )
+    }
+
+    const parsedMatchups = normalizedMatchups.map(m => ({
       raw: m,
       parsed: parseMatchup(m),
     }))
