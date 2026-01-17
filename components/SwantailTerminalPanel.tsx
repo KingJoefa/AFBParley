@@ -267,7 +267,7 @@ export default function SwantailTerminalPanel(props: {
       hardError ? 'system: attention required' : (degraded ? 'system: DEGRADED' : 'system: READY'),
       hardError ? 'warn' : (degraded ? 'warn' : 'ok')
     )
-    append('tip: pick a featured matchup below, then press Build.', 'muted')
+    append('tip: pick a featured matchup below, then press Build (Story).', 'muted')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [append])
 
@@ -356,6 +356,7 @@ export default function SwantailTerminalPanel(props: {
     append('help:', 'muted')
     append('- pick a matchup chip OR type one like "SF @ SEA"', 'muted')
     append('- optionally set Market Anchor/Signals in the Inputs panel', 'muted')
+    append('- BUILD: default Story flow (single-game scripts)', 'muted')
     append('- PROP: find mispriced player tails (alts, quarters, halves)', 'muted')
     append('- STORY: build 1–3 single-game narratives with correlated legs', 'muted')
     append('- PARLAY: construct cross-game portfolio (1 leg per game, 6–7 legs)', 'muted')
@@ -503,8 +504,16 @@ export default function SwantailTerminalPanel(props: {
 
         {/* prompt + actions */}
         <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
-          {/* Action buttons: Prop / Story / Parlay */}
+          {/* Action buttons: Build (Story) + Prop / Story / Parlay */}
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleAction('story')}
+              disabled={!canAct}
+              className="rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isLoading && runState.mode === 'story' ? 'Building…' : 'Build'}
+            </button>
             <button
               type="button"
               onClick={() => handleAction('prop')}
@@ -517,7 +526,7 @@ export default function SwantailTerminalPanel(props: {
               type="button"
               onClick={() => handleAction('story')}
               disabled={!canAct}
-              className="rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-full bg-gradient-to-r from-slate-500 to-slate-700 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isLoading && runState.mode === 'story' ? 'Building…' : 'Story'}
             </button>
