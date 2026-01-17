@@ -183,7 +183,7 @@ export default function AssistedBuilder() {
                           {systemStatus.lines.mode ? ` • ${systemStatus.lines.mode}` : ''}
                         </div>
                         <div className="mt-1 text-[12px] text-white/50">
-                          {systemStatus.lines.state === 'degraded' ? 'Using fallback/manual pricing.' : ''}
+                          {systemStatus.lines.mode === 'fallback' ? 'Using fallback/manual pricing.' : ''}
                         </div>
                       </div>
                     </div>

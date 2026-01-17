@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { SwantailResponse } from '@/lib/swantail/schema'
+import { deriveYearWeekFromSchedule } from '@/lib/swantail/preflight'
 
 type CheckState = 'booting' | 'ready' | 'degraded' | 'error'
 
 export type SwantailSystemStatus = {
   phase: 'booting' | 'ready' | 'running' | 'error'
   schedule: { state: CheckState; games?: number; week?: number; season?: number; error?: string }
-  lines: { state: CheckState; mode?: 'api' | 'manual' | 'none'; error?: string }
+  lines: { state: CheckState; mode?: 'api' | 'fallback' | 'missing' | 'degraded'; expectedRel?: string; expectedAbs?: string; error?: string }
   backend: { state: CheckState; configured?: boolean; probeOk?: boolean; error?: string }
   lastChecked?: string
 }
@@ -102,42 +103,80 @@ export default function SwantailTerminalPanel(props: {
     append('running preflight checks…', 'muted')
 
     let hardError = false
+    let degraded = false
+    let derivedYear = 2025
+    let derivedWeek = 20
+    let schedulePayload: any | null = null
 
     // Schedule
     try {
       const res = await fetch('/api/nfl/schedule', { cache: 'no-store' })
       if (!res.ok) throw new Error(`schedule status ${res.status}`)
       const json = await res.json()
+      schedulePayload = json
       const list = Array.isArray(json?.games) ? json.games : []
+      const derived = deriveYearWeekFromSchedule({ scheduleJson: json, fallbackYear: derivedYear, fallbackWeek: derivedWeek })
+      derivedYear = derived.year
+      derivedWeek = derived.week
       setGames(list)
-      setSchedule({ state: 'ready', games: list.length, week: Number(json?.week), season: Number(json?.season) })
-      append(`schedule… ready (${list.length} games)`, 'ok')
+      if (derived.degraded) {
+        degraded = true
+        setSchedule({ state: 'degraded', games: list.length, week: derivedWeek, season: derivedYear, error: 'missing season/week in schedule payload' })
+        append(`schedule… degraded (using ${derivedYear} wk ${derivedWeek})`, 'warn')
+      } else {
+        setSchedule({ state: 'ready', games: list.length, week: derivedWeek, season: derivedYear })
+        append(`schedule… ready (${list.length} games)`, 'ok')
+      }
     } catch (e: any) {
-      setSchedule({ state: 'error', error: e?.message || 'schedule failed' })
-      append('schedule… error (failed to load)', 'err')
-      hardError = true
+      degraded = true
+      // Fall back to safe defaults; keep terminal usable.
+      derivedYear = 2025
+      derivedWeek = 20
+      setSchedule({ state: 'degraded', season: derivedYear, week: derivedWeek, error: e?.message || 'schedule failed' })
+      append(`schedule… degraded (failed; using ${derivedYear} wk ${derivedWeek})`, 'warn')
     }
 
     // Lines
     try {
-      const res = await fetch('/api/lines/status', { cache: 'no-store' })
+      // Use derived year/week from schedule. Include a matchup so API ping can be real.
+      const sampleMatchup = matchup.trim() || (Array.isArray(schedulePayload?.games) && schedulePayload.games[0]?.display) || ''
+      const u = new URL('/api/lines/status', window.location.origin)
+      u.searchParams.set('year', String(derivedYear))
+      u.searchParams.set('week', String(derivedWeek))
+      if (sampleMatchup) u.searchParams.set('matchup', sampleMatchup)
+      const res = await fetch(u.toString(), { cache: 'no-store' })
       if (!res.ok) throw new Error(`lines status ${res.status}`)
       const json = await res.json()
-      const mode = (json?.mode as 'api' | 'manual' | 'none') || 'none'
+      const mode = (json?.mode as SwantailSystemStatus['lines']['mode']) || 'degraded'
+      const expectedRel = String(json?.expected?.rel || '')
+      const expectedAbs = String(json?.expected?.abs || '')
       if (mode === 'api') {
-        setLines({ state: 'ready', mode })
-        append('lines… ready (api)', 'ok')
-      } else if (mode === 'manual') {
-        setLines({ state: 'degraded', mode })
-        append('lines… ready (fallback)', 'warn')
-      } else {
-        setLines({ state: 'error', mode })
-        append('lines… missing (no api + no fallback)', 'err')
+        setLines({ state: 'ready', mode, expectedRel, expectedAbs })
+        append(`lines… ready (api wk-${String(derivedWeek).padStart(2, '0')})`, 'ok')
+      } else if (mode === 'fallback') {
+        setLines({ state: 'ready', mode, expectedRel, expectedAbs })
+        append(`lines… ready (fallback ${expectedRel.split('/').pop()})`, 'warn')
+      } else if (mode === 'missing') {
+        setLines({ state: 'error', mode, expectedRel, expectedAbs })
+        append(`lines… attention (missing ${expectedRel.split('/').pop()}; expected ${expectedRel})`, 'err')
         hardError = true
+      } else {
+        // degraded
+        const hasFallback = Boolean(json?.fallback?.exists)
+        setLines({ state: hasFallback ? 'degraded' : 'error', mode, expectedRel, expectedAbs, error: String(json?.api?.error || '') })
+        append(
+          hasFallback
+            ? `lines… degraded (api unreachable; fallback ${expectedRel.split('/').pop()})`
+            : `lines… attention (api unreachable; missing ${expectedRel.split('/').pop()}; expected ${expectedRel})`,
+          hasFallback ? 'warn' : 'err'
+        )
+        if (!hasFallback) hardError = true
+        else degraded = true
       }
     } catch (e: any) {
       setLines({ state: 'degraded', error: e?.message || 'lines status failed' })
       append('lines… unknown (status check failed)', 'warn')
+      degraded = true
     }
 
     // Backend (wrapper health/config)
@@ -164,7 +203,10 @@ export default function SwantailTerminalPanel(props: {
     }
 
     setPhase(hardError ? 'error' : 'ready')
-    append(hardError ? 'system: attention required' : 'system: READY', hardError ? 'warn' : 'ok')
+    append(
+      hardError ? 'system: attention required' : (degraded ? 'system: DEGRADED' : 'system: READY'),
+      hardError ? 'warn' : (degraded ? 'warn' : 'ok')
+    )
     append('tip: pick a featured matchup below, then press Build.', 'muted')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [append])
@@ -240,7 +282,10 @@ export default function SwantailTerminalPanel(props: {
 
   const badge = useMemo(() => {
     if (phase === 'running' || isLoading) return { label: 'BUSY', cls: 'bg-amber-500/15 text-amber-200 border-amber-400/20' }
-    if (phase === 'error') return { label: 'DEGRADED', cls: 'bg-red-500/15 text-red-200 border-red-400/20' }
+    const anyError = schedule.state === 'error' || lines.state === 'error' || backend.state === 'error'
+    const anyDegraded = schedule.state === 'degraded' || lines.state === 'degraded' || backend.state === 'degraded'
+    if (anyError || phase === 'error') return { label: 'ATTN', cls: 'bg-red-500/15 text-red-200 border-red-400/20' }
+    if (anyDegraded) return { label: 'DEGRADED', cls: 'bg-amber-500/15 text-amber-200 border-amber-400/20' }
     if (phase === 'ready') return { label: 'READY', cls: 'bg-emerald-500/15 text-emerald-200 border-emerald-400/20' }
     return { label: 'BOOT', cls: 'bg-white/10 text-white/70 border-white/10' }
   }, [phase, isLoading])
