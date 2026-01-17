@@ -46,14 +46,18 @@ export default function SwantailTerminalPanel(props: {
   matchup: string
   lineFocus: string
   angles: string[]
+  oddsPaste?: string
   isLoading: boolean
   error?: string | null
   data: SwantailResponse | null
   onChangeMatchup: (value: string) => void
+  onChangeLineFocus?: (value: string) => void
+  onChangeAngles?: (value: string[]) => void
+  onChangeOddsPaste?: (value: string) => void
   onBuild: () => void
   onStatus?: (status: SwantailSystemStatus) => void
 }) {
-  const { matchup, lineFocus, angles, isLoading, error, data, onChangeMatchup, onBuild, onStatus } = props
+  const { matchup, lineFocus, angles, oddsPaste, isLoading, error, data, onChangeMatchup, onChangeLineFocus, onChangeAngles, onChangeOddsPaste, onBuild, onStatus } = props
 
   const [phase, setPhase] = useState<SwantailSystemStatus['phase']>('booting')
   const [schedule, setSchedule] = useState<SwantailSystemStatus['schedule']>({ state: 'booting' })
@@ -65,6 +69,9 @@ export default function SwantailTerminalPanel(props: {
     { id: uid(), text: 'initializing terminal…', tone: 'muted' },
   ]))
   const [draft, setDraft] = useState('')
+  const [anchorDraft, setAnchorDraft] = useState('')
+  const [signalDraft, setSignalDraft] = useState('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [inputTouched, setInputTouched] = useState(false)
 
   const scrollerRef = useRef<HTMLDivElement | null>(null)
@@ -92,6 +99,16 @@ export default function SwantailTerminalPanel(props: {
     if (!el) return
     el.scrollTop = el.scrollHeight
   }, [buffer.length])
+
+  useEffect(() => {
+    setAnchorDraft(lineFocus || '')
+  }, [lineFocus])
+
+  useEffect(() => {
+    if (angles.length) {
+      setSignalDraft(angles.join(', '))
+    }
+  }, [angles])
 
   const runPreflights = useCallback(async () => {
     setPhase('booting')
@@ -280,6 +297,23 @@ export default function SwantailTerminalPanel(props: {
     append(`matchup set: ${value}`, 'ok')
   }, [append, onChangeMatchup])
 
+  const onApplyAnchor = useCallback(() => {
+    if (!onChangeLineFocus) return
+    const next = anchorDraft.trim()
+    onChangeLineFocus(next)
+    append(next ? `anchor set: ${next}` : 'anchor cleared', next ? 'ok' : 'muted')
+  }, [anchorDraft, onChangeLineFocus, append])
+
+  const onApplySignals = useCallback(() => {
+    if (!onChangeAngles) return
+    const next = signalDraft
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+    onChangeAngles(next)
+    append(next.length ? `signals set: ${next.join(', ')}` : 'signals cleared', next.length ? 'ok' : 'muted')
+  }, [signalDraft, onChangeAngles, append])
+
   const badge = useMemo(() => {
     if (phase === 'running' || isLoading) return { label: 'BUSY', cls: 'bg-amber-500/15 text-amber-200 border-amber-400/20' }
     const anyError = schedule.state === 'error' || lines.state === 'error' || backend.state === 'error'
@@ -351,6 +385,13 @@ export default function SwantailTerminalPanel(props: {
             <button type="button" onClick={onBuild} disabled={!canBuild} className="rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">
               {isLoading ? 'Building…' : 'Build'}
             </button>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(v => !v)}
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70 hover:bg-white/10"
+            >
+              {showAdvanced ? 'Hide inputs' : 'Inputs'}
+            </button>
             <button type="button" onClick={onHelp} className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70 hover:bg-white/10">
               Help
             </button>
@@ -379,6 +420,60 @@ export default function SwantailTerminalPanel(props: {
               Set
             </button>
           </div>
+
+          {showAdvanced && (
+            <div className="grid gap-3">
+              <div className="grid gap-2">
+                <div className="text-[11px] uppercase tracking-wide text-white/50">Market anchor</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={anchorDraft}
+                    onChange={(e) => setAnchorDraft(e.target.value)}
+                    placeholder="Over 44.5 · SEA -2.5 · First Half Under"
+                    className="flex-1 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-blue-400/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={onApplyAnchor}
+                    disabled={!onChangeLineFocus}
+                    className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs text-white hover:bg-white/20 disabled:opacity-50"
+                  >
+                    Set
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <div className="text-[11px] uppercase tracking-wide text-white/50">Signals</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={signalDraft}
+                    onChange={(e) => setSignalDraft(e.target.value)}
+                    placeholder="Pace skew, Pressure mismatch"
+                    className="flex-1 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-blue-400/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={onApplySignals}
+                    disabled={!onChangeAngles}
+                    className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs text-white hover:bg-white/20 disabled:opacity-50"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <div className="text-[11px] uppercase tracking-wide text-white/50">Book odds (optional)</div>
+                <textarea
+                  value={oddsPaste ?? ''}
+                  onChange={(e) => onChangeOddsPaste?.(e.target.value)}
+                  placeholder="RB1 Anytime TD +120&#10;Alt Total Over 44.5 -110"
+                  className="min-h-[72px] w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-blue-400/30"
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

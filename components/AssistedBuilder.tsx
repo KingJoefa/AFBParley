@@ -1,8 +1,6 @@
 'use client'
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { useAfb } from '@/app/hooks/useAfb'
-import SwantailBuilderForm from '@/components/SwantailBuilderForm'
-import SwantailOddsPaste from '@/components/SwantailOddsPaste'
 import SwantailScriptsView from '@/components/SwantailScriptsView'
 import SwantailTerminalPanel from '@/components/SwantailTerminalPanel'
 import { matchOdds, parseOddsPaste } from '@/lib/swantail/odds'
@@ -22,7 +20,7 @@ export default function AssistedBuilder() {
   const { build, isLoading, error, errorDetails } = useAfb()
   const [state, dispatch] = useReducer(swantailReducer, initialSwantailState)
   const voice: 'analyst' = 'analyst'
-  const [rightTab, setRightTab] = useState<'terminal' | 'scripts' | 'stats'>('terminal')
+  const [rightTab, setRightTab] = useState<'scripts' | 'stats'>('scripts')
 
   const matchup = state.matchup
   const lineFocus = state.anchor
@@ -121,22 +119,67 @@ export default function AssistedBuilder() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      <div className="mx-auto max-w-5xl px-4 py-10">
-        <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="space-y-6">
-            <SwantailBuilderForm
+      <div className="mx-auto max-w-6xl px-4 py-10">
+        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-4">
+            {error && (
+              <div className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                {error}
+              </div>
+            )}
+            <SwantailTerminalPanel
               matchup={matchup}
               lineFocus={lineFocus}
               angles={angles}
+              oddsPaste={oddsPaste}
               isLoading={isLoading}
+              error={error}
+              data={data}
               onChangeMatchup={(value) => dispatch({ type: 'set_matchup', value })}
               onChangeLineFocus={(value) => dispatch({ type: 'set_anchor', value })}
               onChangeAngles={(value) => dispatch({ type: 'set_signals', value })}
+              onChangeOddsPaste={(value) => dispatch({ type: 'set_odds', value })}
               onBuild={onBuild}
+              onStatus={(s) => {
+                const checks: PreflightChecks = {
+                  schedule: s.schedule,
+                  lines: s.lines,
+                  backend: s.backend,
+                }
+                const derived = (s.schedule.season && s.schedule.week)
+                  ? { year: s.schedule.season, week: s.schedule.week }
+                  : { year: 2025, week: 20 }
+                const anyDegraded = s.schedule.state === 'degraded' || s.lines.state === 'degraded' || s.backend.state === 'degraded'
+                let value: PreflightStatus
+                if (s.phase === 'error') {
+                  value = {
+                    state: 'error',
+                    checks,
+                    derived,
+                    error: s.schedule.error || s.lines.error || s.backend.error || 'preflight error',
+                  }
+                } else if (s.phase === 'ready' && anyDegraded) {
+                  value = {
+                    state: 'degraded',
+                    checks,
+                    derived,
+                    reason: 'preflight degraded',
+                  }
+                } else if (s.phase === 'ready') {
+                  value = {
+                    state: 'ready',
+                    checks,
+                    derived,
+                  }
+                } else {
+                  value = {
+                    state: 'booting',
+                    checks,
+                  }
+                }
+                dispatch({ type: 'set_preflight', value })
+              }}
             />
-
-            <SwantailOddsPaste value={oddsPaste} onChange={(value) => dispatch({ type: 'set_odds', value })} />
-
             {showNoMatches && (
               <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
                 No matches applied.
@@ -145,15 +188,9 @@ export default function AssistedBuilder() {
           </div>
 
           <div className="space-y-4">
-            {error && (
-              <div className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                {error}
-              </div>
-            )}
-
             {/* Right panel tabs */}
             <div className="flex items-center gap-2">
-              {(['terminal', 'scripts', 'stats'] as const).map(tab => (
+              {(['scripts', 'stats'] as const).map(tab => (
                 <button
                   key={tab}
                   type="button"
@@ -164,62 +201,10 @@ export default function AssistedBuilder() {
                       : 'border border-white/10 bg-white/5 text-white/60 hover:bg-white/10'
                   }`}
                 >
-                  {tab === 'terminal' ? 'Terminal' : tab === 'scripts' ? 'Scripts' : 'Stats'}
+                  {tab === 'scripts' ? 'Scripts' : 'Stats'}
                 </button>
               ))}
             </div>
-
-            {rightTab === 'terminal' && (
-              <SwantailTerminalPanel
-                matchup={matchup}
-                lineFocus={lineFocus}
-                angles={angles}
-                isLoading={isLoading}
-                error={error}
-                data={data}
-                onChangeMatchup={(value) => dispatch({ type: 'set_matchup', value })}
-                onBuild={onBuild}
-                onStatus={(s) => {
-                  const checks: PreflightChecks = {
-                    schedule: s.schedule,
-                    lines: s.lines,
-                    backend: s.backend,
-                  }
-                  const derived = (s.schedule.season && s.schedule.week)
-                    ? { year: s.schedule.season, week: s.schedule.week }
-                    : { year: 2025, week: 20 }
-                  const anyDegraded = s.schedule.state === 'degraded' || s.lines.state === 'degraded' || s.backend.state === 'degraded'
-                  let value: PreflightStatus
-                  if (s.phase === 'error') {
-                    value = {
-                      state: 'error',
-                      checks,
-                      derived,
-                      error: s.schedule.error || s.lines.error || s.backend.error || 'preflight error',
-                    }
-                  } else if (s.phase === 'ready' && anyDegraded) {
-                    value = {
-                      state: 'degraded',
-                      checks,
-                      derived,
-                      reason: 'preflight degraded',
-                    }
-                  } else if (s.phase === 'ready') {
-                    value = {
-                      state: 'ready',
-                      checks,
-                      derived,
-                    }
-                  } else {
-                    value = {
-                      state: 'booting',
-                      checks,
-                    }
-                  }
-                  dispatch({ type: 'set_preflight', value })
-                }}
-              />
-            )}
 
             {rightTab === 'scripts' && (
               <SwantailScriptsView data={data} oddsEntries={oddsEntries} onOpposite={onOpposite} />
