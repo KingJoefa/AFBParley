@@ -17,7 +17,16 @@ export default {
         border: '#1f2735',
         accent: '#3a7bfd',
         success: '#22c55e',
-        danger: '#ef4444'
+        danger: '#ef4444',
+        // Terminal theme colors (CSS variable references)
+        'terminal-bg': 'var(--terminal-bg)',
+        'terminal-primary': 'var(--terminal-primary)',
+        'terminal-accent': 'var(--terminal-accent)',
+        'terminal-text': 'var(--terminal-text)',
+        'terminal-muted': 'var(--terminal-muted)',
+        'terminal-success': 'var(--terminal-success)',
+        'terminal-warning': 'var(--terminal-warning)',
+        'terminal-error': 'var(--terminal-error)',
       },
       boxShadow: {
         soft: '0 8px 30px rgba(0,0,0,0.35)'

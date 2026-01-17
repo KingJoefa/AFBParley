@@ -4,6 +4,16 @@
 
 :root {
   color-scheme: dark;
+
+  /* Terminal theme colors (dynamically updated via JS) */
+  --terminal-bg: #0A0A0A;
+  --terminal-primary: #1A1A1A;
+  --terminal-accent: #00FF88;
+  --terminal-text: #E0E0E0;
+  --terminal-muted: #808080;
+  --terminal-success: #00FF88;
+  --terminal-warning: #FFB612;
+  --terminal-error: #FF4444;
 }
 
 html, body, #__next {
