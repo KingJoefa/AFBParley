@@ -31,7 +31,7 @@ export default function SwantailScriptCard({ script, oddsEntries, onOpposite }: 
     return { legs, math, warning, matchCount }
   }, [script, oddsEntries])
 
-  const notes = script.notes?.length ? script.notes : REQUIRED_NOTES
+  const notes = Array.isArray(script.notes) && script.notes.length ? script.notes : REQUIRED_NOTES
 
   return (
     <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 p-6 shadow-xl">

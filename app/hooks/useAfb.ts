@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { decodeAfbErrorFromResponse, type AfbError } from '@/lib/afb/error'
 
 export type Voice = 'analyst' | 'hype' | 'coach'
 
@@ -13,13 +14,19 @@ export interface AfbRequest {
   signal?: AbortSignal
 }
 
+export type AfbBuildResult<T = any> =
+  | { ok: true; data: T }
+  | { ok: false; error: AfbError }
+
 export function useAfb() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorDetails, setErrorDetails] = useState<AfbError | null>(null)
 
-  const build = useCallback(async (req: AfbRequest) => {
+  const build = useCallback(async (req: AfbRequest): Promise<AfbBuildResult> => {
     setIsLoading(true)
     setError(null)
+    setErrorDetails(null)
     try {
       const payload = {
         matchup: req.matchup,
@@ -42,18 +49,37 @@ export function useAfb() {
       })
 
       if (!res.ok) {
-        const data = await res.json().catch(() => null)
-        throw new Error(data?.message || data?.error || `AFB error ${res.status}`)
+        const err = await decodeAfbErrorFromResponse(res)
+        setError(err.message || `AFB error ${res.status}`)
+        setErrorDetails(err)
+        return { ok: false, error: err }
       }
 
-      return await res.json()
+      const json = await res.json().catch(() => null)
+      // Guard: treat "ok" with error payload as error.
+      if (json && typeof json === 'object' && (json.code || json.error || json.message) && !(json.assumptions && Array.isArray(json.scripts))) {
+        const err = await decodeAfbErrorFromResponse(new Response(JSON.stringify(json), { status: res.status, headers: { 'content-type': 'application/json' } }))
+        setError(err.message || `AFB error ${res.status}`)
+        setErrorDetails(err)
+        return { ok: false, error: err }
+      }
+
+      return { ok: true, data: json }
     } catch (e: any) {
-      setError(e?.message ?? 'Unknown error')
-      throw e
+      const isAbort = e?.name === 'AbortError'
+      const err: AfbError = {
+        code: isAbort ? 'CLIENT_ABORT' : 'NETWORK_ERROR',
+        status: null,
+        message: e?.message ?? (isAbort ? 'Request aborted' : 'Network error'),
+        details: { name: e?.name },
+      }
+      setError(err.message)
+      setErrorDetails(err)
+      return { ok: false, error: err }
     } finally {
       setIsLoading(false)
     }
   }, [])
 
-  return { build, isLoading, error }
+  return { build, isLoading, error, errorDetails }
 }

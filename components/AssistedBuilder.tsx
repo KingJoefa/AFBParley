@@ -1,12 +1,12 @@
 'use client'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { useAfb } from '@/app/hooks/useAfb'
 import SwantailBuilderForm from '@/components/SwantailBuilderForm'
 import SwantailOddsPaste from '@/components/SwantailOddsPaste'
 import SwantailScriptsView from '@/components/SwantailScriptsView'
-import SwantailTerminalPanel, { type SwantailSystemStatus } from '@/components/SwantailTerminalPanel'
+import SwantailTerminalPanel from '@/components/SwantailTerminalPanel'
 import { matchOdds, parseOddsPaste } from '@/lib/swantail/odds'
-import type { SwantailResponse } from '@/lib/swantail/schema'
+import { initialSwantailState, swantailReducer, type PreflightChecks, type PreflightStatus } from '@/lib/swantail/store'
 import { track } from '@/lib/telemetry'
 
 function invertLineFocus(value: string): string {
@@ -19,15 +19,16 @@ function invertLineFocus(value: string): string {
 }
 
 export default function AssistedBuilder() {
-  const { build, isLoading, error } = useAfb()
-  const [matchup, setMatchup] = useState('')
-  const [lineFocus, setLineFocus] = useState('')
-  const [angles, setAngles] = useState<string[]>([])
+  const { build, isLoading, error, errorDetails } = useAfb()
+  const [state, dispatch] = useReducer(swantailReducer, initialSwantailState)
   const voice: 'analyst' = 'analyst'
-  const [oddsPaste, setOddsPaste] = useState('')
-  const [data, setData] = useState<SwantailResponse | null>(null)
   const [rightTab, setRightTab] = useState<'terminal' | 'scripts' | 'stats'>('terminal')
-  const [systemStatus, setSystemStatus] = useState<SwantailSystemStatus | null>(null)
+
+  const matchup = state.matchup
+  const lineFocus = state.anchor
+  const angles = state.signals
+  const oddsPaste = state.oddsPaste
+  const data = state.data
 
   const oddsEntries = useMemo(() => parseOddsPaste(oddsPaste), [oddsPaste])
 
@@ -35,7 +36,7 @@ export default function AssistedBuilder() {
     if (!matchup.trim()) return
     track('ui_build_clicked', { voice, anglesCount: angles.length })
     try {
-      setData(null)
+      dispatch({ type: 'set_data', value: null })
       const res = await build({
         matchup: matchup.trim(),
         lineFocus: lineFocus.trim() || undefined,
@@ -43,10 +44,14 @@ export default function AssistedBuilder() {
         voice,
         userSuppliedOdds: oddsEntries.map(o => ({ leg: o.selectionText, americanOdds: o.americanOdds }))
       })
-      setData(res as SwantailResponse)
-      // After a successful build, move the user to results immediately.
-      setRightTab('scripts')
-      track('ui_build_success')
+      if (res.ok) {
+        dispatch({ type: 'set_data', value: res.data })
+        // After a successful build, move the user to results immediately.
+        setRightTab('scripts')
+        track('ui_build_success')
+      } else {
+        track('ui_build_error', { message: res.error?.message })
+      }
     } catch (e) {
       track('ui_build_error', { message: (e as any)?.message })
     }
@@ -62,7 +67,7 @@ export default function AssistedBuilder() {
     const oppositeLine = invertLineFocus(lineFocus)
     track('ui_build_clicked', { voice, anglesCount: oppositeAngles.length, opposite: true, scriptIndex })
     try {
-      setData(null)
+      dispatch({ type: 'set_data', value: null })
       const res = await build({
         matchup: matchup.trim(),
         lineFocus: oppositeLine.trim() || undefined,
@@ -70,10 +75,14 @@ export default function AssistedBuilder() {
         voice,
         userSuppliedOdds: oddsEntries.map(o => ({ leg: o.selectionText, americanOdds: o.americanOdds }))
       })
-      setData(res as SwantailResponse)
-      // After a successful build, move the user to results immediately.
-      setRightTab('scripts')
-      track('ui_build_success')
+      if (res.ok) {
+        dispatch({ type: 'set_data', value: res.data })
+        // After a successful build, move the user to results immediately.
+        setRightTab('scripts')
+        track('ui_build_success')
+      } else {
+        track('ui_build_error', { message: res.error?.message })
+      }
     } catch (e) {
       track('ui_build_error', { message: (e as any)?.message })
     }
@@ -90,6 +99,26 @@ export default function AssistedBuilder() {
     return matched === 0
   }, [data, oddsEntries])
 
+  useEffect(() => {
+    if (isLoading) {
+      dispatch({ type: 'set_build', value: { state: 'running', startedAt: Date.now() } })
+      return
+    }
+    if (errorDetails) {
+      dispatch({ type: 'set_build', value: { state: 'error', error: errorDetails } })
+      return
+    }
+    if (data) {
+      dispatch({ type: 'set_build', value: { state: 'success', receivedAt: Date.now() } })
+      return
+    }
+    if (matchup.trim()) {
+      dispatch({ type: 'set_build', value: { state: 'ready' } })
+    } else {
+      dispatch({ type: 'set_build', value: { state: 'idle' } })
+    }
+  }, [isLoading, errorDetails, data, matchup])
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       <div className="mx-auto max-w-5xl px-4 py-10">
@@ -100,13 +129,13 @@ export default function AssistedBuilder() {
               lineFocus={lineFocus}
               angles={angles}
               isLoading={isLoading}
-              onChangeMatchup={setMatchup}
-              onChangeLineFocus={setLineFocus}
-              onChangeAngles={setAngles}
+              onChangeMatchup={(value) => dispatch({ type: 'set_matchup', value })}
+              onChangeLineFocus={(value) => dispatch({ type: 'set_anchor', value })}
+              onChangeAngles={(value) => dispatch({ type: 'set_signals', value })}
               onBuild={onBuild}
             />
 
-            <SwantailOddsPaste value={oddsPaste} onChange={setOddsPaste} />
+            <SwantailOddsPaste value={oddsPaste} onChange={(value) => dispatch({ type: 'set_odds', value })} />
 
             {showNoMatches && (
               <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
@@ -148,9 +177,47 @@ export default function AssistedBuilder() {
                 isLoading={isLoading}
                 error={error}
                 data={data}
-                onChangeMatchup={setMatchup}
+                onChangeMatchup={(value) => dispatch({ type: 'set_matchup', value })}
                 onBuild={onBuild}
-                onStatus={(s) => setSystemStatus(s)}
+                onStatus={(s) => {
+                  const checks: PreflightChecks = {
+                    schedule: s.schedule,
+                    lines: s.lines,
+                    backend: s.backend,
+                  }
+                  const derived = (s.schedule.season && s.schedule.week)
+                    ? { year: s.schedule.season, week: s.schedule.week }
+                    : { year: 2025, week: 20 }
+                  const anyDegraded = s.schedule.state === 'degraded' || s.lines.state === 'degraded' || s.backend.state === 'degraded'
+                  let value: PreflightStatus
+                  if (s.phase === 'error') {
+                    value = {
+                      state: 'error',
+                      checks,
+                      derived,
+                      error: s.schedule.error || s.lines.error || s.backend.error || 'preflight error',
+                    }
+                  } else if (s.phase === 'ready' && anyDegraded) {
+                    value = {
+                      state: 'degraded',
+                      checks,
+                      derived,
+                      reason: 'preflight degraded',
+                    }
+                  } else if (s.phase === 'ready') {
+                    value = {
+                      state: 'ready',
+                      checks,
+                      derived,
+                    }
+                  } else {
+                    value = {
+                      state: 'booting',
+                      checks,
+                    }
+                  }
+                  dispatch({ type: 'set_preflight', value })
+                }}
               />
             )}
 
@@ -161,7 +228,7 @@ export default function AssistedBuilder() {
             {rightTab === 'stats' && (
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
                 <div className="text-xs uppercase tracking-wide text-white/50">System status</div>
-                {!systemStatus ? (
+                {state.preflight.state === 'booting' ? (
                   <div className="mt-3 text-white/60">Open Terminal to run preflights.</div>
                 ) : (
                   <div className="mt-3 space-y-3">
@@ -169,33 +236,33 @@ export default function AssistedBuilder() {
                       <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
                         <div className="text-[11px] uppercase tracking-wide text-white/50">Schedule</div>
                         <div className="mt-1 text-white/80">
-                          {systemStatus.schedule.state.toUpperCase()}
-                          {typeof systemStatus.schedule.games === 'number' ? ` • ${systemStatus.schedule.games} games` : ''}
+                          {state.preflight.checks.schedule.state.toUpperCase()}
+                          {typeof state.preflight.checks.schedule.games === 'number' ? ` • ${state.preflight.checks.schedule.games} games` : ''}
                         </div>
                         <div className="mt-1 text-[12px] text-white/50">
-                          {systemStatus.schedule.season ? `Season ${systemStatus.schedule.season}` : ''}{systemStatus.schedule.week ? ` • Week ${systemStatus.schedule.week}` : ''}
+                          {state.preflight.checks.schedule.season ? `Season ${state.preflight.checks.schedule.season}` : ''}{state.preflight.checks.schedule.week ? ` • Week ${state.preflight.checks.schedule.week}` : ''}
                         </div>
                       </div>
                       <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
                         <div className="text-[11px] uppercase tracking-wide text-white/50">Lines</div>
                         <div className="mt-1 text-white/80">
-                          {systemStatus.lines.state.toUpperCase()}
-                          {systemStatus.lines.mode ? ` • ${systemStatus.lines.mode}` : ''}
+                          {state.preflight.checks.lines.state.toUpperCase()}
+                          {state.preflight.checks.lines.mode ? ` • ${state.preflight.checks.lines.mode}` : ''}
                         </div>
                         <div className="mt-1 text-[12px] text-white/50">
-                          {systemStatus.lines.mode === 'fallback' ? 'Using fallback/manual pricing.' : ''}
+                          {state.preflight.checks.lines.mode === 'fallback' ? 'Using fallback/manual pricing.' : ''}
                         </div>
                       </div>
                     </div>
                     <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
                       <div className="text-[11px] uppercase tracking-wide text-white/50">Builder</div>
                       <div className="mt-1 text-white/80">
-                        {systemStatus.backend.state.toUpperCase()}
-                        {typeof systemStatus.backend.configured === 'boolean' ? ` • configured: ${systemStatus.backend.configured ? 'yes' : 'no'}` : ''}
-                        {typeof systemStatus.backend.probeOk === 'boolean' ? ` • health: ${systemStatus.backend.probeOk ? 'ok' : 'no'}` : ''}
+                        {state.preflight.checks.backend.state.toUpperCase()}
+                        {typeof state.preflight.checks.backend.configured === 'boolean' ? ` • configured: ${state.preflight.checks.backend.configured ? 'yes' : 'no'}` : ''}
+                        {typeof state.preflight.checks.backend.probeOk === 'boolean' ? ` • health: ${state.preflight.checks.backend.probeOk ? 'ok' : 'no'}` : ''}
                       </div>
                       <div className="mt-1 text-[12px] text-white/50">
-                        {systemStatus.backend.state === 'degraded' ? 'Health probe failed; builds may still work.' : ''}
+                        {state.preflight.checks.backend.state === 'degraded' ? 'Health probe failed; builds may still work.' : ''}
                       </div>
                     </div>
                   </div>
