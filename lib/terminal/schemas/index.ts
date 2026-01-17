@@ -105,3 +105,14 @@ export {
   type Ladder,
   type BetResult,
 } from './ladder'
+
+// Terminal Response - unified contract for prop/story/parlay
+export {
+  TerminalResponseSchema,
+  ResponseModeSchema,
+  buildTerminalResponse,
+  buildEmptyResponse,
+  buildErrorResponse,
+  type TerminalResponse,
+  type ResponseMode,
+} from './response'

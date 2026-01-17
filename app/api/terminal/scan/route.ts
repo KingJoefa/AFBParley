@@ -2,20 +2,18 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { runAgents, type MatchupContext } from '@/lib/terminal/engine/agent-runner'
 import { buildProvenance, generateRequestId } from '@/lib/terminal/engine/provenance'
-import {
-  renderFindingsFallback,
-  formatFallbackForApi,
-  shouldUseFallback,
-} from '@/lib/terminal/engine/fallback-renderer'
+import { shouldUseFallback } from '@/lib/terminal/engine/fallback-renderer'
 import { checkRequestLimits, estimateTokens } from '@/lib/terminal/engine/guardrails'
+import { analyzeFindings, generateFallbackAlerts } from '@/lib/terminal/analyst'
 
 /**
  * /api/terminal/scan
  *
  * Scan a matchup for betting opportunities.
- * Returns Finding[] from all agents.
+ * Returns Alert[] - the single terminal contract.
  *
- * Future: Will integrate LLM analyst to transform Finding[] → Alert[]
+ * Pipeline: agents → Finding[] → analyst → Alert[]
+ * Finding[] is strictly internal; callers only see Alert[].
  */
 
 const ScanRequestSchema = z.object({
@@ -220,7 +218,7 @@ export async function POST(req: NextRequest) {
       llmTemperature: 0,
     })
 
-    // If no findings, return early
+    // If no findings, return empty alerts
     if (findings.length === 0) {
       return Response.json({
         request_id: requestId,
@@ -228,7 +226,6 @@ export async function POST(req: NextRequest) {
           home: teams.homeTeam,
           away: teams.awayTeam,
         },
-        findings: [],
         alerts: [],
         message: 'No significant findings for this matchup. All agents silent.',
         agents: {
@@ -240,9 +237,25 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // For now, return findings with fallback format
-    // TODO: Task 12 will add LLM analyst to transform Finding[] → Alert[]
-    const fallbackOutput = formatFallbackForApi(findings)
+    // Run LLM analyst to transform Finding[] → Alert[]
+    const analysisResult = await analyzeFindings(findings, matchupContext.dataVersion)
+
+    // Update provenance with LLM info
+    const finalProvenance = buildProvenance({
+      requestId,
+      prompt: analysisResult.prompt,
+      skillMds: analysisResult.skillMds,
+      findings,
+      dataVersion: matchupContext.dataVersion,
+      dataTimestamp: matchupContext.dataTimestamp,
+      searchTimestamps: [],
+      agentsInvoked,
+      agentsSilent,
+      cacheHits: 0,
+      cacheMisses: 0,
+      llmModel: analysisResult.fallback ? 'fallback' : 'gpt-4o-mini',
+      llmTemperature: 0.2,
+    })
 
     return Response.json({
       request_id: requestId,
@@ -250,38 +263,31 @@ export async function POST(req: NextRequest) {
         home: teams.homeTeam,
         away: teams.awayTeam,
       },
-      findings,
-      fallback: fallbackOutput,
+      alerts: analysisResult.alerts,
       agents: {
         invoked: agentsInvoked,
         silent: agentsSilent,
       },
-      provenance,
+      provenance: finalProvenance,
       timing_ms: Date.now() - startTime,
-      _note:
-        'Alert[] output pending LLM analyst integration. Using fallback renderer.',
+      ...(analysisResult.fallback && { fallback: true }),
+      ...(analysisResult.errors.length > 0 && { warnings: analysisResult.errors }),
     })
   } catch (error) {
-    // Check if we should use fallback mode
-    if (shouldUseFallback(error)) {
-      return Response.json(
-        {
-          error: 'Scan degraded',
-          message: 'Using fallback mode due to service issue',
-          fallback: true,
-          request_id: requestId,
-        },
-        { status: 503 }
-      )
-    }
+    // Always return Alert[] contract, even on error
+    // This ensures terminal never has to handle forked response shapes
+    const errorMessage = (error as Error).message
+    const isRecoverable = shouldUseFallback(error)
 
     return Response.json(
       {
-        error: 'Scan failed',
-        message: (error as Error).message,
         request_id: requestId,
+        alerts: [], // Empty alerts on error, but contract preserved
+        error: isRecoverable ? 'Scan degraded' : 'Scan failed',
+        message: errorMessage,
+        fallback: true,
       },
-      { status: 500 }
+      { status: isRecoverable ? 503 : 500 }
     )
   }
 }
@@ -291,13 +297,21 @@ export async function GET() {
   return Response.json({
     endpoint: '/api/terminal/scan',
     method: 'POST',
-    description: 'Scan a matchup for betting opportunities',
+    description: 'Scan a matchup for betting opportunities. Returns Alert[] (single contract).',
     schema: {
       matchup: 'string - e.g., "SF @ SEA" or "49ers @ Seahawks"',
       options: {
         includeWeather: 'boolean (default: true)',
         includeProps: 'boolean (default: true)',
       },
+    },
+    response: {
+      alerts: 'Alert[] - always present, even on fallback/error',
+      matchup: '{ home: string, away: string }',
+      agents: '{ invoked: string[], silent: string[] }',
+      provenance: 'object - data lineage',
+      fallback: 'boolean? - true if LLM analyst failed',
+      warnings: 'string[]? - non-fatal issues',
     },
     examples: [
       { matchup: 'SF @ SEA' },

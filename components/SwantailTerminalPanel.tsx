@@ -3,8 +3,45 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { SwantailResponse } from '@/lib/swantail/schema'
 import { deriveYearWeekFromSchedule } from '@/lib/swantail/preflight'
+import {
+  type RunMode,
+  type RunState,
+  type AgentRunState,
+  AGENT_META,
+  ALL_AGENT_IDS,
+  createInitialRunState,
+  startRun,
+  updateAgent,
+  completeRun,
+  resetRun,
+} from '@/lib/terminal/run-state'
 
 type CheckState = 'booting' | 'ready' | 'degraded' | 'error'
+
+// Re-export for consumers
+export type { RunMode, RunState, AgentRunState }
+
+function AgentCard({ agent }: { agent: AgentRunState }) {
+  const meta = AGENT_META[agent.id]
+  const statusColor = {
+    idle: 'border-white/10 bg-white/5 text-white/40',
+    scanning: 'border-blue-400/30 bg-blue-500/10 text-blue-200 animate-pulse',
+    found: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200',
+    silent: 'border-white/10 bg-white/5 text-white/30',
+    error: 'border-red-400/30 bg-red-500/10 text-red-200',
+  }[agent.status]
+
+  return (
+    <div className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-medium ${statusColor}`}>
+      <span>{meta.icon}</span>
+      <span>{meta.label}</span>
+      {agent.status === 'scanning' && <span className="ml-0.5 text-[8px]">...</span>}
+      {agent.status === 'found' && agent.findings !== undefined && (
+        <span className="ml-0.5 rounded bg-emerald-500/20 px-1 text-[8px]">{agent.findings}</span>
+      )}
+    </div>
+  )
+}
 
 export type SwantailSystemStatus = {
   phase: 'booting' | 'ready' | 'running' | 'error'
@@ -48,21 +85,27 @@ export default function SwantailTerminalPanel(props: {
   angles: string[]
   oddsPaste?: string
   isLoading: boolean
+  runState?: RunState
   error?: string | null
   data: SwantailResponse | null
   onChangeMatchup: (value: string) => void
   onChangeLineFocus?: (value: string) => void
   onChangeAngles?: (value: string[]) => void
   onChangeOddsPaste?: (value: string) => void
-  onBuild: () => void
+  onAction: (mode: RunMode) => void
+  onRunStateChange?: (state: RunState) => void
   onStatus?: (status: SwantailSystemStatus) => void
 }) {
-  const { matchup, lineFocus, angles, oddsPaste, isLoading, error, data, onChangeMatchup, onChangeLineFocus, onChangeAngles, onChangeOddsPaste, onBuild, onStatus } = props
+  const { matchup, lineFocus, angles, oddsPaste, isLoading, runState: externalRunState, error, data, onChangeMatchup, onChangeLineFocus, onChangeAngles, onChangeOddsPaste, onAction, onRunStateChange, onStatus } = props
 
   const [phase, setPhase] = useState<SwantailSystemStatus['phase']>('booting')
   const [schedule, setSchedule] = useState<SwantailSystemStatus['schedule']>({ state: 'booting' })
   const [lines, setLines] = useState<SwantailSystemStatus['lines']>({ state: 'booting' })
   const [backend, setBackend] = useState<SwantailSystemStatus['backend']>({ state: 'booting' })
+
+  // Shared run state for agent orchestration
+  const [internalRunState, setInternalRunState] = useState<RunState>(createInitialRunState)
+  const runState = externalRunState ?? internalRunState
   const [games, setGames] = useState<Array<{ id: string; display: string; time: string; isPopular?: boolean }>>([])
 
   const [buffer, setBuffer] = useState<OutputLine[]>(() => ([
@@ -260,27 +303,84 @@ export default function SwantailTerminalPanel(props: {
     return featured.length ? featured : games
   }, [games])
 
-  const canBuild = Boolean(parseQuickMatchup(matchup) || matchup.trim()) && !isLoading && phase !== 'booting'
+  const canAct = Boolean(parseQuickMatchup(matchup) || matchup.trim()) && !isLoading && phase !== 'booting'
+
+  // Update run state (internal or notify parent)
+  const updateRunState = useCallback((newState: RunState) => {
+    setInternalRunState(newState)
+    onRunStateChange?.(newState)
+  }, [onRunStateChange])
+
+  // Simulate agent scanning with buffer output and run state updates
+  const simulateAgentScan = useCallback((mode: RunMode) => {
+    // Start run
+    const initialState = startRun(internalRunState, mode)
+    updateRunState(initialState)
+    append(`[${mode.toUpperCase()}] initializing agents…`, 'muted')
+
+    // Simulate sequential agent updates
+    ALL_AGENT_IDS.forEach((agentId, idx) => {
+      setTimeout(() => {
+        const findings = Math.random() > 0.3 ? Math.floor(Math.random() * 4) + 1 : 0
+        const status = findings > 0 ? 'found' : 'silent'
+
+        setInternalRunState(prev => {
+          const updated = updateAgent(prev, agentId, status, findings || undefined)
+          onRunStateChange?.(updated)
+          return updated
+        })
+
+        const meta = AGENT_META[agentId]
+        if (findings > 0) {
+          append(`[${meta.label}] scanning… found ${findings}`, 'ok')
+        } else {
+          append(`[${meta.label}] scanning… silent`, 'muted')
+        }
+
+        // Complete run after last agent
+        if (idx === ALL_AGENT_IDS.length - 1) {
+          setTimeout(() => {
+            setInternalRunState(prev => {
+              const completed = completeRun(prev)
+              onRunStateChange?.(completed)
+              return completed
+            })
+            append(`[${mode.toUpperCase()}] scan complete`, 'ok')
+          }, 100)
+        }
+      }, 200 * (idx + 1))
+    })
+  }, [append, internalRunState, updateRunState, onRunStateChange])
 
   const onHelp = useCallback(() => {
     append('help:', 'muted')
     append('- pick a matchup chip OR type one like "SF @ SEA"', 'muted')
-    append('- optionally set Market Anchor/Angles in the form on the left', 'muted')
-    append('- press Build to generate scripts', 'muted')
+    append('- optionally set Market Anchor/Signals in the Inputs panel', 'muted')
+    append('- PROP: find mispriced player tails (alts, quarters, halves)', 'muted')
+    append('- STORY: build 1–3 single-game narratives with correlated legs', 'muted')
+    append('- PARLAY: construct cross-game portfolio (1 leg per game, 6–7 legs)', 'muted')
   }, [append])
 
   const onClear = useCallback(() => {
     setBuffer([{ id: uid(), text: 'cleared.', tone: 'muted' }])
-  }, [])
+    updateRunState(resetRun())
+  }, [updateRunState])
 
   const onReset = useCallback(() => {
     onChangeMatchup('')
     setDraft('')
     setInputTouched(false)
     onClear()
+    updateRunState(resetRun())
     append('resetting…', 'muted')
     runPreflights()
-  }, [append, onChangeMatchup, onClear, runPreflights])
+  }, [append, onChangeMatchup, onClear, runPreflights, updateRunState])
+
+  // Unified action handler for all modes
+  const handleAction = useCallback((mode: RunMode) => {
+    simulateAgentScan(mode)
+    onAction(mode)
+  }, [simulateAgentScan, onAction])
 
   const onSubmitMatchup = useCallback(() => {
     const parsed = parseQuickMatchup(draft)
@@ -343,18 +443,40 @@ export default function SwantailTerminalPanel(props: {
 
       {/* buffer */}
       <div className="grid gap-4 p-4">
+        {/* Agent Status Cards - Live Dashboard */}
+        <div className="flex flex-wrap gap-1.5">
+          {runState.agents.map(agent => (
+            <AgentCard key={agent.id} agent={agent} />
+          ))}
+          {runState.mode && (
+            <div className="ml-auto flex items-center gap-1.5 text-[10px] text-white/50">
+              <span className="uppercase">{runState.mode}</span>
+              {runState.phase === 'scanning' && <span className="animate-pulse">...</span>}
+              {runState.phase === 'complete' && <span className="text-emerald-400">done</span>}
+            </div>
+          )}
+        </div>
+
         <div
           ref={scrollerRef}
-          className="h-[380px] overflow-auto rounded-2xl border border-white/10 bg-black/40 p-4 font-mono text-[12px] leading-relaxed"
+          className="h-[340px] overflow-auto rounded-2xl border border-white/10 bg-black/40 p-4 font-mono text-[12px] leading-relaxed"
         >
-          <div className="mb-3 text-white/60">SWANTAIL</div>
+          {/* ASCII Art Logo */}
+          <pre className="mb-4 text-[10px] leading-[1.1] text-emerald-400/80 select-none">
+{`███████╗██╗    ██╗ █████╗ ███╗   ██╗████████╗ █████╗ ██╗██╗
+██╔════╝██║    ██║██╔══██╗████╗  ██║╚══██╔══╝██╔══██╗██║██║
+███████╗██║ █╗ ██║███████║██╔██╗ ██║   ██║   ███████║██║██║
+╚════██║██║███╗██║██╔══██║██║╚██╗██║   ██║   ██╔══██║██║██║
+███████║╚███╔███╔╝██║  ██║██║ ╚████║   ██║   ██║  ██║██║███████╗
+╚══════╝ ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝╚═╝╚══════╝`}
+          </pre>
           {buffer.map(line => (
             <div key={line.id} className={fmtTone(line.tone)}>{line.text}</div>
           ))}
           <div className="mt-4 text-white/40">
             {matchup.trim() ? `current matchup: ${matchup}` : 'no matchup selected'}
             {lineFocus.trim() ? ` • anchor: ${lineFocus}` : ''}
-            {angles.length ? ` • angles: ${angles.length}` : ''}
+            {angles.length ? ` • signals: ${angles.length}` : ''}
           </div>
         </div>
 
@@ -381,10 +503,33 @@ export default function SwantailTerminalPanel(props: {
 
         {/* prompt + actions */}
         <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+          {/* Action buttons: Prop / Story / Parlay */}
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={onBuild} disabled={!canBuild} className="rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">
-              {isLoading ? 'Building…' : 'Build'}
+            <button
+              type="button"
+              onClick={() => handleAction('prop')}
+              disabled={!canAct}
+              className="rounded-full bg-gradient-to-r from-violet-500 to-purple-500 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isLoading && runState.mode === 'prop' ? 'Scanning…' : 'Prop'}
             </button>
+            <button
+              type="button"
+              onClick={() => handleAction('story')}
+              disabled={!canAct}
+              className="rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isLoading && runState.mode === 'story' ? 'Building…' : 'Story'}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleAction('parlay')}
+              disabled={!canAct}
+              className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isLoading && runState.mode === 'parlay' ? 'Composing…' : 'Parlay'}
+            </button>
+            <div className="h-4 w-px bg-white/10" />
             <button
               type="button"
               onClick={() => setShowAdvanced(v => !v)}

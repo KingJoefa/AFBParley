@@ -1,0 +1,111 @@
+{
+  "matchup": "SF @ SEA",
+  "homeTeam": "SEA",
+  "awayTeam": "SF",
+  "players": {
+    "SEA": [
+      {
+        "name": "DK Metcalf",
+        "team": "SEA",
+        "position": "WR",
+        "target_share_rank": 5,
+        "receiving_yards_rank": 8,
+        "receiving_td_rank": 12,
+        "separation_rank": 15,
+        "targets": 42
+      },
+      {
+        "name": "Tyler Lockett",
+        "team": "SEA",
+        "position": "WR",
+        "target_share_rank": 18,
+        "receiving_yards_rank": 22,
+        "receiving_td_rank": 25,
+        "separation_rank": 8,
+        "targets": 28
+      },
+      {
+        "name": "Kenneth Walker III",
+        "team": "SEA",
+        "position": "HB",
+        "rush_yards_rank": 6,
+        "yards_per_carry_rank": 10,
+        "rush_td_rank": 4,
+        "reception_rank": 35,
+        "carries": 85
+      }
+    ],
+    "SF": [
+      {
+        "name": "Deebo Samuel",
+        "team": "SF",
+        "position": "WR",
+        "target_share_rank": 12,
+        "receiving_yards_rank": 15,
+        "receiving_td_rank": 18,
+        "separation_rank": 6,
+        "targets": 38
+      },
+      {
+        "name": "George Kittle",
+        "team": "SF",
+        "position": "TE",
+        "target_share_rank": 3,
+        "receiving_yards_rank": 5,
+        "receiving_td_rank": 8,
+        "red_zone_target_rank": 2,
+        "targets": 45
+      },
+      {
+        "name": "Brock Purdy",
+        "team": "SF",
+        "position": "QB",
+        "qb_rating_rank": 3,
+        "yards_per_attempt_rank": 2,
+        "turnover_pct_rank": 5,
+        "attempts": 180
+      }
+    ]
+  },
+  "teamStats": {
+    "SEA": {
+      "pressure_rate": 0.35,
+      "pressure_rate_rank": 8,
+      "pass_block_win_rate_rank": 18,
+      "qb_name": "Geno Smith",
+      "qb_passer_rating_under_pressure": 68.5,
+      "pass_defense_rank": 22,
+      "pass_yards_allowed_rank": 25,
+      "interception_rate_rank": 15,
+      "rush_defense_rank": 12,
+      "rush_yards_allowed_rank": 14,
+      "yards_allowed_to_wr_rank": 28,
+      "td_allowed_to_wr_rank": 26,
+      "te_defense_rank": 30,
+      "yards_allowed_to_te_rank": 31,
+      "td_allowed_to_te_rank": 28
+    },
+    "SF": {
+      "pressure_rate": 0.42,
+      "pressure_rate_rank": 3,
+      "pass_block_win_rate_rank": 8,
+      "qb_name": "Brock Purdy",
+      "qb_passer_rating_under_pressure": 82.3,
+      "pass_defense_rank": 5,
+      "pass_yards_allowed_rank": 8,
+      "interception_rate_rank": 6,
+      "rush_defense_rank": 3,
+      "rush_yards_allowed_rank": 5,
+      "epa_allowed_to_wr_rank": 6,
+      "epa_allowed_to_rb_rank": 4
+    }
+  },
+  "weather": {
+    "temperature": 52,
+    "wind_mph": 12,
+    "precipitation_chance": 15,
+    "indoor": false
+  },
+  "dataTimestamp": 1737052800000,
+  "dataVersion": "2025-week-19"
+}

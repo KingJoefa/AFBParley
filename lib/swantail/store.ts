@@ -1,5 +1,6 @@
 import type { SwantailResponse } from '@/lib/swantail/schema'
 import type { AfbError } from '@/lib/afb/error'
+import type { SignalTag } from './signals'
 
 export type CheckState = 'booting' | 'ready' | 'degraded' | 'error'
 
@@ -50,7 +51,8 @@ export type BuildStatus =
 export type SwantailState = {
   matchup: string
   anchor: string
-  signals: string[]
+  signals: SignalTag[]       // Normalized canonical tags
+  signals_raw: string[]      // Original user input for display/debug
   oddsPaste: string
   data: SwantailResponse | null
   preflight: PreflightStatus
@@ -60,7 +62,7 @@ export type SwantailState = {
 export type SwantailAction =
   | { type: 'set_matchup'; value: string }
   | { type: 'set_anchor'; value: string }
-  | { type: 'set_signals'; value: string[] }
+  | { type: 'set_signals'; signals: SignalTag[]; raw: string[] }
   | { type: 'set_odds'; value: string }
   | { type: 'set_data'; value: SwantailResponse | null }
   | { type: 'set_preflight'; value: PreflightStatus }
@@ -70,6 +72,7 @@ export const initialSwantailState: SwantailState = {
   matchup: '',
   anchor: '',
   signals: [],
+  signals_raw: [],
   oddsPaste: '',
   data: null,
   preflight: {
@@ -90,7 +93,7 @@ export function swantailReducer(state: SwantailState, action: SwantailAction): S
     case 'set_anchor':
       return { ...state, anchor: action.value }
     case 'set_signals':
-      return { ...state, signals: action.value }
+      return { ...state, signals: action.signals, signals_raw: action.raw }
     case 'set_odds':
       return { ...state, oddsPaste: action.value }
     case 'set_data':

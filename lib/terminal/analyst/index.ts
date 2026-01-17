@@ -16,6 +16,7 @@ import { renderClaim } from '../schemas/claim'
 import { calculateFindingConfidence } from '../engine/confidence'
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import OpenAI from 'openai'
 
 /**
  * LLM Analyst
@@ -243,17 +244,106 @@ export interface LLMCallOptions {
   maxTokens?: number
 }
 
+// Lazy-init OpenAI client
+let openaiClient: OpenAI | null = null
+
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY not configured')
+    }
+    openaiClient = new OpenAI({ apiKey })
+  }
+  return openaiClient
+}
+
 /**
- * Placeholder for actual LLM call
- * This will be implemented with OpenAI SDK
+ * Call LLM using OpenAI SDK
  */
 export async function callLLM(
   prompt: string,
   options: LLMCallOptions = {}
 ): Promise<string> {
-  // TODO: Implement actual LLM call with OpenAI SDK
-  // For now, throw an error indicating not implemented
-  throw new Error('LLM integration not yet implemented. Use fallback mode.')
+  const client = getOpenAIClient()
+  const model = options.model ?? 'gpt-4o-mini'
+  const temperature = options.temperature ?? 0.2
+  const maxTokens = options.maxTokens ?? 2000
+
+  const response = await client.chat.completions.create({
+    model,
+    temperature,
+    max_tokens: maxTokens,
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a sports betting analyst. Output only valid JSON. No markdown, no explanation.',
+      },
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ],
+  })
+
+  const content = response.choices[0]?.message?.content
+  if (!content) {
+    throw new Error('LLM returned empty response')
+  }
+
+  return content
+}
+
+/**
+ * Map agent type to default implications for fallback
+ */
+const DEFAULT_IMPLICATIONS: Record<AgentType, AnyImplication[]> = {
+  epa: ['team_total_over'],
+  pressure: ['qb_sacks_over'],
+  weather: ['game_total_under'],
+  qb: ['qb_pass_yards_over'],
+  hb: ['rb_rush_yards_over'],
+  wr: ['wr_yards_over'],
+  te: ['te_receptions_over'],
+}
+
+/**
+ * Map agent type to default metric for fallback claims
+ */
+const DEFAULT_METRICS: Record<AgentType, string> = {
+  epa: 'receiving_epa',
+  pressure: 'pressure_rate',
+  weather: 'snap_count',
+  qb: 'yards_per_attempt',
+  hb: 'yards_after_contact',
+  wr: 'target_share',
+  te: 'target_share',
+}
+
+/**
+ * Generate minimal Alert[] from Finding[] when LLM fails
+ * Ensures terminal always gets Alert[] contract, never raw findings
+ */
+export function generateFallbackAlerts(
+  findings: Finding[],
+  dataVersion: string
+): Alert[] {
+  return findings.map(f => {
+    const confidence = calculateFindingConfidence(f)
+    const codeDerived = buildCodeDerivedFields(f, confidence, dataVersion)
+
+    // Build minimal claim from finding data
+    const metric = DEFAULT_METRICS[f.agent] || 'snap_count'
+    const claim = `${f.stat}: ${f.value_num ?? f.value_str} (${f.comparison_context})`
+
+    return {
+      ...codeDerived,
+      severity: confidence >= 0.7 ? 'high' : 'medium',
+      claim,
+      implications: DEFAULT_IMPLICATIONS[f.agent] || [],
+      suppressions: [],
+    } as Alert
+  })
 }
 
 /**
@@ -269,6 +359,7 @@ export async function analyzeFindings(
   errors: string[]
   skillMds: Partial<Record<AgentType, string>>
   prompt: string
+  fallback?: boolean
 }> {
   if (findings.length === 0) {
     return {
@@ -321,13 +412,15 @@ export async function analyzeFindings(
       prompt,
     }
   } catch (error) {
-    // LLM call failed - return empty with error
+    // LLM call failed - use fallback to produce minimal Alert[]
+    const fallbackAlerts = generateFallbackAlerts(findings, dataVersion)
     return {
-      alerts: [],
+      alerts: fallbackAlerts,
       llmOutput: {},
       errors: [(error as Error).message],
       skillMds,
       prompt,
+      fallback: true,
     }
   }
 }
