@@ -1,0 +1,77 @@
+{
+  "week": 20,
+  "season": 2025,
+  "round": "Divisional",
+  "games": {
+    "BUF@DEN": {
+      "kickoff": "2025-01-18T21:30:00Z",
+      "totals": { "home": 23.5, "away": 22 },
+      "spread": { "favorite": "BUF", "line": -1 },
+      "notes": "Rematch of Wild Card where Bills won 31-7. Josh Allen 'Superman game' profile with Shavers and G.Davis both out (ACL). James Cook dominated with 17/18 RB touches; Ty Johnson (ankle) unlikely. Khalil Shakir paced WRs with 71% snaps, 12 targets, 12/82/0 line. Shakir runs 60% routes in slot, avoiding Surtain. Riley Moss (CB2) led league in PBUs (19) but flagged 8x for PI, PFF 55th in passer rating allowed (93.2). Brandin Cooks emerged as top outside WR with 7/159 over last 2 games. Knox decent sleeper vs DEN TE vulnerability (9th-most yards allowed to TEs). Denver held RBs to 3.86 YPC this season but Bills defense got torched for 4.99 YPC and 8.1 YPC to JAX RBs last week. Bo Nix dual-threat (8th passing yards, 11th QB rushing). Bills injuries: Bernard (calf), Hairston (ankle), Poyer (hamstring) all questionable.",
+      "injuries": {
+        "BUF": ["Shavers ACL OUT", "G.Davis ACL OUT", "Kincaid limited", "Ty Johnson ankle doubtful", "Bernard calf questionable", "Hairston ankle questionable", "Poyer hamstring questionable"],
+        "DEN": ["Bryant cleared concussion"]
+      },
+      "keyMatchups": [
+        "Shakir vs Moss in slot - exploitable",
+        "Cooks vs Moss outside - favorable",
+        "Knox vs DEN TE coverage - sleeper",
+        "Cook vs DEN run D (3.86 YPC allowed)"
+      ],
+      "prediction": { "home": 23, "away": 24 }
+    },
+    "SF@SEA": {
+      "kickoff": "2025-01-19T01:00:00Z",
+      "totals": { "home": 26.5, "away": 19 },
+      "spread": { "favorite": "SEA", "line": -7.5 },
+      "notes": "Kittle torn Achilles OUT - was 95% of snaps in Week 18. SEA defense elite: league-low 6.0 YPA allowed, 4th-lowest passer rating (77.9). Held Purdy to 4.7 YPA and 3 points in Week 18. CMC best path via passing game - SEA allowed league-high 97 RB receptions. CMC leads SF in targets (68) and catches (54). Jennings managed only 4/35/0 and 2/16/0 vs SEA this year. Pearsall (PCL) likely to play but may rotate with Robinson. Jake Tonges favorable TE draw - SEA allowed 5th-most TE receptions (105), 6th-most TE yards (1,080). Tonges last 4 games with 65%+ snaps: 7/60/1, 6/58/0, 7/41/1, 3/58/1. SF dead last in sacks (20), 3rd-last pressure rate (16.7%). Darnold PFF #4 QB when not pressured. Walker/Charbonnet near-even split, lean Charbonnet. SF allowed 80/388/3 (4.85 YPC) to RBs last 3 games. JSN tagged SF for 6/84/0 and 9/124/0 this year.",
+      "injuries": {
+        "SF": ["Kittle Achilles OUT", "Pearsall PCL questionable", "Brown hamstring questionable", "Kendricks (3rd string MLB)"],
+        "SEA": ["Cross hamstring/knee questionable", "Arroyo knee - practicing fully"]
+      },
+      "keyMatchups": [
+        "CMC receiving vs SEA (97 RB catches allowed)",
+        "Tonges vs SEA TE coverage - favorable",
+        "JSN vs SF secondary - proven success",
+        "Charbonnet vs SF run D (4.85 YPC allowed)"
+      ],
+      "prediction": { "home": 27, "away": 20 }
+    },
+    "HOU@NE": {
+      "kickoff": "2025-01-19T20:00:00Z",
+      "totals": { "home": 21.5, "away": 18.5 },
+      "spread": { "favorite": "NE", "line": -3 },
+      "notes": "Collins concussion OUT - top offensive player. Possible snowstorm at Foxboro. NE defense dominant: 30 pressures vs LAC, held Chargers to 3.5 YPP, Herbert took 6 sacks and 11 QB hits. Chargers admitted post-game confusion on NE schemes. Spillane and Williams returned from injury. Schultz led HOU in catches (64), catch rate (84%), first downs (31), played 79% snaps in Wild Card. Hutchinson paced HOU WRs in snaps but draws Gonzalez. Kirk vs Marcus Jones in slot - tougher draw than Wild Card. Higgins highest ceiling sans Collins: 7/150/2 over last 3 games. Cade Stover deep sleeper at 53% snaps. NE run D stymied LAC for 12/30/0 (2.5 YPC). Maye 4th in QB rushing (450), averaging 39.4 rush yards last 5 games. Stevenson overtook Henderson as lead back (40-26 snaps, 13-6 touches). Stevenson on fire: 18/246/2 receiving last 6 games.",
+      "injuries": {
+        "HOU": ["Collins concussion OUT"],
+        "NE": ["Spillane returned", "M.Williams returned"]
+      },
+      "keyMatchups": [
+        "Stroud vs NE pressure (30 pressures vs LAC)",
+        "Schultz vs NE coverage - best HOU option",
+        "Higgins vs NE secondary - ceiling play",
+        "Maye rushing vs HOU (9th-most QB rush yards allowed)"
+      ],
+      "weather": { "temp_f": 28, "wind_mph": 15, "snow_chance_pct": 60 },
+      "prediction": { "home": 17, "away": 3 }
+    },
+    "LAR@CHI": {
+      "kickoff": "2025-01-19T23:30:00Z",
+      "totals": { "home": 22.5, "away": 26 },
+      "spread": { "favorite": "LAR", "line": -3.5 },
+      "notes": "Arctic conditions: single-digit temps, high winds at Soldier Field. Rams indoor team, didn't play sub-45 degree game all season. CHI pass D flamed: 3 straight 300+ yard games allowed, 8:2 TD-to-INT ratio to Love/Goff/Purdy. CHI generated just 4 combined sacks those 3 games. Rams led NFL in scoring (30.5 ppg). Kyren Williams more snaps but Corum more explosive, similar touches. CHI allowed 4.84 YPC to RBs. Nacua and Adams should cook vs CHI secondary that got roasted by St. Brown (11/139), Doubs (8/124/1), Golden (4/84/1), Ja.Williams (6/74), Reed (4/43/1). Parkinson led Rams TEs (75% snaps) over Higbee (51%). Ferguson (hamstring) returning. Caleb Williams unfavorable draw: LAR 11th-fewest YPA allowed (6.8), 9th-lowest passer rating (87), 7th in sacks (47), 4th pressure rate (26.3%). LT Ozgood (patellar) OUT - Benedet (PFF 75th in pass block) vs Verse mismatch. Swift slight lead over Monangai (50% vs 46% snaps). Loveland averaging 12.7 targets, 8/107/0.7 last 3 games.",
+      "injuries": {
+        "CHI": ["Ozgood patellar OUT"],
+        "LAR": ["Ferguson hamstring - returning"]
+      },
+      "keyMatchups": [
+        "Nacua/Adams vs CHI secondary - smash spot",
+        "Verse vs Benedet - major mismatch",
+        "Loveland vs LAR coverage - target monster",
+        "Williams/Corum vs CHI run D (4.84 YPC allowed)"
+      ],
+      "weather": { "temp_f": 8, "wind_mph": 25, "snow_chance_pct": 20 },
+      "prediction": { "home": 23, "away": 27 }
+    }
+  }
+}

@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { runAgents, type MatchupContext } from '@/lib/terminal/engine/agent-runner'
 import { buildProvenance, generateRequestId } from '@/lib/terminal/engine/provenance'
-import { analyzeFindings } from '@/lib/terminal/analyst'
+import { loadGameNotes } from '@/lib/terminal/engine/notes-loader'
+import { analyzeFindings, type GameNotesContext } from '@/lib/terminal/analyst'
 import {
   type TerminalResponse,
   buildTerminalResponse,
@@ -105,8 +106,10 @@ function parseMatchup(matchup: string): { homeTeam: string; awayTeam: string } |
 async function loadMatchupContext(
   homeTeam: string,
   awayTeam: string
-): Promise<MatchupContext> {
-  return {
+): Promise<{ context: MatchupContext; gameNotes?: GameNotesContext }> {
+  const gameNotes = loadGameNotes(homeTeam, awayTeam)
+
+  const context: MatchupContext = {
     homeTeam,
     awayTeam,
     players: {
@@ -125,7 +128,14 @@ async function loadMatchupContext(
     },
     dataTimestamp: Date.now(),
     dataVersion: `2025-week-${Math.ceil((Date.now() - new Date('2025-09-01').getTime()) / (7 * 24 * 60 * 60 * 1000))}`,
+    gameNotes: gameNotes?.notes,
+    injuries: gameNotes?.injuries,
+    keyMatchups: gameNotes?.keyMatchups,
+    totals: gameNotes?.totals,
+    spread: gameNotes?.spread,
   }
+
+  return { context, gameNotes }
 }
 
 /**
@@ -359,7 +369,7 @@ export async function POST(req: NextRequest) {
       if (!teams) continue
 
       const gameKey = `${teams.awayTeam}@${teams.homeTeam}`
-      const matchupContext = await loadMatchupContext(teams.homeTeam, teams.awayTeam)
+      const { context: matchupContext, gameNotes } = await loadMatchupContext(teams.homeTeam, teams.awayTeam)
 
       // Run agents
       const { findings, agentsInvoked, agentsSilent } = await runAgents(matchupContext)
@@ -384,8 +394,8 @@ export async function POST(req: NextRequest) {
         continue
       }
 
-      // Analyze findings to get alerts
-      const analysisResult = await analyzeFindings(propFindings, matchupContext.dataVersion)
+      // Analyze findings to get alerts (with game notes for context)
+      const analysisResult = await analyzeFindings(propFindings, matchupContext.dataVersion, {}, gameNotes)
 
       gamePools.push({
         gameKey,

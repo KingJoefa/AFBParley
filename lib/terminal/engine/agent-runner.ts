@@ -89,6 +89,12 @@ export interface MatchupContext {
   weather: WeatherData
   dataTimestamp: number
   dataVersion: string
+  // Game notes from scout reports (enriches analyst output)
+  gameNotes?: string
+  injuries?: Record<string, string[]>
+  keyMatchups?: string[]
+  totals?: { home: number; away: number }
+  spread?: { favorite: string; line: number }
 }
 
 export interface AgentRunResult {

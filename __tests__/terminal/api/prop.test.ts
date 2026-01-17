@@ -299,11 +299,14 @@ describe('/api/terminal/prop', () => {
       await POST(req as any)
 
       // Verify analyzeFindings was called with only WR findings
+      // Signature: analyzeFindings(findings, dataVersion, options, gameNotes)
       expect(analyzeFindings).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({ agent: 'wr' }),
         ]),
-        expect.any(String)
+        expect.any(String),
+        expect.any(Object),
+        expect.anything() // gameNotes (optional)
       )
 
       // Verify EPA, weather, pressure findings were filtered out

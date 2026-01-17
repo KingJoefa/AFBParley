@@ -57,12 +57,21 @@ export function loadRelevantSkillMds(
   return skillMds
 }
 
+export interface GameNotesContext {
+  notes?: string
+  injuries?: Record<string, string[]>
+  keyMatchups?: string[]
+  totals?: { home: number; away: number }
+  spread?: { favorite: string; line: number }
+}
+
 /**
  * Build the prompt for the LLM analyst
  */
 export function buildAnalystPrompt(
   findings: Finding[],
-  skillMds: Partial<Record<AgentType, string>>
+  skillMds: Partial<Record<AgentType, string>>,
+  gameNotes?: GameNotesContext
 ): string {
   const skillSections = Object.entries(skillMds)
     .map(([agent, content]) => `## ${agent.toUpperCase()} Agent Skill\n\n${content}`)
@@ -70,12 +79,48 @@ export function buildAnalystPrompt(
 
   const findingsJson = JSON.stringify(findings, null, 2)
 
+  // Build game notes section if available
+  let gameNotesSection = ''
+  if (gameNotes?.notes || gameNotes?.injuries || gameNotes?.keyMatchups) {
+    const parts: string[] = []
+
+    if (gameNotes.totals || gameNotes.spread) {
+      const lines: string[] = []
+      if (gameNotes.totals) lines.push(`Team Totals: Home ${gameNotes.totals.home}, Away ${gameNotes.totals.away}`)
+      if (gameNotes.spread) lines.push(`Spread: ${gameNotes.spread.favorite} ${gameNotes.spread.line}`)
+      parts.push(lines.join(' | '))
+    }
+
+    if (gameNotes.notes) {
+      parts.push(`Scout Report: ${gameNotes.notes}`)
+    }
+
+    if (gameNotes.injuries) {
+      const injuryLines = Object.entries(gameNotes.injuries)
+        .map(([team, list]) => `${team}: ${list.join(', ')}`)
+        .join('\n')
+      parts.push(`Injuries:\n${injuryLines}`)
+    }
+
+    if (gameNotes.keyMatchups?.length) {
+      parts.push(`Key Matchups:\n- ${gameNotes.keyMatchups.join('\n- ')}`)
+    }
+
+    gameNotesSection = `
+---
+
+## Game Notes (Scout Report)
+
+${parts.join('\n\n')}
+`
+  }
+
   return `You are a sports betting analyst terminal. Your job is to transform raw statistical findings into actionable alerts.
 
 ## Your Skills
 
 ${skillSections}
-
+${gameNotesSection}
 ---
 
 ## Findings to Analyze
@@ -352,7 +397,8 @@ export function generateFallbackAlerts(
 export async function analyzeFindings(
   findings: Finding[],
   dataVersion: string,
-  options: LLMCallOptions = {}
+  options: LLMCallOptions = {},
+  gameNotes?: GameNotesContext
 ): Promise<{
   alerts: Alert[]
   llmOutput: LLMOutput
@@ -374,8 +420,8 @@ export async function analyzeFindings(
   // Load skill MDs
   const skillMds = loadRelevantSkillMds(findings)
 
-  // Build prompt
-  const prompt = buildAnalystPrompt(findings, skillMds)
+  // Build prompt (with game notes if available)
+  const prompt = buildAnalystPrompt(findings, skillMds, gameNotes)
 
   try {
     // Call LLM

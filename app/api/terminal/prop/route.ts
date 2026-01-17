@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { runAgents, type MatchupContext } from '@/lib/terminal/engine/agent-runner'
 import { buildProvenance, generateRequestId } from '@/lib/terminal/engine/provenance'
-import { analyzeFindings } from '@/lib/terminal/analyst'
+import { loadGameNotes } from '@/lib/terminal/engine/notes-loader'
+import { analyzeFindings, type GameNotesContext } from '@/lib/terminal/analyst'
 import {
   type TerminalResponse,
   buildTerminalResponse,
@@ -157,13 +158,16 @@ function rankAlerts(alerts: Alert[]): Alert[] {
 }
 
 /**
- * Load matchup context (shared with scan - TODO: extract to shared module)
+ * Load matchup context with game notes
  */
 async function loadMatchupContext(
   homeTeam: string,
   awayTeam: string
-): Promise<MatchupContext> {
-  return {
+): Promise<{ context: MatchupContext; gameNotes?: GameNotesContext }> {
+  // Load game notes from fixture (graceful degradation if missing)
+  const gameNotes = loadGameNotes(homeTeam, awayTeam)
+
+  const context: MatchupContext = {
     homeTeam,
     awayTeam,
     players: {
@@ -182,7 +186,15 @@ async function loadMatchupContext(
     },
     dataTimestamp: Date.now(),
     dataVersion: `2025-week-${Math.ceil((Date.now() - new Date('2025-09-01').getTime()) / (7 * 24 * 60 * 60 * 1000))}`,
+    // Include notes metadata in context for provenance
+    gameNotes: gameNotes?.notes,
+    injuries: gameNotes?.injuries,
+    keyMatchups: gameNotes?.keyMatchups,
+    totals: gameNotes?.totals,
+    spread: gameNotes?.spread,
   }
+
+  return { context, gameNotes }
 }
 
 export async function POST(req: NextRequest) {
@@ -236,8 +248,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Load context
-    const matchupContext = await loadMatchupContext(teams.homeTeam, teams.awayTeam)
+    // Load context with game notes
+    const { context: matchupContext, gameNotes } = await loadMatchupContext(teams.homeTeam, teams.awayTeam)
 
     // Parse any pasted odds
     const parsedOdds = parseOddsPaste(odds_paste)
@@ -279,8 +291,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Run analyst to transform Finding[] → Alert[]
-    const analysisResult = await analyzeFindings(propFindings, matchupContext.dataVersion)
+    // Run analyst to transform Finding[] → Alert[] (with game notes for context)
+    const analysisResult = await analyzeFindings(propFindings, matchupContext.dataVersion, {}, gameNotes)
 
     // Rank alerts by edge strength
     const rankedAlerts = rankAlerts(analysisResult.alerts)
