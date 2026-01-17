@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { useAfb } from '@/app/hooks/useAfb'
 import { useTerminal } from '@/app/hooks/useTerminal'
 import SwantailScriptsView from '@/components/SwantailScriptsView'
+import TerminalAlertsView from '@/components/TerminalAlertsView'
 import SwantailTerminalPanel from '@/components/SwantailTerminalPanel'
 import { matchOdds, parseOddsPaste } from '@/lib/swantail/odds'
 import { initialSwantailState, swantailReducer, type PreflightChecks, type PreflightStatus } from '@/lib/swantail/store'
@@ -231,7 +232,9 @@ export default function AssistedBuilder() {
             </div>
 
             {rightTab === 'scripts' && (
-              <SwantailScriptsView data={data} oddsEntries={oddsEntries} onOpposite={onOpposite} />
+              terminalData
+                ? <TerminalAlertsView data={terminalData} />
+                : <SwantailScriptsView data={data} oddsEntries={oddsEntries} onOpposite={onOpposite} />
             )}
 
             {rightTab === 'stats' && (
