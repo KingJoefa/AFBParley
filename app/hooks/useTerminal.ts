@@ -64,6 +64,10 @@ export function useTerminal() {
       // Mode-specific fields
       if (req.anchor) payload.anchor = req.anchor
       if (mode === 'prop' && req.odds_paste) payload.odds_paste = req.odds_paste
+      if (mode === 'parlay') {
+        // Parlay expects matchups[] for cross-game portfolios.
+        payload.matchups = [req.matchup]
+      }
 
       const res = await fetch(endpoint, {
         method: 'POST',
