@@ -5,6 +5,7 @@ import type {
   LLMOutput,
   LLMFindingOutput,
   ClaimParts,
+  AnyImplication,
 } from '../schemas'
 import {
   assembleAlerts,
@@ -217,13 +218,15 @@ export function parseLLMOutput(
     }
 
     // Build output entry with validated implications only
+    const validatedImplications = implications.filter(imp => {
+      const v = validateImplicationsForAgent(finding.agent, [imp])
+      return v.valid
+    }) as AnyImplication[]
+
     output[findingId] = {
       severity: severity as 'high' | 'medium',
       claim_parts: claimParts,
-      implications: implications.filter(imp => {
-        const v = validateImplicationsForAgent(finding.agent, [imp])
-        return v.valid
-      }),
+      implications: validatedImplications,
       suppressions: (entry.suppressions as string[]) || [],
     }
   }

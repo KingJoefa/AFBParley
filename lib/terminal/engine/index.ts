@@ -12,10 +12,11 @@
 export { runAgents, type MatchupContext, type AgentRunResult } from './agent-runner'
 export {
   validateSourceIntegrity,
-  validateImplication,
-  validateLineEvidence,
-  validateEdgeLanguage,
-  type ValidationResult,
+  validateImplications,
+  validateLineFreshness,
+  validateNoEdgeWithoutLine,
+  validateAlert,
+  validateAlerts,
 } from './validators'
 export {
   calculateConfidence,
