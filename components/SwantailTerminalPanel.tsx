@@ -327,8 +327,8 @@ export default function SwantailTerminalPanel(props: {
 
   // Compute current inputs hash for staleness detection
   const analysisPayloadHash = useMemo(() =>
-    computeInputsHash(matchup, lineFocus, angles, oddsPaste || ''),
-    [matchup, lineFocus, angles, oddsPaste]
+    computeInputsHash(matchup, lineFocus, angles, oddsPaste || '', selectedAgents),
+    [matchup, lineFocus, angles, oddsPaste, selectedAgents]
   )
 
   // Compute canBuild: requires successful scan with MATCHING hash (not stale)
@@ -365,6 +365,43 @@ export default function SwantailTerminalPanel(props: {
   }, [append, onChangeMatchup, onClear, runPreflights, updateRunState])
 
 
+  const applyMatchupContext = useCallback(async (nextMatchup: string) => {
+    if (typeof window === 'undefined') return
+    if (onChangeAngles) {
+      onChangeAngles([])
+      setSignalDraft('')
+      setSignalStatus('idle')
+    }
+    if (onChangeOddsPaste) {
+      onChangeOddsPaste('')
+      setOddsDraft('')
+      setOddsStatus('idle')
+    }
+    if (onChangeLineFocus) {
+      onChangeLineFocus('')
+      setAnchorDraft('')
+      setAnchorStatus('idle')
+    }
+
+    try {
+      const u = new URL('/api/market/suggest', window.location.origin)
+      u.searchParams.set('matchup', nextMatchup)
+      u.searchParams.set('limit', '1')
+      const res = await fetch(u.toString(), { cache: 'no-store' })
+      if (!res.ok) return
+      const json = await res.json().catch(() => null)
+      const suggestion = Array.isArray(json?.suggestions) ? json.suggestions[0] : ''
+      if (suggestion && onChangeLineFocus) {
+        onChangeLineFocus(suggestion)
+        setAnchorDraft(suggestion)
+        setAnchorStatus('ok')
+        append(`anchor suggested: ${suggestion}`, 'ok')
+      }
+    } catch {
+      // No suggestion available.
+    }
+  }, [append, onChangeAngles, onChangeLineFocus, onChangeOddsPaste])
+
   const onSubmitMatchup = useCallback((nextRaw: string) => {
     const trimmed = nextRaw.trim()
     if (trimmed === matchup.trim()) {
@@ -387,14 +424,16 @@ export default function SwantailTerminalPanel(props: {
     setDraft(parsed)
     setMatchupStatus('ok')
     append(`matchup set: ${parsed}`, 'ok')
-  }, [append, matchup, onChangeMatchup])
+    void applyMatchupContext(parsed)
+  }, [append, applyMatchupContext, matchup, onChangeMatchup])
 
   const onPickMatchup = useCallback((value: string) => {
     onChangeMatchup(value)
     setDraft(value)
     setMatchupStatus('ok')
     append(`matchup set: ${value}`, 'ok')
-  }, [append, onChangeMatchup])
+    void applyMatchupContext(value)
+  }, [append, applyMatchupContext, onChangeMatchup])
 
   const onApplyAnchor = useCallback((nextRaw: string) => {
     if (!onChangeLineFocus) return

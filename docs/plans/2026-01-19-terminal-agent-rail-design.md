@@ -106,3 +106,6 @@ Semantic -> color mapping:
 - Agents feel actionable and integrated into the terminal flow.
 - Inputs feel like parameters rather than legacy form fields.
 - Users can tell what changed from the log echo + chip state.
+
+## Next Steps
+- Add data-backed auto-fill for `--signals` and `--odds` when a matchup is selected (blank if no data source).
