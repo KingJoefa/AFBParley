@@ -1,0 +1,22 @@
+[
+  {
+    "awayCode": "NE",
+    "homeCode": "DEN",
+    "total": 41.5,
+    "spreadHome": 4.5,
+    "spreadAway": -4.5,
+    "source": "fixture",
+    "timestamp": 1737849600,
+    "notes": "AFC Championship - Bo Nix OUT, Jarrett Stidham starting for DEN"
+  },
+  {
+    "awayCode": "LAR",
+    "homeCode": "SEA",
+    "total": 47.5,
+    "spreadHome": -2.5,
+    "spreadAway": 2.5,
+    "source": "fixture",
+    "timestamp": 1737861600,
+    "notes": "NFC Championship - Rams #1 EPA offense vs Seahawks #2 defense"
+  }
+]
