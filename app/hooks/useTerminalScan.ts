@@ -105,10 +105,10 @@ export function useTerminalScan() {
       const data: ScanResponse = {
         request_id: json.request_id,
         alerts: json.alerts || [],
-        findings: json.findings || [], // May not be present in current API
+        findings: json.findings || [],
         matchup: json.matchup,
         agents: json.agents,
-        payload_hash: json.provenance?.payload_hash || json.request_id,
+        payload_hash: json.payload_hash || json.provenance?.payload_hash || json.request_id,
         timing_ms: json.timing_ms,
         fallback: json.fallback,
         warnings: json.warnings,
