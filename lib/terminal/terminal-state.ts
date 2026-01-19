@@ -18,7 +18,7 @@ export type AnalysisMeta = {
   request_id: string
   scan_hash: string        // Hash of inputs at scan time
   scannedAt: number
-  status: 'idle' | 'scanning' | 'success' | 'error'
+  status: 'idle' | 'scanning' | 'success' | 'stale' | 'error'
   alertCount: number
   findingCount: number
   error?: string
@@ -61,14 +61,17 @@ export function createInitialTerminalState(): TerminalState {
 
 /**
  * Compute a hash of scan-affecting inputs for staleness detection
+ * Includes selectedAgents since agent scope is part of execution context
  */
 export function computeInputsHash(
   matchup: string,
   anchor: string,
   signals: string[],
-  oddsPaste: string
+  oddsPaste: string,
+  selectedAgents?: string[]
 ): string {
-  const payload = `${matchup}|${anchor}|${signals.sort().join(',')}|${oddsPaste || ''}`
+  const agentKey = selectedAgents ? selectedAgents.slice().sort().join(',') : 'all'
+  const payload = `${matchup}|${anchor}|${signals.sort().join(',')}|${oddsPaste || ''}|agents:${agentKey}`
   // Simple string hash for client-side use
   let hash = 0
   for (let i = 0; i < payload.length; i++) {
@@ -141,6 +144,20 @@ export function markScanError(state: TerminalState, error: string): TerminalStat
     analysisMeta: state.analysisMeta
       ? { ...state.analysisMeta, status: 'error', error }
       : null,
+  }
+}
+
+/**
+ * Mark terminal state as stale (agent selection changed)
+ * Preserves existing alerts/findings for visibility but blocks Build
+ */
+export function markScanStale(state: TerminalState): TerminalState {
+  if (!state.analysisMeta || state.analysisMeta.status !== 'success') {
+    return state
+  }
+  return {
+    ...state,
+    analysisMeta: { ...state.analysisMeta, status: 'stale' },
   }
 }
 

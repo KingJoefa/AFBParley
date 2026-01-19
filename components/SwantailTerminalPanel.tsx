@@ -8,6 +8,7 @@ import {
   type RunState,
   type AgentRunState,
   AGENT_META,
+  ALL_AGENT_IDS,
   createInitialRunState,
   resetRun,
 } from '@/lib/terminal/run-state'
@@ -17,28 +18,6 @@ type CheckState = 'booting' | 'ready' | 'degraded' | 'error'
 
 // Re-export for consumers
 export type { RunMode, RunState, AgentRunState }
-
-function AgentCard({ agent }: { agent: AgentRunState }) {
-  const meta = AGENT_META[agent.id]
-  const statusColor = {
-    idle: 'border-white/10 bg-white/5 text-white/40',
-    scanning: 'border-blue-400/30 bg-blue-500/10 text-blue-200 animate-pulse',
-    found: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200',
-    silent: 'border-white/10 bg-white/5 text-white/30',
-    error: 'border-red-400/30 bg-red-500/10 text-red-200',
-  }[agent.status]
-
-  return (
-    <div className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-medium ${statusColor}`}>
-      <span>{meta.icon}</span>
-      <span>{meta.label}</span>
-      {agent.status === 'scanning' && <span className="ml-0.5 text-[8px]">...</span>}
-      {agent.status === 'found' && agent.findings !== undefined && (
-        <span className="ml-0.5 rounded bg-emerald-500/20 px-1 text-[8px]">{agent.findings}</span>
-      )}
-    </div>
-  )
-}
 
 export type SwantailSystemStatus = {
   phase: 'booting' | 'ready' | 'running' | 'error'
@@ -89,9 +68,11 @@ export default function SwantailTerminalPanel(props: {
   outputType: OutputType
   analysisMeta: AnalysisMeta | null
   isBuilding: boolean                             // Build-in-flight flag (separate from scan loading)
-  onScan: () => void                              // Phase 1 only
+  selectedAgents: AgentRunState['id'][]           // Lifted state for hash determinism
+  onScan: (options?: { agentIds?: AgentRunState['id'][] }) => void // Phase 1 only
   onBuild: () => void                             // Phase 2 only
   onChangeOutputType: (type: OutputType) => void  // View-only, NO API call
+  onSelectedAgentsChange: (agents: AgentRunState['id'][]) => void // Agent toggle handler
   // Other handlers
   onChangeMatchup: (value: string) => void
   onChangeLineFocus?: (value: string) => void
@@ -103,8 +84,8 @@ export default function SwantailTerminalPanel(props: {
   const {
     matchup, lineFocus, angles, oddsPaste, isLoading,
     runState: externalRunState, error, data,
-    outputType, analysisMeta, isBuilding,
-    onScan, onBuild, onChangeOutputType,
+    outputType, analysisMeta, isBuilding, selectedAgents,
+    onScan, onBuild, onChangeOutputType, onSelectedAgentsChange,
     onChangeMatchup, onChangeLineFocus, onChangeAngles, onChangeOddsPaste,
     onRunStateChange, onStatus
   } = props
@@ -125,8 +106,11 @@ export default function SwantailTerminalPanel(props: {
   const [draft, setDraft] = useState('')
   const [anchorDraft, setAnchorDraft] = useState('')
   const [signalDraft, setSignalDraft] = useState('')
-  const [showAdvanced, setShowAdvanced] = useState(false)
-  const [inputTouched, setInputTouched] = useState(false)
+  const [oddsDraft, setOddsDraft] = useState('')
+  const [matchupStatus, setMatchupStatus] = useState<'idle' | 'ok' | 'err'>('idle')
+  const [anchorStatus, setAnchorStatus] = useState<'idle' | 'ok' | 'err'>('idle')
+  const [signalStatus, setSignalStatus] = useState<'idle' | 'ok' | 'err'>('idle')
+  const [oddsStatus, setOddsStatus] = useState<'idle' | 'ok' | 'err'>('idle')
 
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   const didBootRef = useRef(false)
@@ -155,14 +139,33 @@ export default function SwantailTerminalPanel(props: {
   }, [buffer.length])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = sessionStorage.getItem('swantail:agents')
+      if (!raw) return
+      const parsed = JSON.parse(raw) as AgentRunState['id'][]
+      const next = parsed.filter(id => ALL_AGENT_IDS.includes(id))
+      if (next.length) setSelectedAgents(next)
+    } catch {
+      // Ignore invalid session state.
+    }
+  }, [])
+
+  useEffect(() => {
+    setDraft(matchup || '')
+  }, [matchup])
+
+  useEffect(() => {
     setAnchorDraft(lineFocus || '')
   }, [lineFocus])
 
   useEffect(() => {
-    if (angles.length) {
-      setSignalDraft(angles.join(', '))
-    }
+    setSignalDraft(angles.length ? angles.join(', ') : '')
   }, [angles])
+
+  useEffect(() => {
+    setOddsDraft(oddsPaste || '')
+  }, [oddsPaste])
 
   const runPreflights = useCallback(async () => {
     setPhase('booting')
@@ -339,7 +342,8 @@ export default function SwantailTerminalPanel(props: {
   const onHelp = useCallback(() => {
     append('help:', 'muted')
     append('- pick a matchup chip OR type one like "SF @ SEA"', 'muted')
-    append('- optionally set Market Anchor/Signals in the Inputs panel', 'muted')
+    append('- toggle agents, then run Scan to execute selected agents', 'muted')
+    append('- optionally set flags in the inline CLI strip (anchor, signals, odds)', 'muted')
     append('- BUILD: default Story flow (single-game scripts)', 'muted')
     append('- PROP: find mispriced player tails (alts, quarters, halves)', 'muted')
     append('- STORY: build 1–3 single-game narratives with correlated legs', 'muted')
@@ -354,7 +358,6 @@ export default function SwantailTerminalPanel(props: {
   const onReset = useCallback(() => {
     onChangeMatchup('')
     setDraft('')
-    setInputTouched(false)
     onClear()
     updateRunState(resetRun())
     append('resetting…', 'muted')
@@ -362,37 +365,75 @@ export default function SwantailTerminalPanel(props: {
   }, [append, onChangeMatchup, onClear, runPreflights, updateRunState])
 
 
-  const onSubmitMatchup = useCallback(() => {
-    const parsed = parseQuickMatchup(draft)
+  const onSubmitMatchup = useCallback((nextRaw: string) => {
+    const trimmed = nextRaw.trim()
+    if (trimmed === matchup.trim()) {
+      setMatchupStatus('ok')
+      return
+    }
+    if (!trimmed) {
+      onChangeMatchup('')
+      setMatchupStatus('ok')
+      append('matchup cleared', 'muted')
+      return
+    }
+    const parsed = parseQuickMatchup(trimmed)
     if (!parsed) {
-      append('hint: try "SF @ SEA" or "49ers @ Seahawks".', 'warn')
+      setMatchupStatus('err')
+      append('matchup invalid (try "SF @ SEA").', 'warn')
       return
     }
     onChangeMatchup(parsed)
+    setDraft(parsed)
+    setMatchupStatus('ok')
     append(`matchup set: ${parsed}`, 'ok')
-  }, [append, draft, onChangeMatchup])
+  }, [append, matchup, onChangeMatchup])
 
   const onPickMatchup = useCallback((value: string) => {
     onChangeMatchup(value)
+    setDraft(value)
+    setMatchupStatus('ok')
     append(`matchup set: ${value}`, 'ok')
   }, [append, onChangeMatchup])
 
-  const onApplyAnchor = useCallback(() => {
+  const onApplyAnchor = useCallback((nextRaw: string) => {
     if (!onChangeLineFocus) return
-    const next = anchorDraft.trim()
+    const next = nextRaw.trim()
+    if (next === lineFocus.trim()) {
+      setAnchorStatus('ok')
+      return
+    }
     onChangeLineFocus(next)
+    setAnchorStatus('ok')
     append(next ? `anchor set: ${next}` : 'anchor cleared', next ? 'ok' : 'muted')
-  }, [anchorDraft, onChangeLineFocus, append])
+  }, [lineFocus, onChangeLineFocus, append])
 
-  const onApplySignals = useCallback(() => {
+  const onApplySignals = useCallback((nextRaw: string) => {
     if (!onChangeAngles) return
-    const next = signalDraft
+    const next = nextRaw
       .split(',')
       .map(s => s.trim())
       .filter(Boolean)
+    if (next.join(',') === angles.join(',')) {
+      setSignalStatus('ok')
+      return
+    }
     onChangeAngles(next)
+    setSignalStatus('ok')
     append(next.length ? `signals set: ${next.join(', ')}` : 'signals cleared', next.length ? 'ok' : 'muted')
-  }, [signalDraft, onChangeAngles, append])
+  }, [angles, onChangeAngles, append])
+
+  const onApplyOdds = useCallback((nextRaw: string) => {
+    if (!onChangeOddsPaste) return
+    const next = nextRaw.trim()
+    if (next === (oddsPaste || '').trim()) {
+      setOddsStatus('ok')
+      return
+    }
+    onChangeOddsPaste(next)
+    setOddsStatus('ok')
+    append(next ? 'odds set' : 'odds cleared', next ? 'ok' : 'muted')
+  }, [oddsPaste, onChangeOddsPaste, append])
 
   const badge = useMemo(() => {
     if (phase === 'running' || isLoading) return { label: 'BUSY', cls: 'bg-amber-500/15 text-amber-200 border-amber-400/20' }
@@ -403,6 +444,50 @@ export default function SwantailTerminalPanel(props: {
     if (phase === 'ready') return { label: 'READY', cls: 'bg-emerald-500/15 text-emerald-200 border-emerald-400/20' }
     return { label: 'BOOT', cls: 'bg-white/10 text-white/70 border-white/10' }
   }, [phase, isLoading])
+
+  const toggleAgent = useCallback((agentId: AgentRunState['id']) => {
+    const next = selectedAgents.includes(agentId)
+      ? selectedAgents.filter(id => id !== agentId)
+      : [...selectedAgents, agentId]
+    onSelectedAgentsChange(next)
+  }, [selectedAgents, onSelectedAgentsChange])
+
+  const toggleAllAgents = useCallback(() => {
+    // If all selected, deselect all; otherwise select all
+    const next = selectedAgents.length === ALL_AGENT_IDS.length ? [] : ALL_AGENT_IDS
+    onSelectedAgentsChange(next)
+  }, [selectedAgents, onSelectedAgentsChange])
+
+  const selectedAgentLabels = useMemo(() => (
+    selectedAgents.map(id => AGENT_META[id].label)
+  ), [selectedAgents])
+
+  const getFreshnessLabel = useCallback((scannedAt?: number) => {
+    if (!scannedAt) return '--'
+    const ageMs = Date.now() - scannedAt
+    if (ageMs < 60_000) return 'LIVE'
+    const mins = Math.max(1, Math.round(ageMs / 60_000))
+    return `${mins}m`
+  }, [])
+
+  const onScanClick = useCallback(() => {
+    if (!canAct) {
+      append('hint: set matchup before scanning.', 'warn')
+      return
+    }
+    if (!selectedAgents.length) {
+      append('hint: select at least one agent.', 'warn')
+      return
+    }
+    append(`[scan] agents: ${selectedAgentLabels.join(', ')}`, 'muted')
+    onScan({ agentIds: selectedAgents })
+  }, [append, canAct, onScan, selectedAgentLabels, selectedAgents])
+
+  const statusDot = (status: 'idle' | 'ok' | 'err') => ({
+    idle: 'bg-white/20',
+    ok: 'bg-emerald-400/80',
+    err: 'bg-red-400/80',
+  }[status])
 
   return (
     <div className="rounded-3xl border border-white/10 bg-black/30 shadow-xl">
@@ -416,27 +501,42 @@ export default function SwantailTerminalPanel(props: {
           </div>
           <div className="text-xs text-white/50">~/swantail terminal</div>
         </div>
-        <div className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${badge.cls}`}>
-          {badge.label}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onHelp}
+            className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/60 hover:text-white/80 hover:bg-white/10"
+            aria-label="Help"
+            title="Help"
+          >
+            ?
+          </button>
+          <button
+            type="button"
+            onClick={onClear}
+            className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/60 hover:text-white/80 hover:bg-white/10"
+            aria-label="Clear"
+            title="Clear"
+          >
+            ⌫
+          </button>
+          <button
+            type="button"
+            onClick={onReset}
+            className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/60 hover:text-white/80 hover:bg-white/10"
+            aria-label="Reset"
+            title="Reset"
+          >
+            ↺
+          </button>
+          <div className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${badge.cls}`}>
+            {badge.label}
+          </div>
         </div>
       </div>
 
       {/* buffer */}
       <div className="grid gap-4 p-4">
-        {/* Agent Status Cards - Live Dashboard */}
-        <div className="flex flex-wrap gap-1.5">
-          {runState.agents.map(agent => (
-            <AgentCard key={agent.id} agent={agent} />
-          ))}
-          {runState.mode && (
-            <div className="ml-auto flex items-center gap-1.5 text-[10px] text-white/50">
-              <span className="uppercase">{runState.mode}</span>
-              {runState.phase === 'scanning' && <span className="animate-pulse">...</span>}
-              {runState.phase === 'complete' && <span className="text-emerald-400">done</span>}
-            </div>
-          )}
-        </div>
-
         <div
           ref={scrollerRef}
           className="h-[340px] overflow-auto rounded-2xl border border-white/10 bg-black/40 p-4 font-mono text-[12px] leading-relaxed"
@@ -460,37 +560,95 @@ export default function SwantailTerminalPanel(props: {
           </div>
         </div>
 
-        {/* chips */}
-        <div className="flex flex-wrap gap-2">
-          {featuredGames.slice(0, 6).map(g => (
-            <button
-              key={g.id}
-              type="button"
-              onClick={() => onPickMatchup(g.display)}
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-white/80 hover:bg-white/10"
-            >
-              {g.display}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => runPreflights()}
-            className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-white/70 hover:bg-white/10"
-          >
-            Re-check
-          </button>
-        </div>
-
         {/* prompt + actions */}
         <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Games</div>
+            <div className="flex flex-1 flex-wrap gap-2">
+              {featuredGames.slice(0, 6).map(g => (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => onPickMatchup(g.display)}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-white/70 hover:text-white/90 hover:bg-white/10"
+                >
+                  {g.display}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Agents</div>
+            <div className="flex flex-1 flex-wrap items-center gap-1.5 md:flex-nowrap md:overflow-x-auto md:pb-1 md:pr-1 md:snap-x">
+              {/* ALL chip - toggles all/none */}
+              <button
+                type="button"
+                onClick={toggleAllAgents}
+                disabled={analysisMeta?.status === 'scanning'}
+                className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold md:snap-start disabled:cursor-not-allowed disabled:opacity-40 ${
+                  selectedAgents.length === ALL_AGENT_IDS.length
+                    ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                    : 'border-white/10 bg-white/5 text-white/55'
+                }`}
+              >
+                <span className={`text-[8px] ${selectedAgents.length === ALL_AGENT_IDS.length ? 'text-emerald-400' : 'text-white/40'}`}>
+                  {selectedAgents.length === ALL_AGENT_IDS.length ? '●' : '○'}
+                </span>
+                <span className="font-mono uppercase">ALL</span>
+              </button>
+              {runState.agents.map(agent => {
+                const meta = AGENT_META[agent.id]
+                const isDisabled = analysisMeta?.status === 'scanning'
+                const isSelected = selectedAgents.includes(agent.id)
+                const statusClass = {
+                  idle: 'border-white/10 bg-white/5 text-white/55',
+                  scanning: 'border-cyan-400/30 bg-cyan-500/10 text-cyan-200',
+                  found: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200',
+                  silent: 'border-white/10 bg-white/5 text-white/45',
+                  error: 'border-red-400/30 bg-red-500/10 text-red-200',
+                }[agent.status]
+                const deltaValue = typeof agent.findings === 'number'
+                  ? `${agent.findings > 0 ? '+' : ''}${agent.findings}`
+                  : '--'
+                const freshness = getFreshnessLabel(analysisMeta?.scannedAt)
+                return (
+                  <button
+                    key={agent.id}
+                    type="button"
+                    onClick={() => toggleAgent(agent.id)}
+                    disabled={isDisabled}
+                    className={`group relative flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium ${statusClass} md:snap-start ${isSelected ? '' : 'opacity-50'} disabled:cursor-not-allowed disabled:opacity-40`}
+                  >
+                    {/* Toggle indicator: filled dot when on, hollow dot when off */}
+                    <span className={`text-[8px] ${isSelected ? 'text-emerald-400' : 'text-white/40'}`}>
+                      {isSelected ? '●' : '○'}
+                    </span>
+                    <span>{meta.icon}</span>
+                    <span className="font-mono uppercase">{meta.label}</span>
+                    {agent.status === 'scanning' && <span className="ml-0.5 animate-pulse text-[8px]">::</span>}
+                    {agent.status === 'found' && (
+                      <span className="ml-0.5 rounded bg-emerald-500/20 px-1 text-[8px] font-mono">
+                        {deltaValue}
+                      </span>
+                    )}
+                    <span className="absolute left-0 top-full z-10 hidden translate-y-1 rounded border border-white/10 bg-black/80 px-2 py-1 text-[10px] text-white/70 group-hover:block">
+                      Δ {deltaValue} • {freshness}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           {/* Two-phase action buttons: Scan (Phase 1) + Build (Phase 2) */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Phase 1: Scan button */}
             <button
               type="button"
-              onClick={onScan}
-              disabled={!canAct || (analysisMeta?.status === 'scanning')}
-              className="rounded-full bg-gradient-to-r from-slate-500 to-slate-700 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={onScanClick}
+              disabled={!canAct || !selectedAgents.length || (analysisMeta?.status === 'scanning')}
+              className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {analysisMeta?.status === 'scanning' ? 'Scanning…' : 'Scan'}
             </button>
@@ -504,8 +662,8 @@ export default function SwantailTerminalPanel(props: {
                   onClick={() => onChangeOutputType(type)}
                   className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition ${
                     outputType === type
-                      ? 'bg-white/15 text-white'
-                      : 'text-white/60 hover:text-white/80'
+                      ? 'bg-white/10 text-white/80'
+                      : 'text-white/45 hover:text-white/70'
                   }`}
                 >
                   {type.toUpperCase()}
@@ -523,99 +681,91 @@ export default function SwantailTerminalPanel(props: {
               {isBuilding ? 'Building…' : 'Build'}
             </button>
 
+            {/* Stale scan hint */}
+            {analysisMeta?.status === 'stale' && (
+              <span className="text-[10px] text-amber-300/80 italic">
+                scan stale — re-scan to update
+              </span>
+            )}
+
             <div className="h-4 w-px bg-white/10" />
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(v => !v)}
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70 hover:bg-white/10"
-            >
-              {showAdvanced ? 'Hide inputs' : 'Inputs'}
-            </button>
-            <button type="button" onClick={onHelp} className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70 hover:bg-white/10">
-              Help
-            </button>
-            <button type="button" onClick={onClear} className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70 hover:bg-white/10">
-              Clear
-            </button>
-            <button type="button" onClick={onReset} className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70 hover:bg-white/10">
-              Reset
-            </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="text-[11px] text-white/50">Matchup</div>
-            <input
-              value={draft}
-              onChange={(e) => { setDraft(e.target.value); setInputTouched(true) }}
-              onKeyDown={(e) => { if (e.key === 'Enter') onSubmitMatchup() }}
-              placeholder="Type a matchup (e.g., SF @ SEA)"
-              className={`flex-1 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-blue-400/30 ${inputTouched ? '' : 'opacity-70'}`}
-            />
-            <button
-              type="button"
-              onClick={onSubmitMatchup}
-              className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs text-white hover:bg-white/20"
-            >
-              Set
-            </button>
-          </div>
-
-          {showAdvanced && (
-            <div className="grid gap-3">
-              <div className="grid gap-2">
-                <div className="text-[11px] uppercase tracking-wide text-white/50">Market anchor</div>
-                <div className="flex items-center gap-2">
-                  <input
-                    value={anchorDraft}
-                    onChange={(e) => setAnchorDraft(e.target.value)}
-                    placeholder="Over 44.5 · SEA -2.5 · First Half Under"
-                    className="flex-1 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-blue-400/30"
-                  />
-                  <button
-                    type="button"
-                    onClick={onApplyAnchor}
-                    disabled={!onChangeLineFocus}
-                    className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs text-white hover:bg-white/20 disabled:opacity-50"
-                  >
-                    Set
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <div className="text-[11px] uppercase tracking-wide text-white/50">Signals</div>
-                <div className="flex items-center gap-2">
-                  <input
-                    value={signalDraft}
-                    onChange={(e) => setSignalDraft(e.target.value)}
-                    placeholder="Pace skew, Pressure mismatch"
-                    className="flex-1 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-blue-400/30"
-                  />
-                  <button
-                    type="button"
-                    onClick={onApplySignals}
-                    disabled={!onChangeAngles}
-                    className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs text-white hover:bg-white/20 disabled:opacity-50"
-                  >
-                    Apply
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <div className="text-[11px] uppercase tracking-wide text-white/50">Book odds (optional)</div>
-                <textarea
-                  value={oddsPaste ?? ''}
-                  onChange={(e) => onChangeOddsPaste?.(e.target.value)}
-                  placeholder="RB1 Anytime TD +120&#10;Alt Total Over 44.5 -110"
-                  className="min-h-[72px] w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-blue-400/30"
-                />
-              </div>
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-black/30 px-3 py-2 font-mono text-[11px] text-white/70">
+            <div className="flex items-center gap-2">
+              <span className="text-white/35">--matchup</span>
+              <input
+                value={draft}
+                onChange={(e) => { setDraft(e.target.value); setMatchupStatus('idle') }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    e.currentTarget.blur()
+                  }
+                }}
+                onBlur={() => onSubmitMatchup(draft)}
+                placeholder="SF @ SEA"
+                className="w-[180px] bg-transparent text-white placeholder:text-white/25 focus:outline-none"
+              />
+              <span className={`h-1.5 w-1.5 rounded-full ${statusDot(matchupStatus)}`} />
             </div>
-          )}
+
+            <div className="flex items-center gap-2">
+              <span className="text-white/35">--anchor</span>
+              <input
+                value={anchorDraft}
+                onChange={(e) => { setAnchorDraft(e.target.value); setAnchorStatus('idle') }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    e.currentTarget.blur()
+                  }
+                }}
+                onBlur={() => onApplyAnchor(anchorDraft)}
+                placeholder="O44.5 SEA -2.5"
+                className="w-[200px] bg-transparent text-white placeholder:text-white/25 focus:outline-none"
+              />
+              <span className={`h-1.5 w-1.5 rounded-full ${statusDot(anchorStatus)}`} />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-white/35">--signals</span>
+              <input
+                value={signalDraft}
+                onChange={(e) => { setSignalDraft(e.target.value); setSignalStatus('idle') }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    e.currentTarget.blur()
+                  }
+                }}
+                onBlur={() => onApplySignals(signalDraft)}
+                placeholder="pace skew, pressure"
+                className="w-[200px] bg-transparent text-white placeholder:text-white/25 focus:outline-none"
+              />
+              <span className={`h-1.5 w-1.5 rounded-full ${statusDot(signalStatus)}`} />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-white/35">--odds</span>
+              <input
+                value={oddsDraft}
+                onChange={(e) => { setOddsDraft(e.target.value); setOddsStatus('idle') }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    e.currentTarget.blur()
+                  }
+                }}
+                onBlur={() => onApplyOdds(oddsDraft)}
+                placeholder="RB1 TD +120 | Alt O44.5 -110"
+                className="w-[220px] bg-transparent text-white placeholder:text-white/25 focus:outline-none"
+              />
+              <span className={`h-1.5 w-1.5 rounded-full ${statusDot(oddsStatus)}`} />
+            </div>
+          </div>
         </div>
       </div>
     </div>
   )
 }
-

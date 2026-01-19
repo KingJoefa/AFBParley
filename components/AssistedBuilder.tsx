@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { useAfb } from '@/app/hooks/useAfb'
 import { useTerminalScan } from '@/app/hooks/useTerminalScan'
 import SwantailScriptsView from '@/components/SwantailScriptsView'
@@ -9,6 +9,7 @@ import { matchOdds, parseOddsPaste } from '@/lib/swantail/odds'
 import { initialSwantailState, swantailReducer, type PreflightChecks, type PreflightStatus } from '@/lib/swantail/store'
 import { normalizeSignals } from '@/lib/swantail/signals'
 import { track } from '@/lib/telemetry'
+import { ALL_AGENT_IDS, type AgentRunState } from '@/lib/terminal/run-state'
 import {
   type OutputType,
   type TerminalState,
@@ -18,6 +19,7 @@ import {
   updateStateFromScan,
   markScanning,
   markScanError,
+  markScanStale,
   computeInputsHash,
 } from '@/lib/terminal/terminal-state'
 
@@ -44,6 +46,35 @@ export default function AssistedBuilder() {
   const [viewCache, setViewCache] = useState<Map<OutputType, BuildView>>(new Map())
   const [isBuilding, setIsBuilding] = useState(false)
 
+  // Agent selection state with session restoration
+  const [selectedAgents, setSelectedAgents] = useState<AgentRunState['id'][]>(() => {
+    if (typeof window === 'undefined') return ALL_AGENT_IDS
+    try {
+      const stored = sessionStorage.getItem('swantail:agents')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      }
+    } catch {}
+    return ALL_AGENT_IDS
+  })
+
+  // Persist agent selection to session
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('swantail:agents', JSON.stringify(selectedAgents))
+    }
+  }, [selectedAgents])
+
+  // Mark scan stale when agent selection changes after a successful scan
+  const prevAgentsRef = useRef(selectedAgents)
+  useEffect(() => {
+    if (prevAgentsRef.current !== selectedAgents && terminalState.analysisMeta?.status === 'success') {
+      setTerminalState(prev => markScanStale(prev))
+    }
+    prevAgentsRef.current = selectedAgents
+  }, [selectedAgents, terminalState.analysisMeta?.status])
+
   // Unified loading/error state
   const isLoading = afbLoading || scanLoading || isBuilding
   const error = afbError || scanError
@@ -57,18 +88,20 @@ export default function AssistedBuilder() {
 
   const oddsEntries = useMemo(() => parseOddsPaste(oddsPaste), [oddsPaste])
 
-  // Compute current inputs hash for passing to terminal panel
+  // Compute current inputs hash (includes agent selection for determinism)
   const currentInputsHash = useMemo(() =>
-    computeInputsHash(matchup, lineFocus, signals_raw, oddsPaste),
-    [matchup, lineFocus, signals_raw, oddsPaste]
+    computeInputsHash(matchup, lineFocus, signals_raw, oddsPaste, selectedAgents),
+    [matchup, lineFocus, signals_raw, oddsPaste, selectedAgents]
   )
 
   // Phase 1: Scan handler
-  const onScan = useCallback(async () => {
+  const onScan = useCallback(async (options?: { agentIds?: string[] }) => {
     if (!matchup.trim()) return
 
-    const scanHash = computeInputsHash(matchup, lineFocus, signals_raw, oddsPaste)
-    track('ui_scan_clicked', { anglesCount: signals.length })
+    // Use passed agentIds or fall back to current selection
+    const agentsToScan = options?.agentIds ?? selectedAgents
+    const scanHash = computeInputsHash(matchup, lineFocus, signals_raw, oddsPaste, agentsToScan)
+    track('ui_scan_clicked', { anglesCount: signals.length, agentIds: agentsToScan })
 
     // Clear previous build results on new scan
     setBuildResult(null)
@@ -100,12 +133,18 @@ export default function AssistedBuilder() {
       setTerminalState(prev => markScanError(prev, (e as Error).message))
       track('ui_scan_error', { message: (e as Error).message })
     }
-  }, [matchup, lineFocus, signals, signals_raw, oddsPaste, scan])
+  }, [matchup, lineFocus, signals, signals_raw, oddsPaste, selectedAgents, scan])
+
+  // Handler for agent selection changes from terminal panel
+  const onSelectedAgentsChange = useCallback((agents: AgentRunState['id'][]) => {
+    setSelectedAgents(agents)
+  }, [])
 
   // Phase 2: Build handler
   const onBuild = useCallback(async () => {
     if (!matchup.trim()) return
-    if (!terminalState.analysisMeta || terminalState.analysisMeta.status !== 'success') return
+    // Block build if scan is not successful (includes stale state)
+    if (!terminalState.analysisMeta || (terminalState.analysisMeta.status !== 'success')) return
 
     track('ui_build_clicked', { outputType, alertCount: terminalState.alerts.length })
     setIsBuilding(true)
@@ -158,27 +197,9 @@ export default function AssistedBuilder() {
   }, [matchup, lineFocus, signals, oddsPaste, outputType, terminalState])
 
   // Output type change handler - swaps views from cache or lazy-fetches
-  const onChangeOutputType = useCallback(async (type: OutputType) => {
+  const onChangeOutputType = useCallback((type: OutputType) => {
     setOutputType(type)
-
-    // Check cache first - if cached, it's a pure re-render
-    if (viewCache.has(type)) return
-
-    // Lazy-fetch if not cached and we have a build_id
-    if (buildResult?.build_id) {
-      try {
-        const res = await fetch(`/api/terminal/build/${buildResult.build_id}?output_type=${type}`)
-        const json = await res.json()
-
-        if (res.ok && json.view) {
-          setViewCache(prev => new Map(prev).set(type, json.view))
-        }
-      } catch (e) {
-        // Silently fail lazy-fetch - user can try Build again
-        console.error('Lazy-fetch failed:', e)
-      }
-    }
-  }, [viewCache, buildResult])
+  }, [])
 
   // Abort scan on input change
   useEffect(() => {
@@ -340,9 +361,11 @@ export default function AssistedBuilder() {
               outputType={outputType}
               analysisMeta={terminalState.analysisMeta}
               isBuilding={isBuilding}
+              selectedAgents={selectedAgents}
               onScan={onScan}
               onBuild={onBuild}
               onChangeOutputType={onChangeOutputType}
+              onSelectedAgentsChange={onSelectedAgentsChange}
               onChangeMatchup={(value) => dispatch({ type: 'set_matchup', value })}
               onChangeLineFocus={(value) => dispatch({ type: 'set_anchor', value })}
               onChangeAngles={(value) => {
