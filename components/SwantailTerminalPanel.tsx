@@ -138,18 +138,6 @@ export default function SwantailTerminalPanel(props: {
     el.scrollTop = el.scrollHeight
   }, [buffer.length])
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      const raw = sessionStorage.getItem('swantail:agents')
-      if (!raw) return
-      const parsed = JSON.parse(raw) as AgentRunState['id'][]
-      const next = parsed.filter(id => ALL_AGENT_IDS.includes(id))
-      if (next.length) setSelectedAgents(next)
-    } catch {
-      // Ignore invalid session state.
-    }
-  }, [])
 
   useEffect(() => {
     setDraft(matchup || '')
