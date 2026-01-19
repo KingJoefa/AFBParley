@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { useAfb } from '@/app/hooks/useAfb'
-import { useTerminal } from '@/app/hooks/useTerminal'
+import { useTerminalScan } from '@/app/hooks/useTerminalScan'
 import SwantailScriptsView from '@/components/SwantailScriptsView'
 import TerminalAlertsView from '@/components/TerminalAlertsView'
 import SwantailTerminalPanel from '@/components/SwantailTerminalPanel'
@@ -9,8 +9,17 @@ import { matchOdds, parseOddsPaste } from '@/lib/swantail/odds'
 import { initialSwantailState, swantailReducer, type PreflightChecks, type PreflightStatus } from '@/lib/swantail/store'
 import { normalizeSignals } from '@/lib/swantail/signals'
 import { track } from '@/lib/telemetry'
-import type { RunMode } from '@/lib/terminal/run-state'
-import type { TerminalResponse, Alert } from '@/lib/terminal/schemas'
+import {
+  type OutputType,
+  type TerminalState,
+  type BuildView,
+  type BuildResult,
+  createInitialTerminalState,
+  updateStateFromScan,
+  markScanning,
+  markScanError,
+  computeInputsHash,
+} from '@/lib/terminal/terminal-state'
 
 function invertLineFocus(value: string): string {
   if (!value) return value
@@ -23,15 +32,21 @@ function invertLineFocus(value: string): string {
 
 export default function AssistedBuilder() {
   const { build, isLoading: afbLoading, error: afbError, errorDetails } = useAfb()
-  const { run: runTerminal, isLoading: terminalLoading, error: terminalError, errorDetails: terminalErrorDetails } = useTerminal()
+  const { scan, abort: abortScan, isLoading: scanLoading, error: scanError } = useTerminalScan()
   const [state, dispatch] = useReducer(swantailReducer, initialSwantailState)
   const voice: 'analyst' = 'analyst'
   const [rightTab, setRightTab] = useState<'scripts' | 'stats'>('scripts')
-  const [terminalData, setTerminalData] = useState<TerminalResponse | null>(null)
+
+  // Two-phase terminal state
+  const [terminalState, setTerminalState] = useState<TerminalState>(createInitialTerminalState)
+  const [outputType, setOutputType] = useState<OutputType>('story')
+  const [buildResult, setBuildResult] = useState<BuildResult | null>(null)
+  const [viewCache, setViewCache] = useState<Map<OutputType, BuildView>>(new Map())
+  const [isBuilding, setIsBuilding] = useState(false)
 
   // Unified loading/error state
-  const isLoading = afbLoading || terminalLoading
-  const error = afbError || terminalError
+  const isLoading = afbLoading || scanLoading || isBuilding
+  const error = afbError || scanError
 
   const matchup = state.matchup
   const lineFocus = state.anchor
@@ -42,33 +57,135 @@ export default function AssistedBuilder() {
 
   const oddsEntries = useMemo(() => parseOddsPaste(oddsPaste), [oddsPaste])
 
-  // Unified action handler for Prop / Story / Parlay
-  // Calls distinct terminal routes: /api/terminal/prop, /api/terminal/story, /api/terminal/parlay
-  const onAction = useCallback(async (mode: RunMode) => {
-    if (!matchup.trim()) return
-    track('ui_action_clicked', { mode, voice, anglesCount: signals.length })
-    try {
-      dispatch({ type: 'set_data', value: null })
-      setTerminalData(null)
+  // Compute current inputs hash for passing to terminal panel
+  const currentInputsHash = useMemo(() =>
+    computeInputsHash(matchup, lineFocus, signals_raw, oddsPaste),
+    [matchup, lineFocus, signals_raw, oddsPaste]
+  )
 
-      const res = await runTerminal(mode, {
+  // Phase 1: Scan handler
+  const onScan = useCallback(async () => {
+    if (!matchup.trim()) return
+
+    const scanHash = computeInputsHash(matchup, lineFocus, signals_raw, oddsPaste)
+    track('ui_scan_clicked', { anglesCount: signals.length })
+
+    // Clear previous build results on new scan
+    setBuildResult(null)
+    setViewCache(new Map())
+
+    // Mark scanning state
+    setTerminalState(prev => markScanning(prev, scanHash))
+
+    try {
+      const res = await scan({
         matchup: matchup.trim(),
         signals,
         anchor: lineFocus.trim() || undefined,
-        odds_paste: oddsPaste || undefined,
       })
 
       if (res.ok) {
-        setTerminalData(res.data)
-        setRightTab('scripts')
-        track('ui_action_success', { mode, alertCount: res.data.alerts.length })
+        setTerminalState(prev => updateStateFromScan(prev, {
+          alerts: res.data.alerts,
+          findings: res.data.findings,
+          request_id: res.data.request_id,
+          scan_hash: scanHash,
+        }))
+        track('ui_scan_success', { alertCount: res.data.alerts.length })
       } else {
-        track('ui_action_error', { mode, message: res.error?.message })
+        setTerminalState(prev => markScanError(prev, res.error.message))
+        track('ui_scan_error', { message: res.error.message })
       }
     } catch (e) {
-      track('ui_action_error', { mode, message: (e as any)?.message })
+      setTerminalState(prev => markScanError(prev, (e as Error).message))
+      track('ui_scan_error', { message: (e as Error).message })
     }
-  }, [matchup, lineFocus, signals, oddsPaste, runTerminal])
+  }, [matchup, lineFocus, signals, signals_raw, oddsPaste, scan])
+
+  // Phase 2: Build handler
+  const onBuild = useCallback(async () => {
+    if (!matchup.trim()) return
+    if (!terminalState.analysisMeta || terminalState.analysisMeta.status !== 'success') return
+
+    track('ui_build_clicked', { outputType, alertCount: terminalState.alerts.length })
+    setIsBuilding(true)
+
+    try {
+      // Call Phase 2 endpoint with inline alerts/findings
+      const res = await fetch('/api/terminal/build', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          matchup: matchup.trim(),
+          alerts: terminalState.alerts,
+          findings: terminalState.findings,
+          output_type: outputType,
+          anchor: lineFocus.trim() || undefined,
+          signals,
+          odds_paste: oddsPaste || undefined,
+        }),
+      })
+
+      const json = await res.json()
+
+      if (!res.ok) {
+        track('ui_build_error', { message: json.error || 'Build failed' })
+        return
+      }
+
+      // Store build result
+      const result: BuildResult = {
+        build_id: json.build_id,
+        request_id: json.request_id,
+        payload_hash: json.payload_hash,
+        output_type: json.output_type,
+        view: json.view,
+        created_at: json.created_at,
+      }
+      setBuildResult(result)
+
+      // Cache this view
+      setViewCache(prev => new Map(prev).set(result.output_type, result.view))
+
+      // Switch to scripts tab to show result
+      setRightTab('scripts')
+      track('ui_build_success', { outputType: result.output_type })
+    } catch (e) {
+      track('ui_build_error', { message: (e as Error).message })
+    } finally {
+      setIsBuilding(false)
+    }
+  }, [matchup, lineFocus, signals, oddsPaste, outputType, terminalState])
+
+  // Output type change handler - swaps views from cache or lazy-fetches
+  const onChangeOutputType = useCallback(async (type: OutputType) => {
+    setOutputType(type)
+
+    // Check cache first - if cached, it's a pure re-render
+    if (viewCache.has(type)) return
+
+    // Lazy-fetch if not cached and we have a build_id
+    if (buildResult?.build_id) {
+      try {
+        const res = await fetch(`/api/terminal/build/${buildResult.build_id}?output_type=${type}`)
+        const json = await res.json()
+
+        if (res.ok && json.view) {
+          setViewCache(prev => new Map(prev).set(type, json.view))
+        }
+      } catch (e) {
+        // Silently fail lazy-fetch - user can try Build again
+        console.error('Lazy-fetch failed:', e)
+      }
+    }
+  }, [viewCache, buildResult])
+
+  // Abort scan on input change
+  useEffect(() => {
+    return () => {
+      abortScan()
+    }
+  }, [matchup, lineFocus, signals_raw, oddsPaste, abortScan])
 
   const onOpposite = useCallback(async (scriptIndex: number) => {
     if (!matchup.trim()) return
@@ -91,7 +208,6 @@ export default function AssistedBuilder() {
       })
       if (res.ok) {
         dispatch({ type: 'set_data', value: res.data })
-        // After a successful build, move the user to results immediately.
         setRightTab('scripts')
         track('ui_build_success')
       } else {
@@ -113,21 +229,57 @@ export default function AssistedBuilder() {
     return matched === 0
   }, [data, oddsEntries])
 
+  // Memoized status handler to prevent infinite re-render loop
+  const handleStatus = useCallback((s: import('@/components/SwantailTerminalPanel').SwantailSystemStatus) => {
+    const checks: PreflightChecks = {
+      schedule: s.schedule,
+      lines: s.lines,
+      backend: s.backend,
+    }
+    const derived = (s.schedule.season && s.schedule.week)
+      ? { year: s.schedule.season, week: s.schedule.week }
+      : { year: 2025, week: 20 }
+    const anyDegraded = s.schedule.state === 'degraded' || s.lines.state === 'degraded' || s.backend.state === 'degraded'
+    let value: PreflightStatus
+    if (s.phase === 'error') {
+      value = {
+        state: 'error',
+        checks,
+        derived,
+        error: s.schedule.error || s.lines.error || s.backend.error || 'preflight error',
+      }
+    } else if (s.phase === 'ready' && anyDegraded) {
+      value = {
+        state: 'degraded',
+        checks,
+        derived,
+        reason: 'preflight degraded',
+      }
+    } else if (s.phase === 'ready') {
+      value = {
+        state: 'ready',
+        checks,
+        derived,
+      }
+    } else {
+      value = {
+        state: 'booting',
+        checks,
+      }
+    }
+    dispatch({ type: 'set_preflight', value })
+  }, [])
+
   useEffect(() => {
     if (isLoading) {
       dispatch({ type: 'set_build', value: { state: 'running', startedAt: Date.now() } })
       return
     }
-    if (errorDetails || terminalErrorDetails) {
-      const err = errorDetails || (terminalErrorDetails ? {
-        code: terminalErrorDetails.code,
-        status: terminalErrorDetails.status,
-        message: terminalErrorDetails.message,
-      } : null)
-      if (err) dispatch({ type: 'set_build', value: { state: 'error', error: err } })
+    if (errorDetails) {
+      dispatch({ type: 'set_build', value: { state: 'error', error: errorDetails } })
       return
     }
-    if (data || terminalData) {
+    if (data || buildResult) {
       dispatch({ type: 'set_build', value: { state: 'success', receivedAt: Date.now() } })
       return
     }
@@ -136,7 +288,36 @@ export default function AssistedBuilder() {
     } else {
       dispatch({ type: 'set_build', value: { state: 'idle' } })
     }
-  }, [isLoading, errorDetails, terminalErrorDetails, data, terminalData, matchup])
+  }, [isLoading, errorDetails, data, buildResult, matchup])
+
+  // Get current view from cache for rendering
+  const currentView = viewCache.get(outputType)
+
+  // Render script panel based on view kind
+  const renderScriptPanel = () => {
+    // If we have a cached view for the current output type, render based on kind
+    if (currentView) {
+      if (currentView.kind === 'swantail') {
+        return <SwantailScriptsView data={currentView.data} oddsEntries={oddsEntries} onOpposite={onOpposite} />
+      } else {
+        // terminal kind - render alerts/scripts
+        return <TerminalAlertsView data={{ alerts: currentView.alerts, mode: outputType, request_id: buildResult?.request_id || '', matchup: { home: '', away: '' }, agents: { invoked: [], silent: [] }, provenance: {} as any, timing_ms: 0 }} />
+      }
+    }
+
+    // Fallback to legacy data if no build result
+    if (data) {
+      return <SwantailScriptsView data={data} oddsEntries={oddsEntries} onOpposite={onOpposite} />
+    }
+
+    // Empty state
+    return (
+      <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center text-white/70">
+        <div className="text-base">No scripts yet.</div>
+        <div className="mt-2 text-sm text-white/50">Run a scan, then build to see results.</div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
@@ -156,6 +337,12 @@ export default function AssistedBuilder() {
               isLoading={isLoading}
               error={error}
               data={data}
+              outputType={outputType}
+              analysisMeta={terminalState.analysisMeta}
+              isBuilding={isBuilding}
+              onScan={onScan}
+              onBuild={onBuild}
+              onChangeOutputType={onChangeOutputType}
               onChangeMatchup={(value) => dispatch({ type: 'set_matchup', value })}
               onChangeLineFocus={(value) => dispatch({ type: 'set_anchor', value })}
               onChangeAngles={(value) => {
@@ -164,46 +351,7 @@ export default function AssistedBuilder() {
                 dispatch({ type: 'set_signals', signals, raw: signals_raw })
               }}
               onChangeOddsPaste={(value) => dispatch({ type: 'set_odds', value })}
-              onAction={onAction}
-              onStatus={(s) => {
-                const checks: PreflightChecks = {
-                  schedule: s.schedule,
-                  lines: s.lines,
-                  backend: s.backend,
-                }
-                const derived = (s.schedule.season && s.schedule.week)
-                  ? { year: s.schedule.season, week: s.schedule.week }
-                  : { year: 2025, week: 20 }
-                const anyDegraded = s.schedule.state === 'degraded' || s.lines.state === 'degraded' || s.backend.state === 'degraded'
-                let value: PreflightStatus
-                if (s.phase === 'error') {
-                  value = {
-                    state: 'error',
-                    checks,
-                    derived,
-                    error: s.schedule.error || s.lines.error || s.backend.error || 'preflight error',
-                  }
-                } else if (s.phase === 'ready' && anyDegraded) {
-                  value = {
-                    state: 'degraded',
-                    checks,
-                    derived,
-                    reason: 'preflight degraded',
-                  }
-                } else if (s.phase === 'ready') {
-                  value = {
-                    state: 'ready',
-                    checks,
-                    derived,
-                  }
-                } else {
-                  value = {
-                    state: 'booting',
-                    checks,
-                  }
-                }
-                dispatch({ type: 'set_preflight', value })
-              }}
+              onStatus={handleStatus}
             />
             {showNoMatches && (
               <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
@@ -231,11 +379,7 @@ export default function AssistedBuilder() {
               ))}
             </div>
 
-            {rightTab === 'scripts' && (
-              terminalData
-                ? <TerminalAlertsView data={terminalData} />
-                : <SwantailScriptsView data={data} oddsEntries={oddsEntries} onOpposite={onOpposite} />
-            )}
+            {rightTab === 'scripts' && renderScriptPanel()}
 
             {rightTab === 'stats' && (
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">

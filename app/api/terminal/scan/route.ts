@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { runAgents, type MatchupContext } from '@/lib/terminal/engine/agent-runner'
-import { buildProvenance, generateRequestId } from '@/lib/terminal/engine/provenance'
+import { buildProvenance, generateRequestId, hashObject } from '@/lib/terminal/engine/provenance'
 import { shouldUseFallback } from '@/lib/terminal/engine/fallback-renderer'
 import { checkRequestLimits, estimateTokens } from '@/lib/terminal/engine/guardrails'
 import { analyzeFindings, generateFallbackAlerts } from '@/lib/terminal/analyst'
@@ -218,8 +218,14 @@ export async function POST(req: NextRequest) {
       llmTemperature: 0,
     })
 
-    // If no findings, return empty alerts
+    // If no findings, return empty alerts (but still include findings array and hash)
     if (findings.length === 0) {
+      const payloadHash = hashObject({
+        matchup: parsed.data.matchup,
+        findings: [],
+        alerts: [],
+      })
+
       return Response.json({
         request_id: requestId,
         matchup: {
@@ -227,12 +233,14 @@ export async function POST(req: NextRequest) {
           away: teams.awayTeam,
         },
         alerts: [],
+        findings: [], // Empty but present
         message: 'No significant findings for this matchup. All agents silent.',
         agents: {
           invoked: agentsInvoked,
           silent: agentsSilent,
         },
         provenance,
+        payload_hash: payloadHash, // Hash of empty state
         timing_ms: Date.now() - startTime,
       })
     }
@@ -257,6 +265,13 @@ export async function POST(req: NextRequest) {
       llmTemperature: 0.2,
     })
 
+    // Compute payload hash for staleness detection
+    const payloadHash = hashObject({
+      matchup: parsed.data.matchup,
+      findings,
+      alerts: analysisResult.alerts,
+    })
+
     return Response.json({
       request_id: requestId,
       matchup: {
@@ -264,11 +279,13 @@ export async function POST(req: NextRequest) {
         away: teams.awayTeam,
       },
       alerts: analysisResult.alerts,
+      findings, // Include raw findings for Phase 2
       agents: {
         invoked: agentsInvoked,
         silent: agentsSilent,
       },
       provenance: finalProvenance,
+      payload_hash: payloadHash, // For staleness detection
       timing_ms: Date.now() - startTime,
       ...(analysisResult.fallback && { fallback: true }),
       ...(analysisResult.errors.length > 0 && { warnings: analysisResult.errors }),

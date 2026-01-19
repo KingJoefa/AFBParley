@@ -8,13 +8,10 @@ import {
   type RunState,
   type AgentRunState,
   AGENT_META,
-  ALL_AGENT_IDS,
   createInitialRunState,
-  startRun,
-  updateAgent,
-  completeRun,
   resetRun,
 } from '@/lib/terminal/run-state'
+import { computeInputsHash, type OutputType, type AnalysisMeta } from '@/lib/terminal/terminal-state'
 
 type CheckState = 'booting' | 'ready' | 'degraded' | 'error'
 
@@ -88,15 +85,29 @@ export default function SwantailTerminalPanel(props: {
   runState?: RunState
   error?: string | null
   data: SwantailResponse | null
+  // Split action props - enforces two-phase architecture
+  outputType: OutputType
+  analysisMeta: AnalysisMeta | null
+  isBuilding: boolean                             // Build-in-flight flag (separate from scan loading)
+  onScan: () => void                              // Phase 1 only
+  onBuild: () => void                             // Phase 2 only
+  onChangeOutputType: (type: OutputType) => void  // View-only, NO API call
+  // Other handlers
   onChangeMatchup: (value: string) => void
   onChangeLineFocus?: (value: string) => void
   onChangeAngles?: (value: string[]) => void
   onChangeOddsPaste?: (value: string) => void
-  onAction: (mode: RunMode) => void
   onRunStateChange?: (state: RunState) => void
   onStatus?: (status: SwantailSystemStatus) => void
 }) {
-  const { matchup, lineFocus, angles, oddsPaste, isLoading, runState: externalRunState, error, data, onChangeMatchup, onChangeLineFocus, onChangeAngles, onChangeOddsPaste, onAction, onRunStateChange, onStatus } = props
+  const {
+    matchup, lineFocus, angles, oddsPaste, isLoading,
+    runState: externalRunState, error, data,
+    outputType, analysisMeta, isBuilding,
+    onScan, onBuild, onChangeOutputType,
+    onChangeMatchup, onChangeLineFocus, onChangeAngles, onChangeOddsPaste,
+    onRunStateChange, onStatus
+  } = props
 
   const [phase, setPhase] = useState<SwantailSystemStatus['phase']>('booting')
   const [schedule, setSchedule] = useState<SwantailSystemStatus['schedule']>({ state: 'booting' })
@@ -311,46 +322,19 @@ export default function SwantailTerminalPanel(props: {
     onRunStateChange?.(newState)
   }, [onRunStateChange])
 
-  // Simulate agent scanning with buffer output and run state updates
-  const simulateAgentScan = useCallback((mode: RunMode) => {
-    // Start run
-    const initialState = startRun(internalRunState, mode)
-    updateRunState(initialState)
-    append(`[${mode.toUpperCase()}] initializing agents…`, 'muted')
+  // Compute current inputs hash for staleness detection
+  const analysisPayloadHash = useMemo(() =>
+    computeInputsHash(matchup, lineFocus, angles, oddsPaste || ''),
+    [matchup, lineFocus, angles, oddsPaste]
+  )
 
-    // Simulate sequential agent updates
-    ALL_AGENT_IDS.forEach((agentId, idx) => {
-      setTimeout(() => {
-        const findings = Math.random() > 0.3 ? Math.floor(Math.random() * 4) + 1 : 0
-        const status = findings > 0 ? 'found' : 'silent'
-
-        setInternalRunState(prev => {
-          const updated = updateAgent(prev, agentId, status, findings || undefined)
-          onRunStateChange?.(updated)
-          return updated
-        })
-
-        const meta = AGENT_META[agentId]
-        if (findings > 0) {
-          append(`[${meta.label}] scanning… found ${findings}`, 'ok')
-        } else {
-          append(`[${meta.label}] scanning… silent`, 'muted')
-        }
-
-        // Complete run after last agent
-        if (idx === ALL_AGENT_IDS.length - 1) {
-          setTimeout(() => {
-            setInternalRunState(prev => {
-              const completed = completeRun(prev)
-              onRunStateChange?.(completed)
-              return completed
-            })
-            append(`[${mode.toUpperCase()}] scan complete`, 'ok')
-          }, 100)
-        }
-      }, 200 * (idx + 1))
-    })
-  }, [append, internalRunState, updateRunState, onRunStateChange])
+  // Compute canBuild: requires successful scan with MATCHING hash (not stale)
+  const canBuild = useMemo(() => {
+    return canAct &&
+      analysisMeta?.status === 'success' &&
+      analysisMeta?.scan_hash === analysisPayloadHash &&  // Enforce hash match
+      !isBuilding
+  }, [canAct, analysisMeta, analysisPayloadHash, isBuilding])
 
   const onHelp = useCallback(() => {
     append('help:', 'muted')
@@ -377,11 +361,6 @@ export default function SwantailTerminalPanel(props: {
     runPreflights()
   }, [append, onChangeMatchup, onClear, runPreflights, updateRunState])
 
-  // Unified action handler for all modes
-  const handleAction = useCallback((mode: RunMode) => {
-    simulateAgentScan(mode)
-    onAction(mode)
-  }, [simulateAgentScan, onAction])
 
   const onSubmitMatchup = useCallback(() => {
     const parsed = parseQuickMatchup(draft)
@@ -504,40 +483,46 @@ export default function SwantailTerminalPanel(props: {
 
         {/* prompt + actions */}
         <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
-          {/* Action buttons: Build (Story) + Prop / Story / Parlay */}
+          {/* Two-phase action buttons: Scan (Phase 1) + Build (Phase 2) */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Phase 1: Scan button */}
             <button
               type="button"
-              onClick={() => handleAction('story')}
-              disabled={!canAct}
-              className="rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {isLoading && runState.mode === 'story' ? 'Building…' : 'Build'}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleAction('prop')}
-              disabled={!canAct}
-              className="rounded-full bg-gradient-to-r from-violet-500 to-purple-500 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {isLoading && runState.mode === 'prop' ? 'Scanning…' : 'Prop'}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleAction('story')}
-              disabled={!canAct}
+              onClick={onScan}
+              disabled={!canAct || (analysisMeta?.status === 'scanning')}
               className="rounded-full bg-gradient-to-r from-slate-500 to-slate-700 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {isLoading && runState.mode === 'story' ? 'Building…' : 'Story'}
+              {analysisMeta?.status === 'scanning' ? 'Scanning…' : 'Scan'}
             </button>
+
+            {/* Output type selector - ONLY calls onChangeOutputType, NEVER onScan/onBuild */}
+            <div className="flex gap-1 rounded-full border border-white/10 bg-black/20 p-0.5">
+              {(['prop', 'story', 'parlay'] as const).map(type => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => onChangeOutputType(type)}
+                  className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition ${
+                    outputType === type
+                      ? 'bg-white/15 text-white'
+                      : 'text-white/60 hover:text-white/80'
+                  }`}
+                >
+                  {type.toUpperCase()}
+                </button>
+              ))}
+            </div>
+
+            {/* Phase 2: Build button - commits with current outputType */}
             <button
               type="button"
-              onClick={() => handleAction('parlay')}
-              disabled={!canAct}
-              className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={onBuild}
+              disabled={!canBuild}
+              className="rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {isLoading && runState.mode === 'parlay' ? 'Composing…' : 'Parlay'}
+              {isBuilding ? 'Building…' : 'Build'}
             </button>
+
             <div className="h-4 w-px bg-white/10" />
             <button
               type="button"

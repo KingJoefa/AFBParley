@@ -2,34 +2,35 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import {
   ScriptSchema,
-  BuildResultSchema,
   identifyCorrelations,
   type Script,
+  type Alert,
+  type Finding,
   type CorrelationType,
 } from '@/lib/terminal/schemas'
 import { hashObject, generateRequestId } from '@/lib/terminal/engine/provenance'
 import { checkRequestLimits, estimateTokens } from '@/lib/terminal/engine/guardrails'
+import type { BuildView, OutputType } from '@/lib/terminal/terminal-state'
 
 /**
  * /api/terminal/build
  *
- * Build correlated parlay scripts from alerts.
- * Identifies correlation patterns and groups alerts into parlays.
+ * Phase 2: Build output views from scan results (alerts + findings)
  *
- * Input: Alert IDs + metadata
- * Output: Script[] (correlated parlay recommendations)
+ * Accepts inline alerts/findings payload (not alert_ids)
+ * Returns BuildView discriminated union:
+ *   - 'terminal': Correlated parlay scripts (prop/parlay modes)
+ *   - 'swantail': LLM-generated narrative scripts (story mode)
  */
 
 const BuildRequestSchema = z.object({
-  alert_ids: z.array(z.string()).min(2).describe('Alert IDs to build parlays from'),
-  // Alert metadata needed for correlation analysis
-  alert_metadata: z.array(z.object({
-    id: z.string(),
-    agent: z.enum(['epa', 'pressure', 'weather', 'qb', 'hb', 'wr', 'te']),
-    market: z.string(),
-    confidence: z.number().min(0).max(1),
-    implications: z.array(z.string()).optional(),
-  })),
+  matchup: z.string().min(3).describe('e.g., "49ers @ Seahawks" or "SF @ SEA"'),
+  alerts: z.array(z.any()).min(0), // Inline Alert[] from Phase 1
+  findings: z.array(z.any()).min(0), // Inline Finding[] from Phase 1
+  output_type: z.enum(['prop', 'story', 'parlay']),
+  anchor: z.string().optional(),
+  signals: z.array(z.string()).optional(),
+  odds_paste: z.string().optional(),
   options: z.object({
     max_legs: z.number().min(2).max(6).default(4),
     risk_preference: z.enum(['conservative', 'moderate', 'aggressive']).default('moderate'),
@@ -76,17 +77,17 @@ function determineRiskLevel(
  */
 function buildScript(
   correlation: { type: CorrelationType; ids: string[]; explanation: string },
-  alertMetadata: Map<string, BuildRequest['alert_metadata'][0]>,
+  alertMap: Map<string, Alert>,
   index: number
 ): Script | null {
   const legs = correlation.ids.map(id => {
-    const meta = alertMetadata.get(id)
-    if (!meta) return null
+    const alert = alertMap.get(id)
+    if (!alert) return null
     return {
       alert_id: id,
-      market: meta.market,
-      implied_probability: meta.confidence,
-      agent: meta.agent,
+      market: alert.claim, // Use claim as the market description
+      implied_probability: alert.confidence,
+      agent: alert.agent,
     }
   }).filter(Boolean)
 
@@ -124,6 +125,97 @@ function formatScriptName(type: CorrelationType): string {
   return names[type] || 'Custom Parlay'
 }
 
+/**
+ * Build terminal view (correlated parlays)
+ */
+async function buildTerminalView(
+  alerts: Alert[],
+  findings: Finding[],
+  options?: BuildRequest['options']
+): Promise<BuildView> {
+  const maxLegs = options?.max_legs || 4
+
+  if (alerts.length < 2) {
+    return {
+      kind: 'terminal',
+      scripts: [],
+      alerts,
+    }
+  }
+
+  // Build maps for correlation analysis
+  const alertIds = alerts.map(a => a.id)
+  const alertAgents = new Map(alerts.map(a => [a.id, a.agent]))
+  const alertImplications = new Map(alerts.map(a => [a.id, a.implications || []]))
+  const alertMap = new Map(alerts.map(a => [a.id, a]))
+
+  // Identify correlation patterns
+  const correlations = identifyCorrelations(alertIds, alertAgents, alertImplications)
+
+  // Build scripts from correlations
+  const scripts: Script[] = []
+  for (let i = 0; i < correlations.length; i++) {
+    const correlation = correlations[i]
+
+    // Limit legs per script
+    const limitedCorrelation = {
+      ...correlation,
+      ids: correlation.ids.slice(0, maxLegs),
+    }
+
+    const script = buildScript(limitedCorrelation, alertMap, i)
+    if (script) {
+      // Validate against schema
+      const validated = ScriptSchema.safeParse(script)
+      if (validated.success) {
+        scripts.push(validated.data)
+      }
+    }
+  }
+
+  return {
+    kind: 'terminal',
+    scripts,
+    alerts,
+  }
+}
+
+/**
+ * Build swantail view (LLM narratives)
+ */
+async function buildSwantailView(
+  matchup: string,
+  anchor: string | undefined,
+  signals: string[] | undefined,
+  odds_paste: string | undefined
+): Promise<BuildView> {
+  // Call existing Swantail/AFB wrapper for LLM-generated narratives
+  const payload = {
+    matchup: matchup.trim(),
+    lineFocus: anchor?.trim() || undefined,
+    angles: signals || [],
+    voice: 'analyst' as const,
+    userSuppliedOdds: [], // TODO: Parse odds_paste if provided
+  }
+
+  const res = await fetch('http://localhost:3000/api/afb', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+
+  if (!res.ok) {
+    throw new Error(`Swantail build failed: ${res.status}`)
+  }
+
+  const data = await res.json()
+
+  return {
+    kind: 'swantail',
+    data,
+  }
+}
+
 export async function POST(req: NextRequest) {
   const requestId = generateRequestId()
   const startTime = Date.now()
@@ -144,86 +236,42 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { alert_ids, alert_metadata, options } = parsed.data
-    const maxLegs = options?.max_legs || 4
+    const { matchup, alerts, findings, output_type, anchor, signals, odds_paste, options } = parsed.data
 
     // Check guardrails
-    const inputEstimate = estimateTokens(JSON.stringify(alert_metadata))
+    const inputEstimate = estimateTokens(JSON.stringify({ alerts, findings }))
     checkRequestLimits({ inputTokens: inputEstimate })
 
-    // Build metadata maps for correlation analysis
-    const alertAgents = new Map(alert_metadata.map(m => [m.id, m.agent]))
-    const alertImplications = new Map(alert_metadata.map(m => [m.id, m.implications || []]))
-    const alertMetadataMap = new Map(alert_metadata.map(m => [m.id, m]))
+    // Compute payload hash for idempotency
+    const payloadHash = hashObject({
+      matchup,
+      alerts,
+      findings,
+      output_type,
+      anchor,
+      signals,
+      odds_paste,
+    })
 
-    // Identify correlation patterns
-    const correlations = identifyCorrelations(alert_ids, alertAgents, alertImplications)
+    // Build appropriate view based on output_type
+    let view: BuildView
 
-    if (correlations.length === 0) {
-      return Response.json({
-        request_id: requestId,
-        scripts: [],
-        alerts_used: [],
-        alerts_excluded: alert_ids,
-        message: 'No correlation patterns identified. Alerts may not have compatible relationships.',
-        build_timestamp: Date.now(),
-        provenance_hash: hashObject({ alert_ids, timestamp: Date.now() }),
-        timing_ms: Date.now() - startTime,
-      })
+    if (output_type === 'story') {
+      // Story mode: LLM-generated narratives
+      view = await buildSwantailView(matchup, anchor, signals, odds_paste)
+    } else {
+      // Prop/Parlay modes: Terminal correlated parlays
+      view = await buildTerminalView(alerts, findings, options)
     }
 
-    // Build scripts from correlations
-    const scripts: Script[] = []
-    const alertsUsed = new Set<string>()
-
-    for (let i = 0; i < correlations.length; i++) {
-      const correlation = correlations[i]
-
-      // Limit legs per script
-      const limitedCorrelation = {
-        ...correlation,
-        ids: correlation.ids.slice(0, maxLegs),
-      }
-
-      const script = buildScript(limitedCorrelation, alertMetadataMap, i)
-      if (script) {
-        // Validate against schema
-        const validated = ScriptSchema.safeParse(script)
-        if (validated.success) {
-          scripts.push(validated.data)
-          limitedCorrelation.ids.forEach(id => alertsUsed.add(id))
-        }
-      }
-    }
-
-    // Determine excluded alerts
-    const alertsExcluded = alert_ids.filter(id => !alertsUsed.has(id))
-
-    // Build result
-    const result = {
-      request_id: requestId,
-      scripts,
-      alerts_used: Array.from(alertsUsed),
-      alerts_excluded: alertsExcluded,
-      build_timestamp: Date.now(),
-      provenance_hash: hashObject({ scripts, alert_ids, timestamp: Date.now() }),
-    }
-
-    // Validate result against schema
-    const validatedResult = BuildResultSchema.safeParse(result)
-    if (!validatedResult.success) {
-      return Response.json(
-        {
-          error: 'Build result validation failed',
-          details: validatedResult.error.flatten(),
-          request_id: requestId,
-        },
-        { status: 500 }
-      )
-    }
-
+    // Return BuildResult with discriminated union
     return Response.json({
-      ...validatedResult.data,
+      build_id: `build-${requestId}`,
+      request_id: requestId,
+      payload_hash: payloadHash,
+      output_type,
+      view,
+      created_at: new Date().toISOString(),
       timing_ms: Date.now() - startTime,
     })
   } catch (error) {
@@ -243,29 +291,32 @@ export async function GET() {
   return Response.json({
     endpoint: '/api/terminal/build',
     method: 'POST',
-    description: 'Build correlated parlay scripts from alerts',
+    description: 'Build output views from scan results (Phase 2). Returns BuildView discriminated union.',
     schema: {
-      alert_ids: 'string[] - Alert IDs to build parlays from (min 2)',
-      alert_metadata: '[{ id, agent, market, confidence, implications? }]',
+      matchup: 'string - e.g., "SF @ SEA"',
+      alerts: 'Alert[] - inline from scan',
+      findings: 'Finding[] - inline from scan',
+      output_type: 'prop | story | parlay',
+      anchor: 'string? - market anchor',
+      signals: 'string[]? - betting angles',
+      odds_paste: 'string? - user-supplied odds',
       options: {
         max_legs: 'number (2-6, default: 4)',
         risk_preference: 'conservative | moderate | aggressive',
       },
     },
-    correlation_types: [
-      'game_script - EPA + rushing patterns',
-      'player_stack - QB + receiver combos',
-      'weather_cascade - weather affects passing',
-      'defensive_funnel - pressure + QB metrics',
-      'volume_share - target concentration',
-    ],
+    response: {
+      kind: 'terminal | swantail',
+      terminal: '{ scripts: Script[], alerts: Alert[] }',
+      swantail: '{ data: SwantailResponse }',
+    },
     example: {
-      alert_ids: ['epa-123', 'pressure-456', 'qb-789'],
-      alert_metadata: [
-        { id: 'epa-123', agent: 'epa', market: 'Chase Over 85.5', confidence: 0.72 },
-        { id: 'pressure-456', agent: 'pressure', market: 'Burrow Under 275.5', confidence: 0.68 },
-        { id: 'qb-789', agent: 'qb', market: 'Burrow Under 2.5 TDs', confidence: 0.65 },
-      ],
+      matchup: 'SF @ SEA',
+      alerts: [],
+      findings: [],
+      output_type: 'story',
+      anchor: 'Over 44.5',
+      signals: ['pace_skew', 'pressure_mismatch'],
     },
   })
 }
