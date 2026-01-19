@@ -45,4 +45,4 @@ To:
 
 ## Backlog
 
-_Add future items here._
+- Auto-fill `--signals` and `--odds` from a data source on matchup selection (blank when unavailable).
