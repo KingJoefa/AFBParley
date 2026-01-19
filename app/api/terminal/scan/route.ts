@@ -5,6 +5,8 @@ import { buildProvenance, generateRequestId, hashObject } from '@/lib/terminal/e
 import { shouldUseFallback } from '@/lib/terminal/engine/fallback-renderer'
 import { checkRequestLimits, estimateTokens } from '@/lib/terminal/engine/guardrails'
 import { analyzeFindings, generateFallbackAlerts } from '@/lib/terminal/analyst'
+import { ALL_AGENT_IDS } from '@/lib/terminal/run-state'
+import type { AgentType } from '@/lib/terminal/schemas'
 
 /**
  * /api/terminal/scan
@@ -18,6 +20,7 @@ import { analyzeFindings, generateFallbackAlerts } from '@/lib/terminal/analyst'
 
 const ScanRequestSchema = z.object({
   matchup: z.string().min(3).describe('e.g., "49ers @ Seahawks" or "SF @ SEA"'),
+  agentIds: z.array(z.string()).optional().describe('Optional list of agent IDs to run (defaults to all)'),
   options: z
     .object({
       includeWeather: z.boolean().default(true),
@@ -362,6 +365,34 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Validate agentIds if provided
+    const agentIds = parsed.data.agentIds
+    if (agentIds !== undefined) {
+      // Reject empty list
+      if (agentIds.length === 0) {
+        return Response.json(
+          {
+            error: 'Invalid agentIds',
+            message: 'agentIds cannot be an empty list. Omit the field or provide at least one agent.',
+            request_id: requestId,
+          },
+          { status: 400 }
+        )
+      }
+      // Reject unknown IDs
+      const unknownIds = agentIds.filter(id => !ALL_AGENT_IDS.includes(id as AgentType))
+      if (unknownIds.length > 0) {
+        return Response.json(
+          {
+            error: 'Invalid agentIds',
+            message: `Unknown agent IDs: ${unknownIds.join(', ')}. Valid agents: ${ALL_AGENT_IDS.join(', ')}`,
+            request_id: requestId,
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     // Parse matchup string
     const teams = parseMatchup(parsed.data.matchup)
     if (!teams) {
@@ -384,7 +415,11 @@ export async function POST(req: NextRequest) {
     checkRequestLimits({ inputTokens: inputEstimate })
 
     // Run threshold checks (deterministic)
-    const { findings, agentsInvoked, agentsSilent } = await runAgents(matchupContext)
+    // Pass validated agentIds to filter which agents run
+    const { findings, agentsInvoked, agentsSilent } = await runAgents(
+      matchupContext,
+      agentIds as AgentType[] | undefined
+    )
 
     // Build provenance
     const provenance = buildProvenance({
@@ -407,6 +442,7 @@ export async function POST(req: NextRequest) {
     if (findings.length === 0) {
       const payloadHash = hashObject({
         matchup: parsed.data.matchup,
+        agentIds: agentIds?.slice().sort() || ALL_AGENT_IDS.slice().sort(),
         findings: [],
         alerts: [],
       })
@@ -453,6 +489,7 @@ export async function POST(req: NextRequest) {
     // Compute payload hash for staleness detection
     const payloadHash = hashObject({
       matchup: parsed.data.matchup,
+      agentIds: agentIds?.slice().sort() || ALL_AGENT_IDS.slice().sort(),
       findings,
       alerts: analysisResult.alerts,
     })

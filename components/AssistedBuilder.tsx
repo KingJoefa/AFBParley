@@ -46,18 +46,21 @@ export default function AssistedBuilder() {
   const [viewCache, setViewCache] = useState<Map<OutputType, BuildView>>(new Map())
   const [isBuilding, setIsBuilding] = useState(false)
 
-  // Agent selection state with session restoration
-  const [selectedAgents, setSelectedAgents] = useState<AgentRunState['id'][]>(() => {
-    if (typeof window === 'undefined') return ALL_AGENT_IDS
+  // Agent selection state (hydrate from session storage after mount)
+  const [selectedAgents, setSelectedAgents] = useState<AgentRunState['id'][]>(ALL_AGENT_IDS)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
     try {
       const stored = sessionStorage.getItem('swantail:agents')
       if (stored) {
         const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSelectedAgents(parsed)
+        }
       }
     } catch {}
-    return ALL_AGENT_IDS
-  })
+  }, [])
 
   // Persist agent selection to session
   useEffect(() => {
@@ -115,6 +118,7 @@ export default function AssistedBuilder() {
         matchup: matchup.trim(),
         signals,
         anchor: lineFocus.trim() || undefined,
+        agentIds: agentsToScan,
       })
 
       if (res.ok) {

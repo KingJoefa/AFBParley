@@ -109,7 +109,6 @@ export default function SwantailTerminalPanel(props: {
   const [oddsDraft, setOddsDraft] = useState('')
   const [matchupStatus, setMatchupStatus] = useState<'idle' | 'ok' | 'err'>('idle')
   const [anchorStatus, setAnchorStatus] = useState<'idle' | 'ok' | 'err'>('idle')
-  const [signalStatus, setSignalStatus] = useState<'idle' | 'ok' | 'err'>('idle')
   const [oddsStatus, setOddsStatus] = useState<'idle' | 'ok' | 'err'>('idle')
 
   const scrollerRef = useRef<HTMLDivElement | null>(null)
@@ -358,7 +357,6 @@ export default function SwantailTerminalPanel(props: {
     if (onChangeAngles) {
       onChangeAngles([])
       setSignalDraft('')
-      setSignalStatus('idle')
     }
     if (onChangeOddsPaste) {
       onChangeOddsPaste('')
@@ -435,21 +433,6 @@ export default function SwantailTerminalPanel(props: {
     append(next ? `anchor set: ${next}` : 'anchor cleared', next ? 'ok' : 'muted')
   }, [lineFocus, onChangeLineFocus, append])
 
-  const onApplySignals = useCallback((nextRaw: string) => {
-    if (!onChangeAngles) return
-    const next = nextRaw
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean)
-    if (next.join(',') === angles.join(',')) {
-      setSignalStatus('ok')
-      return
-    }
-    onChangeAngles(next)
-    setSignalStatus('ok')
-    append(next.length ? `signals set: ${next.join(', ')}` : 'signals cleared', next.length ? 'ok' : 'muted')
-  }, [angles, onChangeAngles, append])
-
   const onApplyOdds = useCallback((nextRaw: string) => {
     if (!onChangeOddsPaste) return
     const next = nextRaw.trim()
@@ -484,6 +467,15 @@ export default function SwantailTerminalPanel(props: {
     const next = selectedAgents.length === ALL_AGENT_IDS.length ? [] : ALL_AGENT_IDS
     onSelectedAgentsChange(next)
   }, [selectedAgents, onSelectedAgentsChange])
+
+  const onCopySignals = useCallback(() => {
+    const text = signalDraft.trim()
+    if (!text) return
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text).catch(() => undefined)
+      append('signals copied', 'muted')
+    }
+  }, [append, signalDraft])
 
   const selectedAgentLabels = useMemo(() => (
     selectedAgents.map(id => AGENT_META[id].label)
@@ -607,13 +599,13 @@ export default function SwantailTerminalPanel(props: {
 
           <div className="flex items-center gap-2">
             <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Agents</div>
-            <div className="flex flex-1 flex-wrap items-center gap-1.5 md:flex-nowrap md:overflow-x-auto md:pb-1 md:pr-1 md:snap-x">
+            <div className="flex flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden md:pb-1 md:pr-1 md:snap-x">
               {/* ALL chip - toggles all/none */}
               <button
                 type="button"
                 onClick={toggleAllAgents}
                 disabled={analysisMeta?.status === 'scanning'}
-                className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold md:snap-start disabled:cursor-not-allowed disabled:opacity-40 ${
+                className={`flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold md:snap-start disabled:cursor-not-allowed disabled:opacity-40 ${
                   selectedAgents.length === ALL_AGENT_IDS.length
                     ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
                     : 'border-white/10 bg-white/5 text-white/55'
@@ -645,7 +637,8 @@ export default function SwantailTerminalPanel(props: {
                     type="button"
                     onClick={() => toggleAgent(agent.id)}
                     disabled={isDisabled}
-                    className={`group relative flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium ${statusClass} md:snap-start ${isSelected ? '' : 'opacity-50'} disabled:cursor-not-allowed disabled:opacity-40`}
+                    title={`Δ ${deltaValue} • ${freshness}`}
+                    className={`flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium ${statusClass} md:snap-start ${isSelected ? '' : 'opacity-50'} disabled:cursor-not-allowed disabled:opacity-40`}
                   >
                     {/* Toggle indicator: filled dot when on, hollow dot when off */}
                     <span className={`text-[8px] ${isSelected ? 'text-emerald-400' : 'text-white/40'}`}>
@@ -659,9 +652,6 @@ export default function SwantailTerminalPanel(props: {
                         {deltaValue}
                       </span>
                     )}
-                    <span className="absolute left-0 top-full z-10 hidden translate-y-1 rounded border border-white/10 bg-black/80 px-2 py-1 text-[10px] text-white/70 group-hover:block">
-                      Δ {deltaValue} • {freshness}
-                    </span>
                   </button>
                 )
               })}
@@ -679,6 +669,9 @@ export default function SwantailTerminalPanel(props: {
             >
               {analysisMeta?.status === 'scanning' ? 'Scanning…' : 'Scan'}
             </button>
+            <div className={`rounded-full border px-2 py-1 text-[10px] font-mono ${analysisMeta?.scannedAt ? 'border-emerald-400/20 bg-emerald-500/10 text-emerald-200' : 'border-white/10 text-white/40'}`}>
+              DATA {getFreshnessLabel(analysisMeta?.scannedAt)}
+            </div>
 
             {/* Output type selector - ONLY calls onChangeOutputType, NEVER onScan/onBuild */}
             <div className="flex gap-1 rounded-full border border-white/10 bg-black/20 p-0.5">
@@ -756,21 +749,18 @@ export default function SwantailTerminalPanel(props: {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-white/35">--signals</span>
-              <input
-                value={signalDraft}
-                onChange={(e) => { setSignalDraft(e.target.value); setSignalStatus('idle') }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    e.currentTarget.blur()
-                  }
-                }}
-                onBlur={() => onApplySignals(signalDraft)}
-                placeholder="pace skew, pressure"
-                className="w-[200px] bg-transparent text-white placeholder:text-white/25 focus:outline-none"
-              />
-              <span className={`h-1.5 w-1.5 rounded-full ${statusDot(signalStatus)}`} />
+              <span className="text-white/35">signals:</span>
+              <span className="max-w-[260px] truncate text-white/60">{signalDraft.trim() || '--'}</span>
+              <button
+                type="button"
+                onClick={onCopySignals}
+                disabled={!signalDraft.trim()}
+                className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-white/50 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Copy signals"
+                title="Copy signals"
+              >
+                ⎘
+              </button>
             </div>
 
             <div className="flex items-center gap-2">

@@ -5,6 +5,7 @@ export interface ScanRequest {
   matchup: string
   signals?: string[]
   anchor?: string
+  agentIds?: string[]
 }
 
 export interface ScanResponse {
@@ -83,6 +84,7 @@ export function useTerminalScan() {
         matchup: req.matchup,
         signals: req.signals,
         anchor: req.anchor,
+        agentIds: req.agentIds,
       }
 
       const res = await fetch('/api/terminal/scan', {

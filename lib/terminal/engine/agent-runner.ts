@@ -105,8 +105,19 @@ export interface AgentRunResult {
 
 /**
  * Run all agents against the matchup context
+ * @param context - Matchup data and statistics
+ * @param agentIds - Optional list of agent IDs to run (defaults to all agents)
  */
-export async function runAgents(context: MatchupContext): Promise<AgentRunResult> {
+export async function runAgents(
+  context: MatchupContext,
+  agentIds?: AgentType[]
+): Promise<AgentRunResult> {
+  // Determine which agents to run (default to all if not specified)
+  const agentsToRun = agentIds || ALL_AGENTS
+
+  // Log which agents are running for verification
+  console.log('[scan] agents:', agentsToRun.join(', '))
+
   const findings: Finding[] = []
   const agentsWithFindings = new Set<AgentType>()
 
@@ -115,201 +126,215 @@ export async function runAgents(context: MatchupContext): Promise<AgentRunResult
     dataVersion: context.dataVersion,
   }
 
-  // Run EPA agent for all players
-  for (const team of [context.homeTeam, context.awayTeam]) {
-    const opponent = team === context.homeTeam ? context.awayTeam : context.homeTeam
-    const players = context.players[team] || []
-    const opponentStats = context.teamStats[opponent] || {}
+  // Run EPA agent for all players (if enabled)
+  if (agentsToRun.includes('epa')) {
+    for (const team of [context.homeTeam, context.awayTeam]) {
+      const opponent = team === context.homeTeam ? context.awayTeam : context.homeTeam
+      const players = context.players[team] || []
+      const opponentStats = context.teamStats[opponent] || {}
 
-    for (const player of players) {
-      const epaFindings = checkEpaThresholds(
-        {
-          name: player.name,
-          team: player.team,
-          receiving_epa_rank: player.receiving_epa_rank,
-          rushing_epa_rank: player.rushing_epa_rank,
-          targets: player.targets,
-          rushes: player.rushes,
-        },
-        {
-          team: opponent,
-          epa_allowed_to_wr_rank: opponentStats.epa_allowed_to_wr_rank,
-          epa_allowed_to_rb_rank: opponentStats.epa_allowed_to_rb_rank,
-        },
-        thresholdContext
-      )
-      if (epaFindings.length > 0) {
-        findings.push(...epaFindings)
-        agentsWithFindings.add('epa')
+      for (const player of players) {
+        const epaFindings = checkEpaThresholds(
+          {
+            name: player.name,
+            team: player.team,
+            receiving_epa_rank: player.receiving_epa_rank,
+            rushing_epa_rank: player.rushing_epa_rank,
+            targets: player.targets,
+            rushes: player.rushes,
+          },
+          {
+            team: opponent,
+            epa_allowed_to_wr_rank: opponentStats.epa_allowed_to_wr_rank,
+            epa_allowed_to_rb_rank: opponentStats.epa_allowed_to_rb_rank,
+          },
+          thresholdContext
+        )
+        if (epaFindings.length > 0) {
+          findings.push(...epaFindings)
+          agentsWithFindings.add('epa')
+        }
       }
     }
   }
 
-  // Run Pressure agent (team-level)
-  for (const team of [context.homeTeam, context.awayTeam]) {
-    const opponent = team === context.homeTeam ? context.awayTeam : context.homeTeam
-    const teamStats = context.teamStats[team] || {}
-    const opponentStats = context.teamStats[opponent] || {}
+  // Run Pressure agent (team-level) (if enabled)
+  if (agentsToRun.includes('pressure')) {
+    for (const team of [context.homeTeam, context.awayTeam]) {
+      const opponent = team === context.homeTeam ? context.awayTeam : context.homeTeam
+      const teamStats = context.teamStats[team] || {}
+      const opponentStats = context.teamStats[opponent] || {}
 
-    if (opponentStats.pressure_rate_rank !== undefined) {
-      const pressureFindings = checkPressureThresholds(
-        {
-          team: opponent,
-          pressure_rate: opponentStats.pressure_rate,
-          pressure_rate_rank: opponentStats.pressure_rate_rank,
-        },
-        {
-          team: team,
-          qb_name: teamStats.qb_name || 'Unknown QB',
-          pass_block_win_rate_rank: teamStats.pass_block_win_rate_rank,
-          qb_passer_rating_under_pressure: teamStats.qb_passer_rating_under_pressure,
-        },
-        thresholdContext
-      )
-      if (pressureFindings.length > 0) {
-        findings.push(...pressureFindings)
-        agentsWithFindings.add('pressure')
+      if (opponentStats.pressure_rate_rank !== undefined) {
+        const pressureFindings = checkPressureThresholds(
+          {
+            team: opponent,
+            pressure_rate: opponentStats.pressure_rate,
+            pressure_rate_rank: opponentStats.pressure_rate_rank,
+          },
+          {
+            team: team,
+            qb_name: teamStats.qb_name || 'Unknown QB',
+            pass_block_win_rate_rank: teamStats.pass_block_win_rate_rank,
+            qb_passer_rating_under_pressure: teamStats.qb_passer_rating_under_pressure,
+          },
+          thresholdContext
+        )
+        if (pressureFindings.length > 0) {
+          findings.push(...pressureFindings)
+          agentsWithFindings.add('pressure')
+        }
       }
     }
   }
 
-  // Run Weather agent
-  const weatherFindings = checkWeatherThresholds(context.weather, thresholdContext)
-  if (weatherFindings.length > 0) {
-    findings.push(...weatherFindings)
-    agentsWithFindings.add('weather')
+  // Run Weather agent (if enabled)
+  if (agentsToRun.includes('weather')) {
+    const weatherFindings = checkWeatherThresholds(context.weather, thresholdContext)
+    if (weatherFindings.length > 0) {
+      findings.push(...weatherFindings)
+      agentsWithFindings.add('weather')
+    }
   }
 
-  // Run QB agent
-  for (const team of [context.homeTeam, context.awayTeam]) {
-    const opponent = team === context.homeTeam ? context.awayTeam : context.homeTeam
-    const players = context.players[team] || []
-    const opponentStats = context.teamStats[opponent] || {}
+  // Run QB agent (if enabled)
+  if (agentsToRun.includes('qb')) {
+    for (const team of [context.homeTeam, context.awayTeam]) {
+      const opponent = team === context.homeTeam ? context.awayTeam : context.homeTeam
+      const players = context.players[team] || []
+      const opponentStats = context.teamStats[opponent] || {}
 
-    for (const player of players.filter(p => p.position === 'QB')) {
-      const qbFindings = checkQbThresholds(
-        {
-          name: player.name,
-          team: player.team,
-          qb_rating_rank: player.qb_rating_rank,
-          yards_per_attempt_rank: player.yards_per_attempt_rank,
-          turnover_pct_rank: player.turnover_pct_rank,
-          attempts: player.attempts,
-        },
-        {
-          team: opponent,
-          pass_defense_rank: opponentStats.pass_defense_rank,
-          pass_yards_allowed_rank: opponentStats.pass_yards_allowed_rank,
-          interception_rate_rank: opponentStats.interception_rate_rank,
-        },
-        thresholdContext
-      )
-      if (qbFindings.length > 0) {
-        findings.push(...qbFindings)
-        agentsWithFindings.add('qb')
+      for (const player of players.filter(p => p.position === 'QB')) {
+        const qbFindings = checkQbThresholds(
+          {
+            name: player.name,
+            team: player.team,
+            qb_rating_rank: player.qb_rating_rank,
+            yards_per_attempt_rank: player.yards_per_attempt_rank,
+            turnover_pct_rank: player.turnover_pct_rank,
+            attempts: player.attempts,
+          },
+          {
+            team: opponent,
+            pass_defense_rank: opponentStats.pass_defense_rank,
+            pass_yards_allowed_rank: opponentStats.pass_yards_allowed_rank,
+            interception_rate_rank: opponentStats.interception_rate_rank,
+          },
+          thresholdContext
+        )
+        if (qbFindings.length > 0) {
+          findings.push(...qbFindings)
+          agentsWithFindings.add('qb')
+        }
       }
     }
   }
 
-  // Run HB agent
-  for (const team of [context.homeTeam, context.awayTeam]) {
-    const opponent = team === context.homeTeam ? context.awayTeam : context.homeTeam
-    const players = context.players[team] || []
-    const opponentStats = context.teamStats[opponent] || {}
+  // Run HB agent (if enabled)
+  if (agentsToRun.includes('hb')) {
+    for (const team of [context.homeTeam, context.awayTeam]) {
+      const opponent = team === context.homeTeam ? context.awayTeam : context.homeTeam
+      const players = context.players[team] || []
+      const opponentStats = context.teamStats[opponent] || {}
 
-    for (const player of players.filter(p => p.position === 'HB' || p.position === 'RB')) {
-      const hbFindings = checkHbThresholds(
-        {
-          name: player.name,
-          team: player.team,
-          rush_yards_rank: player.rush_yards_rank,
-          yards_per_carry_rank: player.yards_per_carry_rank,
-          rush_td_rank: player.rush_td_rank,
-          reception_rank: player.reception_rank,
-          carries: player.carries,
-        },
-        {
-          team: opponent,
-          rush_defense_rank: opponentStats.rush_defense_rank,
-          rush_yards_allowed_rank: opponentStats.rush_yards_allowed_rank,
-          rush_td_allowed_rank: opponentStats.rush_td_allowed_rank,
-        },
-        thresholdContext
-      )
-      if (hbFindings.length > 0) {
-        findings.push(...hbFindings)
-        agentsWithFindings.add('hb')
+      for (const player of players.filter(p => p.position === 'HB' || p.position === 'RB')) {
+        const hbFindings = checkHbThresholds(
+          {
+            name: player.name,
+            team: player.team,
+            rush_yards_rank: player.rush_yards_rank,
+            yards_per_carry_rank: player.yards_per_carry_rank,
+            rush_td_rank: player.rush_td_rank,
+            reception_rank: player.reception_rank,
+            carries: player.carries,
+          },
+          {
+            team: opponent,
+            rush_defense_rank: opponentStats.rush_defense_rank,
+            rush_yards_allowed_rank: opponentStats.rush_yards_allowed_rank,
+            rush_td_allowed_rank: opponentStats.rush_td_allowed_rank,
+          },
+          thresholdContext
+        )
+        if (hbFindings.length > 0) {
+          findings.push(...hbFindings)
+          agentsWithFindings.add('hb')
+        }
       }
     }
   }
 
-  // Run WR agent
-  for (const team of [context.homeTeam, context.awayTeam]) {
-    const opponent = team === context.homeTeam ? context.awayTeam : context.homeTeam
-    const players = context.players[team] || []
-    const opponentStats = context.teamStats[opponent] || {}
+  // Run WR agent (if enabled)
+  if (agentsToRun.includes('wr')) {
+    for (const team of [context.homeTeam, context.awayTeam]) {
+      const opponent = team === context.homeTeam ? context.awayTeam : context.homeTeam
+      const players = context.players[team] || []
+      const opponentStats = context.teamStats[opponent] || {}
 
-    for (const player of players.filter(p => p.position === 'WR')) {
-      const wrFindings = checkWrThresholds(
-        {
-          name: player.name,
-          team: player.team,
-          target_share_rank: player.target_share_rank,
-          receiving_yards_rank: player.receiving_yards_rank,
-          receiving_td_rank: player.receiving_td_rank,
-          separation_rank: player.separation_rank,
-          targets: player.targets,
-        },
-        {
-          team: opponent,
-          pass_defense_rank: opponentStats.pass_defense_rank,
-          yards_allowed_to_wr_rank: opponentStats.yards_allowed_to_wr_rank,
-          td_allowed_to_wr_rank: opponentStats.td_allowed_to_wr_rank,
-        },
-        thresholdContext
-      )
-      if (wrFindings.length > 0) {
-        findings.push(...wrFindings)
-        agentsWithFindings.add('wr')
+      for (const player of players.filter(p => p.position === 'WR')) {
+        const wrFindings = checkWrThresholds(
+          {
+            name: player.name,
+            team: player.team,
+            target_share_rank: player.target_share_rank,
+            receiving_yards_rank: player.receiving_yards_rank,
+            receiving_td_rank: player.receiving_td_rank,
+            separation_rank: player.separation_rank,
+            targets: player.targets,
+          },
+          {
+            team: opponent,
+            pass_defense_rank: opponentStats.pass_defense_rank,
+            yards_allowed_to_wr_rank: opponentStats.yards_allowed_to_wr_rank,
+            td_allowed_to_wr_rank: opponentStats.td_allowed_to_wr_rank,
+          },
+          thresholdContext
+        )
+        if (wrFindings.length > 0) {
+          findings.push(...wrFindings)
+          agentsWithFindings.add('wr')
+        }
       }
     }
   }
 
-  // Run TE agent
-  for (const team of [context.homeTeam, context.awayTeam]) {
-    const opponent = team === context.homeTeam ? context.awayTeam : context.homeTeam
-    const players = context.players[team] || []
-    const opponentStats = context.teamStats[opponent] || {}
+  // Run TE agent (if enabled)
+  if (agentsToRun.includes('te')) {
+    for (const team of [context.homeTeam, context.awayTeam]) {
+      const opponent = team === context.homeTeam ? context.awayTeam : context.homeTeam
+      const players = context.players[team] || []
+      const opponentStats = context.teamStats[opponent] || {}
 
-    for (const player of players.filter(p => p.position === 'TE')) {
-      const teFindings = checkTeThresholds(
-        {
-          name: player.name,
-          team: player.team,
-          target_share_rank: player.target_share_rank,
-          receiving_yards_rank: player.receiving_yards_rank,
-          receiving_td_rank: player.receiving_td_rank,
-          red_zone_target_rank: player.red_zone_target_rank,
-          targets: player.targets,
-        },
-        {
-          team: opponent,
-          te_defense_rank: opponentStats.te_defense_rank,
-          yards_allowed_to_te_rank: opponentStats.yards_allowed_to_te_rank,
-          td_allowed_to_te_rank: opponentStats.td_allowed_to_te_rank,
-        },
-        thresholdContext
-      )
-      if (teFindings.length > 0) {
-        findings.push(...teFindings)
-        agentsWithFindings.add('te')
+      for (const player of players.filter(p => p.position === 'TE')) {
+        const teFindings = checkTeThresholds(
+          {
+            name: player.name,
+            team: player.team,
+            target_share_rank: player.target_share_rank,
+            receiving_yards_rank: player.receiving_yards_rank,
+            receiving_td_rank: player.receiving_td_rank,
+            red_zone_target_rank: player.red_zone_target_rank,
+            targets: player.targets,
+          },
+          {
+            team: opponent,
+            te_defense_rank: opponentStats.te_defense_rank,
+            yards_allowed_to_te_rank: opponentStats.yards_allowed_to_te_rank,
+            td_allowed_to_te_rank: opponentStats.td_allowed_to_te_rank,
+          },
+          thresholdContext
+        )
+        if (teFindings.length > 0) {
+          findings.push(...teFindings)
+          agentsWithFindings.add('te')
+        }
       }
     }
   }
 
-  // Calculate invoked vs silent
-  const agentsInvoked = ALL_AGENTS.filter(a => agentsWithFindings.has(a))
-  const agentsSilent = ALL_AGENTS.filter(a => !agentsWithFindings.has(a))
+  // Calculate invoked vs silent (only among agents that were selected to run)
+  const agentsInvoked = agentsToRun.filter(a => agentsWithFindings.has(a))
+  const agentsSilent = agentsToRun.filter(a => !agentsWithFindings.has(a))
 
   return {
     findings,
