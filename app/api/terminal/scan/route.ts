@@ -133,23 +133,73 @@ async function loadMatchupContext(
   homeTeam: string,
   awayTeam: string
 ): Promise<MatchupContext> {
-  // For now, return mock data structure
-  // This will be replaced with actual data loading
+  // Mock data with strong signals to trigger agent findings
+  // This simulates a matchup with multiple betting opportunities
   return {
     homeTeam,
     awayTeam,
     players: {
-      [homeTeam]: [],
-      [awayTeam]: [],
+      [homeTeam]: [
+        {
+          name: 'George Kittle',
+          team: homeTeam,
+          position: 'TE',
+          receiving_epa_rank: 2,  // Top tier EPA
+          targets: 95,
+          target_share_rank: 1,   // High target share
+          red_zone_target_rank: 1, // Red zone usage
+        },
+        {
+          name: 'Christian McCaffrey',
+          team: homeTeam,
+          position: 'HB',
+          rushing_epa_rank: 1,    // Elite rusher
+          receiving_epa_rank: 3,  // Dual threat
+          carries: 280,
+          targets: 95,
+        },
+      ],
+      [awayTeam]: [
+        {
+          name: 'DK Metcalf',
+          team: awayTeam,
+          position: 'WR',
+          receiving_epa_rank: 4,  // Strong receiver
+          target_share_rank: 2,
+          targets: 120,
+          separation_rank: 8,
+        },
+        {
+          name: 'Geno Smith',
+          team: awayTeam,
+          position: 'QB',
+          qb_rating_rank: 12,
+          yards_per_attempt_rank: 10,
+          attempts: 520,
+        },
+      ],
     },
     teamStats: {
-      [homeTeam]: {},
-      [awayTeam]: {},
+      [homeTeam]: {
+        epa_allowed_to_wr_rank: 28,  // Weak vs WR (good for opponents)
+        pressure_rate_rank: 5,        // Strong pressure
+        pass_defense_rank: 8,
+        qb_name: 'Brock Purdy',
+      },
+      [awayTeam]: {
+        epa_allowed_to_rb_rank: 30,  // Terrible vs RB (CMC advantage)
+        te_defense_rank: 25,          // Weak vs TE (Kittle advantage)
+        pressure_rate_rank: 22,       // Weak pressure (Purdy safe)
+        pass_block_win_rate_rank: 18,
+        qb_name: 'Geno Smith',
+        qb_passer_rating_under_pressure: 65.2, // Struggles under pressure
+      },
     },
     weather: {
-      temperature: 55,
-      wind_mph: 8,
-      precipitation_chance: 10,
+      temperature: 42,
+      wind_mph: 15,               // Moderate wind (affects passing)
+      precipitation_chance: 60,    // Rain likely
+      precipitation_type: 'rain',
       indoor: false,
     },
     dataTimestamp: Date.now(),
