@@ -29,6 +29,8 @@ const BuildRequestSchema = z.object({
   findings: z.array(z.any()).min(0), // Inline Finding[] from Phase 1
   output_type: z.enum(['prop', 'story', 'parlay']),
   anchor: z.string().optional(),
+  anchors: z.array(z.string()).optional(),
+  script_bias: z.array(z.string()).optional(),
   signals: z.array(z.string()).optional(),
   odds_paste: z.string().optional(),
   options: z.object({

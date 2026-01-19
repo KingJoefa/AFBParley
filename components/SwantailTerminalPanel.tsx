@@ -8,11 +8,10 @@ import {
   type RunState,
   type AgentRunState,
   AGENT_META,
-  ALL_AGENT_IDS,
   createInitialRunState,
   resetRun,
 } from '@/lib/terminal/run-state'
-import { computeInputsHash, type OutputType, type AnalysisMeta } from '@/lib/terminal/terminal-state'
+import { computeInputsHash, type AnalysisMeta } from '@/lib/terminal/terminal-state'
 
 type CheckState = 'booting' | 'ready' | 'degraded' | 'error'
 
@@ -55,9 +54,15 @@ function parseQuickMatchup(raw: string): string | null {
   return null
 }
 
+function parseMatchupSides(raw: string): { away?: string; home?: string } {
+  const cleaned = raw.split('(')[0].trim()
+  const parts = cleaned.split(/\s*@\s*/i)
+  if (parts.length !== 2) return {}
+  return { away: parts[0]?.trim(), home: parts[1]?.trim() }
+}
+
 export default function SwantailTerminalPanel(props: {
   matchup: string
-  lineFocus: string
   angles: string[]
   oddsPaste?: string
   isLoading: boolean
@@ -65,28 +70,29 @@ export default function SwantailTerminalPanel(props: {
   error?: string | null
   data: SwantailResponse | null
   // Split action props - enforces two-phase architecture
-  outputType: OutputType
   analysisMeta: AnalysisMeta | null
   isBuilding: boolean                             // Build-in-flight flag (separate from scan loading)
   selectedAgents: AgentRunState['id'][]           // Lifted state for hash determinism
+  anchors: string[]
+  scriptBias: string[]
   onScan: (options?: { agentIds?: AgentRunState['id'][] }) => void // Phase 1 only
   onBuild: () => void                             // Phase 2 only
-  onChangeOutputType: (type: OutputType) => void  // View-only, NO API call
   onSelectedAgentsChange: (agents: AgentRunState['id'][]) => void // Agent toggle handler
+  onChangeAnchors: (values: string[]) => void
+  onChangeScriptBias: (values: string[]) => void
   // Other handlers
   onChangeMatchup: (value: string) => void
-  onChangeLineFocus?: (value: string) => void
   onChangeAngles?: (value: string[]) => void
   onChangeOddsPaste?: (value: string) => void
   onRunStateChange?: (state: RunState) => void
   onStatus?: (status: SwantailSystemStatus) => void
 }) {
   const {
-    matchup, lineFocus, angles, oddsPaste, isLoading,
+    matchup, angles, oddsPaste, isLoading,
     runState: externalRunState, error, data,
-    outputType, analysisMeta, isBuilding, selectedAgents,
-    onScan, onBuild, onChangeOutputType, onSelectedAgentsChange,
-    onChangeMatchup, onChangeLineFocus, onChangeAngles, onChangeOddsPaste,
+    analysisMeta, isBuilding, selectedAgents, anchors, scriptBias,
+    onScan, onBuild, onSelectedAgentsChange, onChangeAnchors, onChangeScriptBias,
+    onChangeMatchup, onChangeAngles, onChangeOddsPaste,
     onRunStateChange, onStatus
   } = props
 
@@ -104,11 +110,9 @@ export default function SwantailTerminalPanel(props: {
     { id: uid(), text: 'initializing terminal…', tone: 'muted' },
   ]))
   const [draft, setDraft] = useState('')
-  const [anchorDraft, setAnchorDraft] = useState('')
   const [signalDraft, setSignalDraft] = useState('')
   const [oddsDraft, setOddsDraft] = useState('')
   const [matchupStatus, setMatchupStatus] = useState<'idle' | 'ok' | 'err'>('idle')
-  const [anchorStatus, setAnchorStatus] = useState<'idle' | 'ok' | 'err'>('idle')
   const [oddsStatus, setOddsStatus] = useState<'idle' | 'ok' | 'err'>('idle')
 
   const scrollerRef = useRef<HTMLDivElement | null>(null)
@@ -141,10 +145,6 @@ export default function SwantailTerminalPanel(props: {
   useEffect(() => {
     setDraft(matchup || '')
   }, [matchup])
-
-  useEffect(() => {
-    setAnchorDraft(lineFocus || '')
-  }, [lineFocus])
 
   useEffect(() => {
     setSignalDraft(angles.length ? angles.join(', ') : '')
@@ -304,6 +304,40 @@ export default function SwantailTerminalPanel(props: {
     return featured.length ? featured : games
   }, [games])
 
+  const matchupSides = useMemo(() => parseMatchupSides(matchup), [matchup])
+  const anchorGroups = useMemo(() => ([
+    {
+      id: 'total',
+      label: 'TOTAL',
+      options: [
+        { id: 'total_over', label: 'Over' },
+        { id: 'total_under', label: 'Under' },
+      ],
+    },
+    {
+      id: 'side',
+      label: 'SIDE',
+      options: [
+        { id: 'side_home', label: matchupSides.home ? `${matchupSides.home} win` : 'Home win' },
+        { id: 'side_away', label: matchupSides.away ? `${matchupSides.away} win` : 'Away win' },
+      ],
+    },
+    {
+      id: 'spread',
+      label: 'SPREAD',
+      options: [
+        { id: 'spread_home', label: matchupSides.home ? `${matchupSides.home} cover` : 'Home cover' },
+        { id: 'spread_away', label: matchupSides.away ? `${matchupSides.away} cover` : 'Away cover' },
+      ],
+    },
+  ]), [matchupSides])
+  const scriptBiasOptions = useMemo(() => ([
+    'Shootout',
+    'Grind',
+    'Pass-heavy',
+    'Run-heavy',
+  ]), [])
+
   const canAct = Boolean(parseQuickMatchup(matchup) || matchup.trim()) && !isLoading && phase !== 'booting'
 
   // Update run state (internal or notify parent)
@@ -314,27 +348,25 @@ export default function SwantailTerminalPanel(props: {
 
   // Compute current inputs hash for staleness detection
   const analysisPayloadHash = useMemo(() =>
-    computeInputsHash(matchup, lineFocus, angles, oddsPaste || '', selectedAgents),
-    [matchup, lineFocus, angles, oddsPaste, selectedAgents]
+    computeInputsHash(matchup, anchors, scriptBias, angles, oddsPaste || '', selectedAgents),
+    [matchup, anchors, scriptBias, angles, oddsPaste, selectedAgents]
   )
 
   // Compute canBuild: requires successful scan with MATCHING hash (not stale)
   const canBuild = useMemo(() => {
     return canAct &&
+      anchors.length > 0 &&
       analysisMeta?.status === 'success' &&
       analysisMeta?.scan_hash === analysisPayloadHash &&  // Enforce hash match
       !isBuilding
-  }, [canAct, analysisMeta, analysisPayloadHash, isBuilding])
+  }, [canAct, anchors.length, analysisMeta, analysisPayloadHash, isBuilding])
 
   const onHelp = useCallback(() => {
     append('help:', 'muted')
     append('- pick a matchup chip OR type one like "SF @ SEA"', 'muted')
     append('- toggle agents, then run Scan to execute selected agents', 'muted')
-    append('- optionally set flags in the inline CLI strip (anchor, signals, odds)', 'muted')
-    append('- BUILD: default Story flow (single-game scripts)', 'muted')
-    append('- PROP: find mispriced player tails (alts, quarters, halves)', 'muted')
-    append('- STORY: build 1–3 single-game narratives with correlated legs', 'muted')
-    append('- PARLAY: construct cross-game portfolio (1 leg per game, 6–7 legs)', 'muted')
+    append('- select at least one anchor, then add script bias if desired', 'muted')
+    append('- BUILD SCRIPT commits your thesis + evidence', 'muted')
   }, [append])
 
   const onClear = useCallback(() => {
@@ -345,15 +377,8 @@ export default function SwantailTerminalPanel(props: {
   const onReset = useCallback(() => {
     onChangeMatchup('')
     setDraft('')
-    onClear()
-    updateRunState(resetRun())
-    append('resetting…', 'muted')
-    runPreflights()
-  }, [append, onChangeMatchup, onClear, runPreflights, updateRunState])
-
-
-  const applyMatchupContext = useCallback(async (nextMatchup: string) => {
-    if (typeof window === 'undefined') return
+    onChangeAnchors([])
+    onChangeScriptBias([])
     if (onChangeAngles) {
       onChangeAngles([])
       setSignalDraft('')
@@ -363,30 +388,27 @@ export default function SwantailTerminalPanel(props: {
       setOddsDraft('')
       setOddsStatus('idle')
     }
-    if (onChangeLineFocus) {
-      onChangeLineFocus('')
-      setAnchorDraft('')
-      setAnchorStatus('idle')
-    }
+    onClear()
+    updateRunState(resetRun())
+    append('resetting…', 'muted')
+    runPreflights()
+  }, [append, onChangeAnchors, onChangeAngles, onChangeMatchup, onChangeOddsPaste, onChangeScriptBias, onClear, runPreflights, updateRunState])
 
-    try {
-      const u = new URL('/api/market/suggest', window.location.origin)
-      u.searchParams.set('matchup', nextMatchup)
-      u.searchParams.set('limit', '1')
-      const res = await fetch(u.toString(), { cache: 'no-store' })
-      if (!res.ok) return
-      const json = await res.json().catch(() => null)
-      const suggestion = Array.isArray(json?.suggestions) ? json.suggestions[0] : ''
-      if (suggestion && onChangeLineFocus) {
-        onChangeLineFocus(suggestion)
-        setAnchorDraft(suggestion)
-        setAnchorStatus('ok')
-        append(`anchor suggested: ${suggestion}`, 'ok')
-      }
-    } catch {
-      // No suggestion available.
+
+  const applyMatchupContext = useCallback((nextMatchup: string) => {
+    void nextMatchup
+    onChangeAnchors([])
+    onChangeScriptBias([])
+    if (onChangeAngles) {
+      onChangeAngles([])
+      setSignalDraft('')
     }
-  }, [append, onChangeAngles, onChangeLineFocus, onChangeOddsPaste])
+    if (onChangeOddsPaste) {
+      onChangeOddsPaste('')
+      setOddsDraft('')
+      setOddsStatus('idle')
+    }
+  }, [onChangeAnchors, onChangeAngles, onChangeOddsPaste, onChangeScriptBias])
 
   const onSubmitMatchup = useCallback((nextRaw: string) => {
     const trimmed = nextRaw.trim()
@@ -421,18 +443,6 @@ export default function SwantailTerminalPanel(props: {
     void applyMatchupContext(value)
   }, [append, applyMatchupContext, onChangeMatchup])
 
-  const onApplyAnchor = useCallback((nextRaw: string) => {
-    if (!onChangeLineFocus) return
-    const next = nextRaw.trim()
-    if (next === lineFocus.trim()) {
-      setAnchorStatus('ok')
-      return
-    }
-    onChangeLineFocus(next)
-    setAnchorStatus('ok')
-    append(next ? `anchor set: ${next}` : 'anchor cleared', next ? 'ok' : 'muted')
-  }, [lineFocus, onChangeLineFocus, append])
-
   const onApplyOdds = useCallback((nextRaw: string) => {
     if (!onChangeOddsPaste) return
     const next = nextRaw.trim()
@@ -462,11 +472,21 @@ export default function SwantailTerminalPanel(props: {
     onSelectedAgentsChange(next)
   }, [selectedAgents, onSelectedAgentsChange])
 
-  const toggleAllAgents = useCallback(() => {
-    // If all selected, deselect all; otherwise select all
-    const next = selectedAgents.length === ALL_AGENT_IDS.length ? [] : ALL_AGENT_IDS
-    onSelectedAgentsChange(next)
-  }, [selectedAgents, onSelectedAgentsChange])
+  const toggleAnchor = useCallback((groupId: string, label: string) => {
+    const group = anchorGroups.find(g => g.id === groupId)
+    if (!group) return
+    const groupLabels = group.options.map(option => option.label)
+    const isSelected = anchors.includes(label)
+    const next = anchors.filter(value => !groupLabels.includes(value))
+    onChangeAnchors(isSelected ? next : [...next, label])
+  }, [anchorGroups, anchors, onChangeAnchors])
+
+  const toggleBias = useCallback((label: string) => {
+    const next = scriptBias.includes(label)
+      ? scriptBias.filter(value => value !== label)
+      : [...scriptBias, label]
+    onChangeScriptBias(next)
+  }, [scriptBias, onChangeScriptBias])
 
   const onCopySignals = useCallback(() => {
     const text = signalDraft.trim()
@@ -554,8 +574,253 @@ export default function SwantailTerminalPanel(props: {
         </div>
       </div>
 
-      {/* buffer */}
+      {/* execution context */}
       <div className="grid gap-4 p-4">
+        <div className="grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-3">
+          <div className="grid gap-2">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Matchup</div>
+            <div className="flex items-center gap-2">
+              <input
+                value={draft}
+                onChange={(e) => { setDraft(e.target.value); setMatchupStatus('idle') }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    e.currentTarget.blur()
+                  }
+                }}
+                onBlur={() => onSubmitMatchup(draft)}
+                placeholder="SF @ SEA"
+                className="flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-[12px] text-white placeholder:text-white/25 focus:outline-none"
+              />
+              <span className={`h-1.5 w-1.5 rounded-full ${statusDot(matchupStatus)}`} />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {featuredGames.slice(0, 6).map(g => (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => onPickMatchup(g.display)}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-white/70 hover:text-white/90 hover:bg-white/10"
+                >
+                  {g.display}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Agents</div>
+            <div className="grid gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-white/40">PROPS</span>
+                <div className="flex flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden md:pb-1 md:pr-1 md:snap-x">
+                  {runState.agents.filter(a => ['qb', 'hb', 'wr', 'te'].includes(a.id)).map(agent => {
+                    const meta = AGENT_META[agent.id]
+                    const isDisabled = analysisMeta?.status === 'scanning'
+                    const isSelected = selectedAgents.includes(agent.id)
+                    const statusClass = {
+                      idle: 'border-white/10 bg-white/5 text-white/55',
+                      scanning: 'border-cyan-400/30 bg-cyan-500/10 text-cyan-200',
+                      found: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200',
+                      silent: 'border-white/10 bg-white/5 text-white/45',
+                      error: 'border-red-400/30 bg-red-500/10 text-red-200',
+                    }[agent.status]
+                    const deltaValue = typeof agent.findings === 'number'
+                      ? `${agent.findings > 0 ? '+' : ''}${agent.findings}`
+                      : '--'
+                    const freshness = getFreshnessLabel(analysisMeta?.scannedAt)
+                    return (
+                      <button
+                        key={agent.id}
+                        type="button"
+                        onClick={() => toggleAgent(agent.id)}
+                        disabled={isDisabled}
+                        title={`Δ ${deltaValue} • ${freshness}`}
+                        className={`flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium ${statusClass} md:snap-start ${isSelected ? '' : 'opacity-50'} disabled:cursor-not-allowed disabled:opacity-40`}
+                      >
+                        <span className={`text-[8px] ${isSelected ? 'text-emerald-400' : 'text-white/40'}`}>
+                          {isSelected ? '●' : '○'}
+                        </span>
+                        <span>{meta.icon}</span>
+                        <span className="font-mono uppercase">{meta.label}</span>
+                        {agent.status === 'scanning' && <span className="ml-0.5 animate-pulse text-[8px]">::</span>}
+                        {agent.status === 'found' && (
+                          <span className="ml-0.5 rounded bg-emerald-500/20 px-1 text-[8px] font-mono">
+                            {deltaValue}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-white/40">ANGLES</span>
+                <div className="flex flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden md:pb-1 md:pr-1 md:snap-x">
+                  {runState.agents.filter(a => ['epa', 'pressure', 'weather'].includes(a.id)).map(agent => {
+                    const meta = AGENT_META[agent.id]
+                    const isDisabled = analysisMeta?.status === 'scanning'
+                    const isSelected = selectedAgents.includes(agent.id)
+                    const statusClass = {
+                      idle: 'border-white/10 bg-white/5 text-white/55',
+                      scanning: 'border-cyan-400/30 bg-cyan-500/10 text-cyan-200',
+                      found: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200',
+                      silent: 'border-white/10 bg-white/5 text-white/45',
+                      error: 'border-red-400/30 bg-red-500/10 text-red-200',
+                    }[agent.status]
+                    const deltaValue = typeof agent.findings === 'number'
+                      ? `${agent.findings > 0 ? '+' : ''}${agent.findings}`
+                      : '--'
+                    const freshness = getFreshnessLabel(analysisMeta?.scannedAt)
+                    return (
+                      <button
+                        key={agent.id}
+                        type="button"
+                        onClick={() => toggleAgent(agent.id)}
+                        disabled={isDisabled}
+                        title={`Δ ${deltaValue} • ${freshness}`}
+                        className={`flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium ${statusClass} md:snap-start ${isSelected ? '' : 'opacity-50'} disabled:cursor-not-allowed disabled:opacity-40`}
+                      >
+                        <span className={`text-[8px] ${isSelected ? 'text-emerald-400' : 'text-white/40'}`}>
+                          {isSelected ? '●' : '○'}
+                        </span>
+                        <span>{meta.icon}</span>
+                        <span className="font-mono uppercase">{meta.label}</span>
+                        {agent.status === 'scanning' && <span className="ml-0.5 animate-pulse text-[8px]">::</span>}
+                        {agent.status === 'found' && (
+                          <span className="ml-0.5 rounded bg-emerald-500/20 px-1 text-[8px] font-mono">
+                            {deltaValue}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onScanClick}
+              disabled={!canAct || !selectedAgents.length || (analysisMeta?.status === 'scanning')}
+              className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {analysisMeta?.status === 'scanning' ? 'Scanning…' : 'Scan'}
+            </button>
+            <div className={`rounded-full border px-2 py-1 text-[10px] font-mono ${analysisMeta?.scannedAt ? 'border-emerald-400/20 bg-emerald-500/10 text-emerald-200' : 'border-white/10 text-white/40'}`}>
+              DATA {getFreshnessLabel(analysisMeta?.scannedAt)}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-[11px] text-white/50">
+            <span className="font-mono">signals:</span>
+            <span className="max-w-[320px] truncate font-mono text-white/70">{signalDraft.trim() || '--'}</span>
+            <button
+              type="button"
+              onClick={onCopySignals}
+              disabled={!signalDraft.trim()}
+              className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-white/50 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Copy signals"
+              title="Copy signals"
+            >
+              ⎘
+            </button>
+          </div>
+
+          <div className="grid gap-2">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Anchors</div>
+            <div className="grid gap-2">
+              {anchorGroups.map(group => (
+                <div key={group.id} className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono text-white/40">{group.label}</span>
+                  <div className="flex flex-wrap gap-2">
+                    {group.options.map(option => {
+                      const isSelected = anchors.includes(option.label)
+                      const groupSelected = group.options.some(item => anchors.includes(item.label))
+                      const isDisabled = groupSelected && !isSelected
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => toggleAnchor(group.id, option.label)}
+                          disabled={isDisabled}
+                          className={`rounded-full border px-3 py-1.5 text-[11px] font-medium transition ${
+                            isSelected
+                              ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                              : 'border-white/10 bg-white/5 text-white/60 hover:text-white/80'
+                          } disabled:cursor-not-allowed disabled:opacity-40`}
+                        >
+                          {option.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Script Bias</div>
+            <div className="flex flex-wrap gap-2">
+              {scriptBiasOptions.map(option => {
+                const isSelected = scriptBias.includes(option)
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => toggleBias(option)}
+                    className={`rounded-full border px-3 py-1.5 text-[11px] font-medium transition ${
+                      isSelected
+                        ? 'border-white/20 bg-white/10 text-white'
+                        : 'border-white/10 bg-white/5 text-white/55 hover:text-white/75'
+                    }`}
+                  >
+                    {option}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-white/40">Odds (optional)</span>
+            <input
+              value={oddsDraft}
+              onChange={(e) => { setOddsDraft(e.target.value); setOddsStatus('idle') }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  e.currentTarget.blur()
+                }
+              }}
+              onBlur={() => onApplyOdds(oddsDraft)}
+              placeholder="RB1 TD +120 | Alt O44.5 -110"
+              className="flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-[11px] text-white placeholder:text-white/25 focus:outline-none"
+            />
+            <span className={`h-1.5 w-1.5 rounded-full ${statusDot(oddsStatus)}`} />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onBuild}
+              disabled={!canBuild}
+              className="rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isBuilding ? 'Building…' : 'Build Script'}
+            </button>
+            {analysisMeta?.status === 'stale' && (
+              <span className="text-[10px] text-amber-300/80 italic">
+                scan stale — re-scan to update
+              </span>
+            )}
+          </div>
+        </div>
+
         <div
           ref={scrollerRef}
           className="h-[340px] overflow-auto rounded-2xl border border-white/10 bg-black/40 p-4 font-mono text-[12px] leading-relaxed"
@@ -574,212 +839,9 @@ export default function SwantailTerminalPanel(props: {
           ))}
           <div className="mt-4 text-white/40">
             {matchup.trim() ? `current matchup: ${matchup}` : 'no matchup selected'}
-            {lineFocus.trim() ? ` • anchor: ${lineFocus}` : ''}
+            {anchors.length ? ` • anchors: ${anchors.join(' + ')}` : ''}
+            {scriptBias.length ? ` • bias: ${scriptBias.join(', ')}` : ''}
             {angles.length ? ` • signals: ${angles.length}` : ''}
-          </div>
-        </div>
-
-        {/* prompt + actions */}
-        <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Games</div>
-            <div className="flex flex-1 flex-wrap gap-2">
-              {featuredGames.slice(0, 6).map(g => (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => onPickMatchup(g.display)}
-                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-white/70 hover:text-white/90 hover:bg-white/10"
-                >
-                  {g.display}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Agents</div>
-            <div className="flex flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden md:pb-1 md:pr-1 md:snap-x">
-              {/* ALL chip - toggles all/none */}
-              <button
-                type="button"
-                onClick={toggleAllAgents}
-                disabled={analysisMeta?.status === 'scanning'}
-                className={`flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold md:snap-start disabled:cursor-not-allowed disabled:opacity-40 ${
-                  selectedAgents.length === ALL_AGENT_IDS.length
-                    ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
-                    : 'border-white/10 bg-white/5 text-white/55'
-                }`}
-              >
-                <span className={`text-[8px] ${selectedAgents.length === ALL_AGENT_IDS.length ? 'text-emerald-400' : 'text-white/40'}`}>
-                  {selectedAgents.length === ALL_AGENT_IDS.length ? '●' : '○'}
-                </span>
-                <span className="font-mono uppercase">ALL</span>
-              </button>
-              {runState.agents.map(agent => {
-                const meta = AGENT_META[agent.id]
-                const isDisabled = analysisMeta?.status === 'scanning'
-                const isSelected = selectedAgents.includes(agent.id)
-                const statusClass = {
-                  idle: 'border-white/10 bg-white/5 text-white/55',
-                  scanning: 'border-cyan-400/30 bg-cyan-500/10 text-cyan-200',
-                  found: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200',
-                  silent: 'border-white/10 bg-white/5 text-white/45',
-                  error: 'border-red-400/30 bg-red-500/10 text-red-200',
-                }[agent.status]
-                const deltaValue = typeof agent.findings === 'number'
-                  ? `${agent.findings > 0 ? '+' : ''}${agent.findings}`
-                  : '--'
-                const freshness = getFreshnessLabel(analysisMeta?.scannedAt)
-                return (
-                  <button
-                    key={agent.id}
-                    type="button"
-                    onClick={() => toggleAgent(agent.id)}
-                    disabled={isDisabled}
-                    title={`Δ ${deltaValue} • ${freshness}`}
-                    className={`flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium ${statusClass} md:snap-start ${isSelected ? '' : 'opacity-50'} disabled:cursor-not-allowed disabled:opacity-40`}
-                  >
-                    {/* Toggle indicator: filled dot when on, hollow dot when off */}
-                    <span className={`text-[8px] ${isSelected ? 'text-emerald-400' : 'text-white/40'}`}>
-                      {isSelected ? '●' : '○'}
-                    </span>
-                    <span>{meta.icon}</span>
-                    <span className="font-mono uppercase">{meta.label}</span>
-                    {agent.status === 'scanning' && <span className="ml-0.5 animate-pulse text-[8px]">::</span>}
-                    {agent.status === 'found' && (
-                      <span className="ml-0.5 rounded bg-emerald-500/20 px-1 text-[8px] font-mono">
-                        {deltaValue}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Two-phase action buttons: Scan (Phase 1) + Build (Phase 2) */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Phase 1: Scan button */}
-            <button
-              type="button"
-              onClick={onScanClick}
-              disabled={!canAct || !selectedAgents.length || (analysisMeta?.status === 'scanning')}
-              className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {analysisMeta?.status === 'scanning' ? 'Scanning…' : 'Scan'}
-            </button>
-            <div className={`rounded-full border px-2 py-1 text-[10px] font-mono ${analysisMeta?.scannedAt ? 'border-emerald-400/20 bg-emerald-500/10 text-emerald-200' : 'border-white/10 text-white/40'}`}>
-              DATA {getFreshnessLabel(analysisMeta?.scannedAt)}
-            </div>
-
-            {/* Output type selector - ONLY calls onChangeOutputType, NEVER onScan/onBuild */}
-            <div className="flex gap-1 rounded-full border border-white/10 bg-black/20 p-0.5">
-              {(['prop', 'story', 'parlay'] as const).map(type => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => onChangeOutputType(type)}
-                  className={`rounded-full px-3 py-1.5 text-[11px] font-medium transition ${
-                    outputType === type
-                      ? 'bg-white/10 text-white/80'
-                      : 'text-white/45 hover:text-white/70'
-                  }`}
-                >
-                  {type.toUpperCase()}
-                </button>
-              ))}
-            </div>
-
-            {/* Phase 2: Build button - commits with current outputType */}
-            <button
-              type="button"
-              onClick={onBuild}
-              disabled={!canBuild}
-              className="rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {isBuilding ? 'Building…' : 'Build'}
-            </button>
-
-            {/* Stale scan hint */}
-            {analysisMeta?.status === 'stale' && (
-              <span className="text-[10px] text-amber-300/80 italic">
-                scan stale — re-scan to update
-              </span>
-            )}
-
-            <div className="h-4 w-px bg-white/10" />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-black/30 px-3 py-2 font-mono text-[11px] text-white/70">
-            <div className="flex items-center gap-2">
-              <span className="text-white/35">--matchup</span>
-              <input
-                value={draft}
-                onChange={(e) => { setDraft(e.target.value); setMatchupStatus('idle') }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    e.currentTarget.blur()
-                  }
-                }}
-                onBlur={() => onSubmitMatchup(draft)}
-                placeholder="SF @ SEA"
-                className="w-[180px] bg-transparent text-white placeholder:text-white/25 focus:outline-none"
-              />
-              <span className={`h-1.5 w-1.5 rounded-full ${statusDot(matchupStatus)}`} />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-white/35">--anchor</span>
-              <input
-                value={anchorDraft}
-                onChange={(e) => { setAnchorDraft(e.target.value); setAnchorStatus('idle') }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    e.currentTarget.blur()
-                  }
-                }}
-                onBlur={() => onApplyAnchor(anchorDraft)}
-                placeholder="O44.5 SEA -2.5"
-                className="w-[200px] bg-transparent text-white placeholder:text-white/25 focus:outline-none"
-              />
-              <span className={`h-1.5 w-1.5 rounded-full ${statusDot(anchorStatus)}`} />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-white/35">signals:</span>
-              <span className="max-w-[260px] truncate text-white/60">{signalDraft.trim() || '--'}</span>
-              <button
-                type="button"
-                onClick={onCopySignals}
-                disabled={!signalDraft.trim()}
-                className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-white/50 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Copy signals"
-                title="Copy signals"
-              >
-                ⎘
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-white/35">--odds</span>
-              <input
-                value={oddsDraft}
-                onChange={(e) => { setOddsDraft(e.target.value); setOddsStatus('idle') }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    e.currentTarget.blur()
-                  }
-                }}
-                onBlur={() => onApplyOdds(oddsDraft)}
-                placeholder="RB1 TD +120 | Alt O44.5 -110"
-                className="w-[220px] bg-transparent text-white placeholder:text-white/25 focus:outline-none"
-              />
-              <span className={`h-1.5 w-1.5 rounded-full ${statusDot(oddsStatus)}`} />
-            </div>
           </div>
         </div>
       </div>

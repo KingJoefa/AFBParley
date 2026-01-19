@@ -1,60 +1,74 @@
-# Swantail Terminal • NFL Parlay Builder
+# Swantail Terminal — Agent-First Script Builder
 
-Agent-driven NFL parlay analysis terminal. Runs threshold-based agents to identify edges, then surfaces correlated betting opportunities through three distinct modes.
+Terminal-first tool for discovering game insights, forming a clear game script, and generating a story-driven betting output. Agents surface evidence, anchors express the user thesis, and Build Script commits it all into one coherent payload.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Swantail Terminal UI                                   │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐                   │
-│  │  PROP   │ │  STORY  │ │ PARLAY  │  ← Action Buttons │
-│  └────┬────┘ └────┬────┘ └────┬────┘                   │
-└───────┼──────────┼──────────┼──────────────────────────┘
-        │          │          │
-        ▼          ▼          ▼
+│  Matchup → Agents → Scan → Anchors → Bias → Build        │
+└─────────────────────────────────────────────────────────┘
+        │
+        ▼
 ┌─────────────────────────────────────────────────────────┐
-│  /api/terminal/{prop,story,parlay}                      │
-│                                                         │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │  Agent Runner                                    │   │
-│  │  EPA | Pressure | Weather | QB | HB | WR | TE   │   │
-│  └─────────────────────────────────────────────────┘   │
-│                         │                               │
-│                         ▼                               │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │  Analyst (LLM + Fallback)                       │   │
-│  │  Finding[] → Alert[]                            │   │
-│  └─────────────────────────────────────────────────┘   │
-│                         │                               │
-│                         ▼                               │
-│              Unified Alert[] Response                   │
+│  /api/terminal/scan                                     │
+│  Agent Runner → Analyst (Finding[] → Alert[])           │
+└─────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────────┐
+│  /api/terminal/build                                    │
+│  Thesis + Evidence → Unified Script Output              │
 └─────────────────────────────────────────────────────────┘
 ```
 
-## Terminal Modes
+## Execution Flow
 
-| Mode | Endpoint | Purpose | Output |
-|------|----------|---------|--------|
-| **PROP** | `/api/terminal/prop` | Find mispriced player tails | `Alert[]` - standalone selections |
-| **STORY** | `/api/terminal/story` | Build single-game narratives | `Alert[]` + correlated leg scripts |
-| **PARLAY** | `/api/terminal/parlay` | Cross-game portfolio | `Alert[]` + risk-tiered scripts |
+1. Matchup selection
+2. Agent selection (scope only, session-persistent)
+3. Scan (runs selected agents; logs evidence)
+4. Anchors (user thesis; required)
+5. Script Bias (optional modifier)
+6. Build Script (commit action)
 
-All modes return a unified `Alert[]` contract so the UI never branches on action type.
+Build Script is disabled unless a scan has run, at least one anchor is selected, and the scan hash matches current flags + selected agents.
 
 ## Agents
 
-Seven threshold-based agents scan matchup context:
+Agents surface evidence; they never define the story. Two categories:
 
-- **EPA** - Expected points added efficiency mismatches
-- **Pressure** - Pass rush and protection edges
-- **Weather** - Wind/precipitation impact chains
+**Prop Discovery Agents**
 - **QB** - Quarterback efficiency and matchup advantages
 - **HB** - Halfback workload and game script correlations
 - **WR** - Receiver target share and coverage exploits
 - **TE** - Tight end red zone and usage patterns
 
+**Game Angle Agents**
+- **EPA** - Expected points added efficiency mismatches
+- **Pressure** - Pass rush and protection edges
+- **Weather** - Wind/precipitation impact chains
+
 Each agent returns `Finding[]` when thresholds are met, which the analyst transforms into actionable `Alert[]`.
+
+## Anchors (Required)
+
+Anchors express user thesis and are required before Build Script:
+
+- Totals: Over / Under (mutually exclusive)
+- Side: Home win / Away win (mutually exclusive)
+- Spread: Home cover / Away cover (mutually exclusive)
+
+Multiple compatible anchors may be selected (e.g., Away win + Under).
+
+## Script Bias (Optional)
+
+Script bias shapes the narrative without selecting markets:
+
+- Shootout
+- Grind
+- Pass-heavy
+- Run-heavy
 
 ## Requirements
 
@@ -80,10 +94,7 @@ OPENAI_API_KEY=sk-...
 LINES_API_URL=https://...
 LINES_API_KEY=...
 
-# Optional: Feature flags (all enabled by default)
-TERMINAL_PROP_ENABLED=true
-TERMINAL_STORY_ENABLED=true
-TERMINAL_PARLAY_ENABLED=true
+# Optional: Feature flags
 TERMINAL_LIVE_DATA=false      # Use real data vs mock
 TERMINAL_LLM_ANALYST=true     # Use LLM vs fallback
 ```
@@ -91,10 +102,8 @@ TERMINAL_LLM_ANALYST=true     # Use LLM vs fallback
 ## API Reference
 
 ### Terminal Routes
-- `POST /api/terminal/prop` - Player prop analysis
-- `POST /api/terminal/story` - Single-game narrative builder
-- `POST /api/terminal/parlay` - Cross-game portfolio constructor
-- `POST /api/terminal/scan` - Raw agent scan (development)
+- `POST /api/terminal/scan` - Run selected agents and return `Alert[]`
+- `POST /api/terminal/build` - Build script output from anchors + evidence
 
 ### Supporting Routes
 - `GET /api/nfl/schedule` - Current week schedule

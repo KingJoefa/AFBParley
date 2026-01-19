@@ -65,13 +65,16 @@ export function createInitialTerminalState(): TerminalState {
  */
 export function computeInputsHash(
   matchup: string,
-  anchor: string,
+  anchors: string[],
+  scriptBias: string[],
   signals: string[],
   oddsPaste: string,
   selectedAgents?: string[]
 ): string {
   const agentKey = selectedAgents ? selectedAgents.slice().sort().join(',') : 'all'
-  const payload = `${matchup}|${anchor}|${signals.sort().join(',')}|${oddsPaste || ''}|agents:${agentKey}`
+  const anchorKey = anchors.slice().sort().join(',')
+  const biasKey = scriptBias.slice().sort().join(',')
+  const payload = `${matchup}|anchors:${anchorKey}|bias:${biasKey}|${signals.sort().join(',')}|${oddsPaste || ''}|agents:${agentKey}`
   // Simple string hash for client-side use
   let hash = 0
   for (let i = 0; i < payload.length; i++) {

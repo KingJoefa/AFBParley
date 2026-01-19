@@ -51,6 +51,8 @@ export type BuildStatus =
 export type SwantailState = {
   matchup: string
   anchor: string
+  anchors: string[]
+  scriptBias: string[]
   signals: SignalTag[]       // Normalized canonical tags
   signals_raw: string[]      // Original user input for display/debug
   oddsPaste: string
@@ -62,6 +64,8 @@ export type SwantailState = {
 export type SwantailAction =
   | { type: 'set_matchup'; value: string }
   | { type: 'set_anchor'; value: string }
+  | { type: 'set_anchors'; values: string[] }
+  | { type: 'set_script_bias'; values: string[] }
   | { type: 'set_signals'; signals: SignalTag[]; raw: string[] }
   | { type: 'set_odds'; value: string }
   | { type: 'set_data'; value: SwantailResponse | null }
@@ -71,6 +75,8 @@ export type SwantailAction =
 export const initialSwantailState: SwantailState = {
   matchup: '',
   anchor: '',
+  anchors: [],
+  scriptBias: [],
   signals: [],
   signals_raw: [],
   oddsPaste: '',
@@ -92,6 +98,10 @@ export function swantailReducer(state: SwantailState, action: SwantailAction): S
       return { ...state, matchup: action.value }
     case 'set_anchor':
       return { ...state, anchor: action.value }
+    case 'set_anchors':
+      return { ...state, anchors: action.values, anchor: action.values.join(' + ') }
+    case 'set_script_bias':
+      return { ...state, scriptBias: action.values }
     case 'set_signals':
       return { ...state, signals: action.signals, signals_raw: action.raw }
     case 'set_odds':
@@ -106,4 +116,3 @@ export function swantailReducer(state: SwantailState, action: SwantailAction): S
       return state
   }
 }
-

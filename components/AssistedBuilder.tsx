@@ -41,7 +41,7 @@ export default function AssistedBuilder() {
 
   // Two-phase terminal state
   const [terminalState, setTerminalState] = useState<TerminalState>(createInitialTerminalState)
-  const [outputType, setOutputType] = useState<OutputType>('story')
+  const [outputType] = useState<OutputType>('story')
   const [buildResult, setBuildResult] = useState<BuildResult | null>(null)
   const [viewCache, setViewCache] = useState<Map<OutputType, BuildView>>(new Map())
   const [isBuilding, setIsBuilding] = useState(false)
@@ -84,6 +84,8 @@ export default function AssistedBuilder() {
 
   const matchup = state.matchup
   const lineFocus = state.anchor
+  const anchors = state.anchors
+  const scriptBias = state.scriptBias
   const signals = state.signals           // Normalized tags for API calls
   const signals_raw = state.signals_raw   // Original text for display
   const oddsPaste = state.oddsPaste
@@ -91,11 +93,9 @@ export default function AssistedBuilder() {
 
   const oddsEntries = useMemo(() => parseOddsPaste(oddsPaste), [oddsPaste])
 
-  // Compute current inputs hash (includes agent selection for determinism)
-  const currentInputsHash = useMemo(() =>
-    computeInputsHash(matchup, lineFocus, signals_raw, oddsPaste, selectedAgents),
-    [matchup, lineFocus, signals_raw, oddsPaste, selectedAgents]
-  )
+  const anchorSummary = useMemo(() => anchors.join(' + '), [anchors])
+
+  // Current inputs hash available for future UI cues (scan staleness handled in panel).
 
   // Phase 1: Scan handler
   const onScan = useCallback(async (options?: { agentIds?: string[] }) => {
@@ -103,7 +103,7 @@ export default function AssistedBuilder() {
 
     // Use passed agentIds or fall back to current selection
     const agentsToScan = options?.agentIds ?? selectedAgents
-    const scanHash = computeInputsHash(matchup, lineFocus, signals_raw, oddsPaste, agentsToScan)
+    const scanHash = computeInputsHash(matchup, anchors, scriptBias, signals_raw, oddsPaste, agentsToScan)
     track('ui_scan_clicked', { anglesCount: signals.length, agentIds: agentsToScan })
 
     // Clear previous build results on new scan
@@ -117,7 +117,7 @@ export default function AssistedBuilder() {
       const res = await scan({
         matchup: matchup.trim(),
         signals,
-        anchor: lineFocus.trim() || undefined,
+        anchor: anchorSummary.trim() || undefined,
         agentIds: agentsToScan,
       })
 
@@ -137,7 +137,7 @@ export default function AssistedBuilder() {
       setTerminalState(prev => markScanError(prev, (e as Error).message))
       track('ui_scan_error', { message: (e as Error).message })
     }
-  }, [matchup, lineFocus, signals, signals_raw, oddsPaste, selectedAgents, scan])
+  }, [matchup, anchors, scriptBias, anchorSummary, signals, signals_raw, oddsPaste, selectedAgents, scan])
 
   // Handler for agent selection changes from terminal panel
   const onSelectedAgentsChange = useCallback((agents: AgentRunState['id'][]) => {
@@ -149,6 +149,7 @@ export default function AssistedBuilder() {
     if (!matchup.trim()) return
     // Block build if scan is not successful (includes stale state)
     if (!terminalState.analysisMeta || (terminalState.analysisMeta.status !== 'success')) return
+    if (!anchors.length) return
 
     track('ui_build_clicked', { outputType, alertCount: terminalState.alerts.length })
     setIsBuilding(true)
@@ -163,9 +164,11 @@ export default function AssistedBuilder() {
           alerts: terminalState.alerts,
           findings: terminalState.findings,
           output_type: outputType,
-          anchor: lineFocus.trim() || undefined,
+          anchor: anchorSummary.trim() || undefined,
           signals,
           odds_paste: oddsPaste || undefined,
+          anchors,
+          script_bias: scriptBias,
         }),
       })
 
@@ -198,19 +201,14 @@ export default function AssistedBuilder() {
     } finally {
       setIsBuilding(false)
     }
-  }, [matchup, lineFocus, signals, oddsPaste, outputType, terminalState])
-
-  // Output type change handler - swaps views from cache or lazy-fetches
-  const onChangeOutputType = useCallback((type: OutputType) => {
-    setOutputType(type)
-  }, [])
+  }, [matchup, anchorSummary, anchors, scriptBias, signals, oddsPaste, outputType, terminalState])
 
   // Abort scan on input change
   useEffect(() => {
     return () => {
       abortScan()
     }
-  }, [matchup, lineFocus, signals_raw, oddsPaste, abortScan])
+  }, [matchup, anchors, scriptBias, signals_raw, oddsPaste, abortScan])
 
   const onOpposite = useCallback(async (scriptIndex: number) => {
     if (!matchup.trim()) return
@@ -356,22 +354,22 @@ export default function AssistedBuilder() {
             )}
             <SwantailTerminalPanel
               matchup={matchup}
-              lineFocus={lineFocus}
               angles={signals_raw}
               oddsPaste={oddsPaste}
               isLoading={isLoading}
               error={error}
               data={data}
-              outputType={outputType}
               analysisMeta={terminalState.analysisMeta}
               isBuilding={isBuilding}
               selectedAgents={selectedAgents}
+              anchors={anchors}
+              scriptBias={scriptBias}
               onScan={onScan}
               onBuild={onBuild}
-              onChangeOutputType={onChangeOutputType}
               onSelectedAgentsChange={onSelectedAgentsChange}
               onChangeMatchup={(value) => dispatch({ type: 'set_matchup', value })}
-              onChangeLineFocus={(value) => dispatch({ type: 'set_anchor', value })}
+              onChangeAnchors={(values) => dispatch({ type: 'set_anchors', values })}
+              onChangeScriptBias={(values) => dispatch({ type: 'set_script_bias', values })}
               onChangeAngles={(value) => {
                 // Normalize free-text signals to canonical tags
                 const { signals, signals_raw } = normalizeSignals(value.join(', '))
