@@ -13,6 +13,15 @@ import { checkRequestLimits, estimateTokens } from '@/lib/terminal/engine/guardr
 import type { BuildView, OutputType } from '@/lib/terminal/terminal-state'
 import { SwantailResponseSchema, type SwantailResponse } from '@/lib/swantail/schema'
 import OpenAI from 'openai'
+import { loadMatchupProjections } from '@/lib/terminal/engine/projections-loader'
+import {
+  buildAllowedRoster,
+  extractPlayers,
+  validatePlayers,
+  formatAllowedPlayersForPrompt,
+  buildRetryPrompt,
+  type AllowedRoster,
+} from '@/lib/terminal/engine/roster-validator'
 
 /**
  * /api/terminal/build
@@ -254,7 +263,9 @@ function buildStoryModePrompt(
   findings: Finding[],
   anchor?: string,
   signals?: string[],
-  script_bias?: string[]
+  script_bias?: string[],
+  rosterBlock?: string,
+  retryInstruction?: string
 ): string {
   const alertsSection = alerts.length > 0
     ? `## Alerts from Scan\n\n${alerts.map(a => `- ${a.claim} (${a.agent}, confidence: ${a.confidence})`).join('\n')}`
@@ -267,14 +278,16 @@ function buildStoryModePrompt(
   const anchorSection = anchor ? `\n## Line Focus\n\n${anchor}` : ''
   const signalsSection = signals && signals.length > 0 ? `\n## Betting Angles\n\n${signals.join(', ')}` : ''
   const biasSection = script_bias && script_bias.length > 0 ? `\n## Script Bias\n\n${script_bias.join(', ')}` : ''
+  const rosterSection = rosterBlock ? `\n${rosterBlock}\n` : ''
+  const retrySection = retryInstruction ? `\n## IMPORTANT RETRY INSTRUCTION\n\n${retryInstruction}\n` : ''
 
   return `You are a sports betting analyst generating narrative-driven parlay scripts.
-
+${retrySection}
 ## Matchup
 
 ${matchup}
 ${anchorSection}${signalsSection}${biasSection}
-
+${rosterSection}
 ${alertsSection}
 
 ${findingsSection}
@@ -351,25 +364,18 @@ Return ONLY valid JSON matching this exact schema:
 6. Narratives should be specific to this matchup, not generic
 7. Use the alerts and findings to inform your scripts
 8. Always include the two standard notes about guarantees and odds
+${rosterBlock ? '9. ONLY use player names from the Allowed Players list. Do NOT invent player names.' : ''}
 
 Respond with ONLY the JSON object, no surrounding text.`
 }
 
 /**
- * Build swantail view using direct LLM call (default)
+ * Call LLM and parse response
  */
-async function buildSwantailViewDirect(
-  matchup: string,
-  alerts: Alert[],
-  findings: Finding[],
-  anchor?: string,
-  signals?: string[],
-  script_bias?: string[]
-): Promise<BuildView> {
-  const client = getOpenAIClient()
-
-  const prompt = buildStoryModePrompt(matchup, alerts, findings, anchor, signals, script_bias)
-
+async function callLLM(
+  client: OpenAI,
+  prompt: string
+): Promise<SwantailResponse> {
   const response = await client.chat.completions.create({
     model: 'gpt-4o',
     temperature: 0.7,
@@ -407,9 +413,203 @@ async function buildSwantailViewDirect(
     throw new Error('LLM output does not match SwantailResponse schema')
   }
 
+  return validated.data
+}
+
+/**
+ * Parse matchup string to extract team codes
+ * e.g., "Texans @ Patriots" → { home: "NE", away: "HOU" }
+ */
+function parseMatchupTeams(matchup: string): { home: string; away: string } | null {
+  // Common patterns: "Team1 @ Team2", "Team1 vs Team2", "Team1 at Team2"
+  const match = matchup.match(/^(.+?)\s*[@vs]+\s*(.+)$/i)
+  if (!match) return null
+
+  const away = match[1].trim()
+  const home = match[2].trim()
+
+  // Map team names to codes (simplified)
+  const teamCodes: Record<string, string> = {
+    'patriots': 'NE', 'new england': 'NE', 'ne': 'NE',
+    'texans': 'HOU', 'houston': 'HOU', 'hou': 'HOU',
+    'broncos': 'DEN', 'denver': 'DEN', 'den': 'DEN',
+    'bills': 'BUF', 'buffalo': 'BUF', 'buf': 'BUF',
+    '49ers': 'SF', 'niners': 'SF', 'san francisco': 'SF', 'sf': 'SF',
+    'seahawks': 'SEA', 'seattle': 'SEA', 'sea': 'SEA',
+    'rams': 'LA', 'los angeles rams': 'LA', 'la': 'LA', 'lar': 'LA',
+    'bears': 'CHI', 'chicago': 'CHI', 'chi': 'CHI',
+    'chiefs': 'KC', 'kansas city': 'KC', 'kc': 'KC',
+    'raiders': 'LV', 'las vegas': 'LV', 'lv': 'LV',
+    'chargers': 'LAC', 'los angeles chargers': 'LAC', 'lac': 'LAC',
+    'cowboys': 'DAL', 'dallas': 'DAL', 'dal': 'DAL',
+    'eagles': 'PHI', 'philadelphia': 'PHI', 'phi': 'PHI',
+    'giants': 'NYG', 'new york giants': 'NYG', 'nyg': 'NYG',
+    'commanders': 'WAS', 'washington': 'WAS', 'was': 'WAS',
+    'lions': 'DET', 'detroit': 'DET', 'det': 'DET',
+    'packers': 'GB', 'green bay': 'GB', 'gb': 'GB',
+    'vikings': 'MIN', 'minnesota': 'MIN', 'min': 'MIN',
+    'falcons': 'ATL', 'atlanta': 'ATL', 'atl': 'ATL',
+    'panthers': 'CAR', 'carolina': 'CAR', 'car': 'CAR',
+    'saints': 'NO', 'new orleans': 'NO', 'no': 'NO',
+    'buccaneers': 'TB', 'bucs': 'TB', 'tampa bay': 'TB', 'tb': 'TB',
+    'ravens': 'BAL', 'baltimore': 'BAL', 'bal': 'BAL',
+    'bengals': 'CIN', 'cincinnati': 'CIN', 'cin': 'CIN',
+    'browns': 'CLE', 'cleveland': 'CLE', 'cle': 'CLE',
+    'steelers': 'PIT', 'pittsburgh': 'PIT', 'pit': 'PIT',
+    'colts': 'IND', 'indianapolis': 'IND', 'ind': 'IND',
+    'jaguars': 'JAX', 'jacksonville': 'JAX', 'jax': 'JAX',
+    'titans': 'TEN', 'tennessee': 'TEN', 'ten': 'TEN',
+    'dolphins': 'MIA', 'miami': 'MIA', 'mia': 'MIA',
+    'jets': 'NYJ', 'new york jets': 'NYJ', 'nyj': 'NYJ',
+    'cardinals': 'ARI', 'arizona': 'ARI', 'ari': 'ARI',
+  }
+
+  const normalizeTeam = (t: string): string => {
+    const lower = t.toLowerCase()
+    return teamCodes[lower] || t.toUpperCase().slice(0, 3)
+  }
+
   return {
-    kind: 'swantail',
-    data: validated.data,
+    home: normalizeTeam(home),
+    away: normalizeTeam(away),
+  }
+}
+
+interface BuildSwantailResult {
+  view: BuildView
+  validation?: {
+    roster_loaded: boolean
+    players_checked: number
+    invalid_players?: string[]
+    regenerated?: boolean
+    fallback_to_game_level?: boolean
+  }
+}
+
+/**
+ * Build swantail view using direct LLM call (default)
+ * With roster validation and retry logic
+ */
+async function buildSwantailViewDirect(
+  matchup: string,
+  alerts: Alert[],
+  findings: Finding[],
+  requestId: string,
+  anchor?: string,
+  signals?: string[],
+  script_bias?: string[]
+): Promise<BuildSwantailResult> {
+  const client = getOpenAIClient()
+
+  // Step 1: Parse matchup and load roster
+  const teams = parseMatchupTeams(matchup)
+  let roster: AllowedRoster | null = null
+  let rosterBlock = ''
+
+  if (teams) {
+    try {
+      const players = await loadMatchupProjections(teams.home, teams.away)
+      if (players.length > 0) {
+        roster = buildAllowedRoster(players, teams.home, teams.away)
+        rosterBlock = formatAllowedPlayersForPrompt(roster, teams.home, teams.away)
+        console.log(`[Build] Loaded roster: ${roster.all.length} players for ${teams.away} @ ${teams.home}`)
+      } else {
+        console.warn(`[Build] No roster data for ${teams.away} @ ${teams.home}`)
+      }
+    } catch (e) {
+      console.warn(`[Build] Failed to load roster: ${(e as Error).message}`)
+    }
+  }
+
+  // Step 2: Initial LLM call with roster grounding
+  const initialPrompt = buildStoryModePrompt(matchup, alerts, findings, anchor, signals, script_bias, rosterBlock)
+  let result = await callLLM(client, initialPrompt)
+
+  // Step 3: Validate players if roster available
+  if (roster && roster.all.length > 0) {
+    const extractedPlayers = extractPlayers(result.scripts, roster.aliasSet)
+    const validation = validatePlayers(extractedPlayers, roster)
+
+    console.log(`[Build] Player validation: ${validation.matched.length} matched, ${validation.invalid.length} invalid`)
+
+    if (!validation.valid) {
+      // Log invalid players for drift tracking
+      console.warn('[Build] llm_invalid_player', {
+        request_id: requestId,
+        matchup,
+        invalid_players: validation.invalid,
+      })
+
+      // Step 4: Retry with explicit forbidden list
+      const retryInstruction = buildRetryPrompt(validation.invalid)
+      const retryPrompt = buildStoryModePrompt(
+        matchup, alerts, findings, anchor, signals, script_bias,
+        rosterBlock, retryInstruction
+      )
+
+      try {
+        const retryResult = await callLLM(client, retryPrompt)
+        const retryExtracted = extractPlayers(retryResult.scripts, roster.aliasSet)
+        const retryValidation = validatePlayers(retryExtracted, roster)
+
+        if (retryValidation.valid) {
+          console.log('[Build] Retry succeeded, all players valid')
+          return {
+            view: { kind: 'swantail', data: retryResult },
+            validation: {
+              roster_loaded: true,
+              players_checked: retryExtracted.length,
+              invalid_players: validation.invalid,
+              regenerated: true,
+            },
+          }
+        } else {
+          // Still invalid after retry - log and return anyway with warning
+          console.warn('[Build] Retry still has invalid players:', retryValidation.invalid)
+          // TODO: Could fall back to game-level-only script here
+          return {
+            view: { kind: 'swantail', data: retryResult },
+            validation: {
+              roster_loaded: true,
+              players_checked: retryExtracted.length,
+              invalid_players: retryValidation.invalid,
+              regenerated: true,
+              fallback_to_game_level: false,
+            },
+          }
+        }
+      } catch (retryError) {
+        console.error('[Build] Retry failed:', (retryError as Error).message)
+        // Return original result if retry fails
+        return {
+          view: { kind: 'swantail', data: result },
+          validation: {
+            roster_loaded: true,
+            players_checked: extractedPlayers.length,
+            invalid_players: validation.invalid,
+            regenerated: false,
+          },
+        }
+      }
+    }
+
+    // Validation passed on first attempt
+    return {
+      view: { kind: 'swantail', data: result },
+      validation: {
+        roster_loaded: true,
+        players_checked: extractedPlayers.length,
+      },
+    }
+  }
+
+  // No roster available - return without validation
+  return {
+    view: { kind: 'swantail', data: result },
+    validation: {
+      roster_loaded: false,
+      players_checked: 0,
+    },
   }
 }
 
@@ -527,6 +727,7 @@ export async function POST(req: NextRequest) {
 
     // Build appropriate view based on output_type
     let view: BuildView
+    let rosterValidation: BuildSwantailResult['validation'] | undefined
 
     if (output_type === 'story') {
       // Story mode: LLM-generated narratives
@@ -537,8 +738,10 @@ export async function POST(req: NextRequest) {
         console.log('[Build] Using wrapper fallback for story mode')
         view = await buildSwantailView(matchup, anchor, signals, odds_paste)
       } else {
-        console.log('[Build] Using direct LLM for story mode')
-        view = await buildSwantailViewDirect(matchup, alerts, findings, anchor, signals, script_bias)
+        console.log('[Build] Using direct LLM for story mode with roster validation')
+        const result = await buildSwantailViewDirect(matchup, alerts, findings, requestId, anchor, signals, script_bias)
+        view = result.view
+        rosterValidation = result.validation
       }
     } else {
       // Prop/Parlay modes: Terminal correlated parlays
@@ -554,6 +757,7 @@ export async function POST(req: NextRequest) {
       view,
       created_at: new Date().toISOString(),
       timing_ms: Date.now() - startTime,
+      ...(rosterValidation && { roster_validation: rosterValidation }),
     })
   } catch (error) {
     return Response.json(
