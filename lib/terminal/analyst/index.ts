@@ -167,6 +167,7 @@ receiving_epa, rushing_epa, pass_block_win_rate, pressure_rate, target_share, sn
 - HB: rb_rush_yards_over/under, rb_receptions_over, rb_rush_attempts_over, rb_tds_over
 - WR: wr_receptions_over/under, wr_yards_over/under, wr_tds_over, wr_longest_reception_over
 - TE: te_receptions_over/under, te_yards_over/under, te_tds_over
+- NOTES: any implication from the lists above
 
 ## Rules
 
@@ -350,6 +351,7 @@ const DEFAULT_IMPLICATIONS: Record<AgentType, AnyImplication[]> = {
   hb: ['rb_rush_yards_over'],
   wr: ['wr_yards_over'],
   te: ['te_receptions_over'],
+  notes: ['team_total_over'],
 }
 
 /**
@@ -363,6 +365,7 @@ const DEFAULT_METRICS: Record<AgentType, string> = {
   hb: 'yards_after_contact',
   wr: 'target_share',
   te: 'target_share',
+  notes: 'snap_count',
 }
 
 /**

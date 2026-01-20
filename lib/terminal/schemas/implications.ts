@@ -45,6 +45,19 @@ export const TeImplicationSchema = z.enum([
   'te_tds_over',
 ])
 
+// All possible implications (union)
+export const AnyImplicationSchema = z.enum([
+  ...EpaImplicationSchema.options,
+  ...PressureImplicationSchema.options,
+  ...WeatherImplicationSchema.options,
+  ...QbImplicationSchema.options,
+  ...HbImplicationSchema.options,
+  ...WrImplicationSchema.options,
+  ...TeImplicationSchema.options,
+])
+
+export const NotesImplicationSchema = AnyImplicationSchema
+
 // Map agent → implication schema
 export const IMPLICATION_SCHEMAS: Record<AgentType, z.ZodEnum<[string, ...string[]]>> = {
   epa: EpaImplicationSchema,
@@ -54,6 +67,7 @@ export const IMPLICATION_SCHEMAS: Record<AgentType, z.ZodEnum<[string, ...string
   hb: HbImplicationSchema,
   wr: WrImplicationSchema,
   te: TeImplicationSchema,
+  notes: NotesImplicationSchema,
 }
 
 // Get allowed implications for an agent
@@ -72,17 +86,6 @@ export function validateImplicationsForAgent(
   return { valid: invalid.length === 0, invalid }
 }
 
-// All possible implications (union)
-export const AnyImplicationSchema = z.enum([
-  ...EpaImplicationSchema.options,
-  ...PressureImplicationSchema.options,
-  ...WeatherImplicationSchema.options,
-  ...QbImplicationSchema.options,
-  ...HbImplicationSchema.options,
-  ...WrImplicationSchema.options,
-  ...TeImplicationSchema.options,
-])
-
 export type EpaImplication = z.infer<typeof EpaImplicationSchema>
 export type PressureImplication = z.infer<typeof PressureImplicationSchema>
 export type WeatherImplication = z.infer<typeof WeatherImplicationSchema>
@@ -90,4 +93,5 @@ export type QbImplication = z.infer<typeof QbImplicationSchema>
 export type HbImplication = z.infer<typeof HbImplicationSchema>
 export type WrImplication = z.infer<typeof WrImplicationSchema>
 export type TeImplication = z.infer<typeof TeImplicationSchema>
+export type NotesImplication = z.infer<typeof NotesImplicationSchema>
 export type AnyImplication = z.infer<typeof AnyImplicationSchema>

@@ -36,6 +36,7 @@ export {
   HbImplicationSchema,
   WrImplicationSchema,
   TeImplicationSchema,
+  NotesImplicationSchema,
   AnyImplicationSchema,
   IMPLICATION_SCHEMAS,
   getImplicationSchema,
@@ -47,6 +48,7 @@ export {
   type HbImplication,
   type WrImplication,
   type TeImplication,
+  type NotesImplication,
   type AnyImplication,
 } from './implications'
 

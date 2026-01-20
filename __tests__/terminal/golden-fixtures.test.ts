@@ -577,6 +577,12 @@ describe('Validator Pass/Fail Matrix', () => {
       const result = validateImplicationsForAgent('pressure', ['qb_sacks_over', 'qb_ints_over'])
       expect(result.valid).toBe(true)
     })
+
+    it('PASS: Notes agent with general implications', () => {
+      const result = validateImplicationsForAgent('notes', ['team_total_over'])
+      expect(result.valid).toBe(true)
+      expect(result.invalid).toHaveLength(0)
+    })
   })
 })
 

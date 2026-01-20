@@ -55,6 +55,7 @@ const AGENT_DISPLAY: Record<AgentType, string> = {
   hb: 'HB Agent',
   wr: 'WR Agent',
   te: 'TE Agent',
+  notes: 'Notes Agent',
 }
 
 /**
