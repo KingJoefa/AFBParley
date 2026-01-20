@@ -1,6 +1,6 @@
 # Swantail Terminal — Agent-First Script Builder
 
-Terminal-first tool for discovering game insights, forming a clear game script, and generating a story-driven betting output. Agents surface evidence, anchors express the user thesis, and Build Script commits it all into one coherent payload.
+Terminal-first, agent-driven execution surface for discovering game insights, forming a clear game script, and generating a story-driven betting output. Agents surface evidence, anchors express the user thesis, and Build Script commits it all into one coherent payload. The product is anchored on a strict Scan → Build contract.
 
 ## Architecture
 
@@ -19,7 +19,7 @@ Terminal-first tool for discovering game insights, forming a clear game script, 
         ▼
 ┌─────────────────────────────────────────────────────────┐
 │  /api/terminal/build                                    │
-│  Thesis + Evidence → Unified Script Output              │
+│  Thesis + Evidence → Script View                         │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -32,7 +32,7 @@ Terminal-first tool for discovering game insights, forming a clear game script, 
 5. Script Bias (optional modifier)
 6. Build Script (commit action)
 
-Build Script is disabled unless a scan has run, at least one anchor is selected, and the scan hash matches current flags + selected agents.
+Build Script is disabled unless a scan has run, at least one anchor is selected, and the scan hash matches the current inputs (matchup, anchors, script bias, signals, odds paste, selected agents).
 
 ## Agents
 
@@ -49,7 +49,7 @@ Agents surface evidence; they never define the story. Two categories:
 - **Pressure** - Pass rush and protection edges
 - **Weather** - Wind/precipitation impact chains
 
-Each agent returns `Finding[]` when thresholds are met, which the analyst transforms into actionable `Alert[]`.
+Each agent returns `Finding[]` when thresholds are met, which the analyst transforms into actionable `Alert[]`. Alert[] is the only terminal contract between Scan and Build.
 
 ## Anchors (Required)
 
@@ -70,6 +70,11 @@ Script bias shapes the narrative without selecting markets:
 - Pass-heavy
 - Run-heavy
 
+## Signals and Odds (Optional)
+
+- Signals (aka angles) are free-form tags that modify the analysis and narrative.
+- Odds paste allows optional leg context and correlations for script building.
+
 ## Requirements
 
 - Node.js 18+
@@ -82,7 +87,7 @@ npm install
 npm run dev
 ```
 
-Visit `http://localhost:3000/terminal` for the Swantail Terminal.
+Visit `http://localhost:3000/` for the Swantail Terminal (root page).
 
 ## Environment Variables
 
@@ -95,21 +100,48 @@ LINES_API_URL=https://...
 LINES_API_KEY=...
 
 # Optional: Feature flags
+TERMINAL_PROP_ENABLED=true    # Enable /api/terminal/prop
+TERMINAL_STORY_ENABLED=true   # Enable /api/terminal/story
+TERMINAL_PARLAY_ENABLED=true  # Enable /api/terminal/parlay
 TERMINAL_LIVE_DATA=false      # Use real data vs mock
 TERMINAL_LLM_ANALYST=true     # Use LLM vs fallback
+TERMINAL_AGENT_CARDS=true     # Render agent cards in UI
+TERMINAL_SCRIPTS_METADATA=true # Add metadata in scripts view
 ```
 
 ## API Reference
 
 ### Terminal Routes
-- `POST /api/terminal/scan` - Run selected agents and return `Alert[]`
-- `POST /api/terminal/build` - Build script output from anchors + evidence
+- `POST /api/terminal/scan` - Phase 1. Run selected agents and return `Alert[]` + `Finding[]`
+- `POST /api/terminal/build` - Phase 2. Build script view from anchors + evidence
+- `POST /api/terminal/prop` - Direct action route (prop mode)
+- `POST /api/terminal/story` - Direct action route (story mode)
+- `POST /api/terminal/parlay` - Direct action route (parlay mode)
+- `POST /api/terminal/bet` - Betting ladder output
 
 ### Supporting Routes
 - `GET /api/nfl/schedule` - Current week schedule
 - `GET /api/lines/status` - Lines source health check
-- `POST /api/afb` - Legacy AFB script generator
 - `GET/POST /api/memory` - Profile memory (dev only)
+
+## Scan → Build Contract (Essentials)
+
+### Scan Request (Phase 1)
+- Required: `matchup`
+- Optional: `signals`, `anchor`, `agentIds`
+
+### Scan Response (Phase 1)
+- `alerts`: Alert[]
+- `findings`: Finding[]
+- `request_id`, `scan_hash`
+
+### Build Request (Phase 2)
+- Required: `matchup`, `alerts`, `findings`, `output_type`
+- Optional: `anchors`, `anchor`, `script_bias`, `signals`, `odds_paste`, `selected_agents`, `payload_hash`, `options`
+
+### Build Response (Phase 2)
+- `view`: BuildView (terminal or swantail narrative output)
+- `payload_hash` used for staleness validation
 
 ## Project Structure
 
@@ -154,6 +186,11 @@ Tests cover:
 - Analyst transformation
 - Schema validation
 - Provenance tracking
+
+## Future / Legacy Context
+
+- `/api/afb` is legacy AFB script generation and is not the primary product flow.
+- README focuses on the Scan → Build terminal contract and current UI path.
 
 ## License
 
