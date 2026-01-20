@@ -166,6 +166,11 @@
   - `lib/terminal/engine/agent-runner.ts:106-120, 130-337` - Filter agents based on `agentIds` parameter
   - `components/AssistedBuilder.tsx:114-119` - Pass `selectedAgents` to scan hook
 
+### 4. Scan Response Fields ✅
+- `selected_agents`: Echo of requested agent IDs (for hash validation)
+- `agents.invoked`: Agents that actually executed and produced findings
+- `agents.silent`: Agents that executed but produced no findings
+
 ### 4. Verification Logging ✅
 - **File**: `lib/terminal/engine/agent-runner.ts:119`
 - `console.log('[scan] agents:', agentsToRun.join(', '))` for verification
