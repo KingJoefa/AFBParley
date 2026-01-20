@@ -286,12 +286,50 @@ function buildStoryModePrompt(
   rosterBlock?: string,
   retryInstruction?: string
 ): string {
+  // Separate notes findings from other findings
+  const notesFindings = findings.filter(f => f.agent === 'notes')
+  const otherFindings = findings.filter(f => f.agent !== 'notes')
+
+  // Build Curated Notes section (authoritative context from notes agent)
+  let curatedNotesSection = ''
+  if (notesFindings.length > 0) {
+    const notesByType: Record<string, Finding[]> = {}
+    for (const f of notesFindings) {
+      const type = f.type
+      if (!notesByType[type]) notesByType[type] = []
+      notesByType[type].push(f)
+    }
+
+    const formatNote = (f: Finding) => {
+      const conf = f.confidence !== undefined ? ` (conf: ${(f.confidence * 100).toFixed(0)}%)` : ''
+      return `- ${f.value_str}${conf}`
+    }
+
+    const sections: string[] = []
+    if (notesByType['note_key_matchup']) {
+      sections.push(`**Key Matchups:**\n${notesByType['note_key_matchup'].map(formatNote).join('\n')}`)
+    }
+    if (notesByType['note_tendency']) {
+      sections.push(`**Tendencies & Stats:**\n${notesByType['note_tendency'].map(formatNote).join('\n')}`)
+    }
+    if (notesByType['note_injury_context']) {
+      sections.push(`**Injury Context:**\n${notesByType['note_injury_context'].map(formatNote).join('\n')}`)
+    }
+    if (notesByType['note_weather_context']) {
+      sections.push(`**Weather:**\n${notesByType['note_weather_context'].map(formatNote).join('\n')}`)
+    }
+
+    if (sections.length > 0) {
+      curatedNotesSection = `\n## Curated Notes (Authoritative - Do NOT Invent Beyond These)\n\n${sections.join('\n\n')}\n`
+    }
+  }
+
   const alertsSection = alerts.length > 0
     ? `## Alerts from Scan\n\n${alerts.map(a => `- ${a.claim} (${a.agent}, confidence: ${a.confidence})`).join('\n')}`
     : '## Alerts from Scan\n\nNo alerts generated. Build general parlays based on the matchup.'
 
-  const findingsSection = findings.length > 0
-    ? `## Raw Findings\n\n${JSON.stringify(findings.slice(0, 5), null, 2)}`
+  const findingsSection = otherFindings.length > 0
+    ? `## Raw Findings\n\n${JSON.stringify(otherFindings.slice(0, 5), null, 2)}`
     : ''
 
   const anchorSection = anchor ? `\n## Line Focus\n\n${anchor}` : ''
@@ -306,7 +344,7 @@ ${retrySection}
 
 ${matchup}
 ${anchorSection}${signalsSection}${biasSection}
-${rosterSection}
+${rosterSection}${curatedNotesSection}
 ${alertsSection}
 
 ${findingsSection}

@@ -1,0 +1,60 @@
+{
+  "week": 21,
+  "season": 2025,
+  "round": "Conference Championships",
+  "games": {
+    "NE@DEN": {
+      "kickoff": "2026-01-25T20:00:00Z",
+      "totals": { "home": 18, "away": 23 },
+      "spread": { "favorite": "NE", "line": -4.5 },
+      "notes": "Bo Nix fractured right ankle in OT vs Bills - OUT for season. Jarrett Stidham has not thrown a pass since January 2024 (749 days since last attempt on Jan 7, 2024). Patriots favored by 4.5 points. Denver defense ranks 4th in sacks with 47 this season, 3rd in pass rush win rate. NE allowed 30 sacks on the season, finished 13th in pass block win rate - Drake Maye mobile enough to escape pressure with 10.3% scramble rate (led all QBs). Drake Maye led NFL in QBR and completion percentage over expectation. Kayshon Boutte: 4th receiving TD on deep fade/go route this season (tied 2nd in NFL), played 55.4% of offensive snaps, totaled 33 receptions for 551 yards and 6 touchdowns. Hunter Henry: Broncos allowed 59.7 receiving yards per game to opposing tight ends, Henry caught 5 touchdowns in the red zone this season. Broncos: 13th comeback win of the season (NFL record 12 in regular season), 6 wins trailing in 4th quarter. Patriots beat Texans 17-3 in Divisional with dominant defensive performance. DeMario Douglas leads NE with 110 targets, 8th in receiving EPA. Mile High altitude factor for visiting team. Cold weather expected (28-35°F range).",
+      "injuries": {
+        "DEN": ["Bo Nix (ankle) - OUT for season, Jarrett Stidham starts"],
+        "NE": []
+      },
+      "keyMatchups": [
+        "Drake Maye vs DEN's 47-sack pass rush (3rd in pass rush win rate)",
+        "DeMario Douglas vs Pat Surtain II",
+        "Hunter Henry vs DEN TE coverage (59.7 receiving yards/game allowed to TEs)",
+        "Kayshon Boutte deep fade/go routes (4th TD, tied 2nd in NFL)",
+        "NE run game vs DEN's 4th-ranked rush defense",
+        "Jarrett Stidham vs NE pressure (30 pressures vs LAC last week)"
+      ],
+      "weather": { "temp_f": 32, "wind_mph": 8, "snow_chance_pct": 15 },
+      "prediction": { "home": 14, "away": 24 },
+      "news": [
+        { "date": "2026-01-19", "text": "Bo Nix officially ruled out for remainder of postseason with ankle fracture" },
+        { "date": "2026-01-20", "text": "Jarrett Stidham named starter - 749 days since last pass attempt (Jan 7, 2024)" },
+        { "date": "2026-01-21", "text": "Kayshon Boutte's one-handed 32-yard TD vs Texans highlights deep fade/go route success (4th TD, tied 2nd in NFL)" },
+        { "date": "2026-01-21", "text": "Broncos set NFL record with 12 regular-season comeback wins, now at 13 including playoffs" }
+      ]
+    },
+    "LAR@SEA": {
+      "kickoff": "2026-01-25T23:30:00Z",
+      "totals": { "home": 25, "away": 22.5 },
+      "spread": { "favorite": "SEA", "line": -2.5 },
+      "notes": "Rams offense #1 in EPA per play this season, highest success rate on designed runs at 50%. Teams split regular season 1-1 (Rams 21-19 Week 11, Seahawks 38-37 OT Week 16). Seahawks dominated 49ers 41-6 in Divisional, held SF to 9 points combined in two games. Sam Darnold dealing with oblique injury but expected to play - PFF #4 QB when not pressured, but ranks 27th in QBR since Week 11 (when he first played Rams). Darnold's air yards per target dropped after Week 11. Matthew Stafford probable (finger sprain), potential MVP candidate. Seattle defense elite: league-low 6.0 YPA allowed, 4th-lowest passer rating (77.9), #1 defensive success rate on designed runs, best in NFL at 3.7 yards allowed per carry. Seahawks #1 special teams, #1 scoring defense, 3-0 at home in conference championship games. Puka Nacua and Davante Adams should challenge SEA secondary. Cooper Kupp game-time decision but trending towards playing. Kyren Williams: boost in receiving volume with at least 3 catches in each of past 4 games, coming off 2-touchdown, 117-yard performance vs Bears. Kenneth Walker/Zach Charbonnet near-even split, lean Charbonnet as grinder. Seattle's Tariq Woolen questionable (hamstring). Jaxon Smith-Njigba tagged SF for 6/84/0 and 9/124/0 this year - key target for Darnold.",
+      "injuries": {
+        "SEA": ["Sam Darnold (oblique) - expected to play", "Tariq Woolen (hamstring) - questionable"],
+        "LAR": ["Matthew Stafford (finger) - probable", "Cooper Kupp (ankle) - game-time decision"]
+      },
+      "keyMatchups": [
+        "Nacua/Adams vs Seattle secondary",
+        "Stafford vs SEA pressure (4th-best pressure rate)",
+        "Kyren Williams vs SEA run D (3.7 YPC allowed, best in NFL)",
+        "Rams designed runs (50% success rate) vs SEA (#1 defensive success rate)",
+        "JSN vs LAR coverage - proven success",
+        "Charbonnet vs LAR run D"
+      ],
+      "weather": { "temp_f": 48, "wind_mph": 12, "snow_chance_pct": 0 },
+      "prediction": { "home": 27, "away": 24 },
+      "news": [
+        { "date": "2026-01-19", "text": "Cooper Kupp participated in team walkthrough - trending towards playing" },
+        { "date": "2026-01-20", "text": "Sam Darnold's oblique expected to hold up - full go for Sunday" },
+        { "date": "2026-01-21", "text": "Seahawks held 49ers to 9 points combined in two games, #1 scoring defense" },
+        { "date": "2026-01-21", "text": "Kyren Williams: 3+ catches in each of past 4 games, 2 TD, 117 yards vs Bears" },
+        { "date": "2026-01-21", "text": "Seahawks 3-0 at home in conference championship games, 3-0 all-time in NFC Championship Games" }
+      ]
+    }
+  }
+}

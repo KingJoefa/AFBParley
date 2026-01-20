@@ -33,8 +33,11 @@ export type RunState = {
   error?: string
 }
 
-// All agent types
+// All agent types (toggleable by user)
 export const ALL_AGENT_IDS: AgentType[] = ['epa', 'pressure', 'weather', 'qb', 'hb', 'wr', 'te']
+
+// Notes agent runs unconditionally (curated context, not toggleable)
+export const NOTES_AGENT_ID: AgentType = 'notes'
 
 // Agent display metadata
 export const AGENT_META: Record<AgentType, { label: string; icon: string; description: string }> = {
@@ -45,6 +48,7 @@ export const AGENT_META: Record<AgentType, { label: string; icon: string; descri
   hb: { label: 'HB', icon: '🏃', description: 'Halfback usage and efficiency' },
   wr: { label: 'WR', icon: '📡', description: 'Wide receiver target patterns' },
   te: { label: 'TE', icon: '🔒', description: 'Tight end coverage opportunities' },
+  notes: { label: 'Notes', icon: '📝', description: 'Curated game intelligence' },
 }
 
 // Initial state factory

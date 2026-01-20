@@ -215,6 +215,8 @@ async function loadMatchupContext(
       },
       dataTimestamp: Date.now(),
       dataVersion: '2025-week-21-championship',
+      year: 2025,
+      week: 21,
       gameNotes: 'Bo Nix fractured right ankle in OT vs Bills. Stidham has not thrown a pass since January 2024. Patriots favored by 4.5 points.',
       injuries: {
         DEN: ['Bo Nix (QB, OUT - fractured ankle)'],
@@ -312,6 +314,8 @@ async function loadMatchupContext(
       },
       dataTimestamp: Date.now(),
       dataVersion: '2025-week-21-championship',
+      year: 2025,
+      week: 21,
       gameNotes: 'Rams offense #1 in EPA per play. Teams split regular season 1-1. Seahawks dominated 49ers 41-6. Darnold dealing with oblique injury but expected to play.',
       injuries: {
         SEA: ['Sam Darnold (QB, QUESTIONABLE - oblique, expected to play)'],
@@ -342,6 +346,8 @@ async function loadMatchupContext(
     },
     dataTimestamp: Date.now(),
     dataVersion: '2025-week-21',
+    year: 2025,
+    week: 21,
   }
 }
 

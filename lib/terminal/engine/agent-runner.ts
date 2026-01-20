@@ -6,6 +6,7 @@ import { checkQbThresholds } from '../agents/qb/thresholds'
 import { checkHbThresholds } from '../agents/hb/thresholds'
 import { checkWrThresholds } from '../agents/wr/thresholds'
 import { checkTeThresholds } from '../agents/te/thresholds'
+import { runNotesAgent } from '../agents/notes/thresholds'
 
 /**
  * Agent Runner
@@ -95,6 +96,9 @@ export interface MatchupContext {
   keyMatchups?: string[]
   totals?: { home: number; away: number }
   spread?: { favorite: string; line: number }
+  // Week/year for NotesAgent lookup
+  year?: number
+  week?: number
 }
 
 export interface AgentRunResult {
@@ -329,6 +333,22 @@ export async function runAgents(
           agentsWithFindings.add('te')
         }
       }
+    }
+  }
+
+  // Run Notes agent (unconditionally - provides curated context)
+  // Note: NotesAgent runs regardless of agentIds since it's curated intelligence, not toggleable
+  if (context.year && context.week) {
+    const notesFindings = runNotesAgent({
+      year: context.year,
+      week: context.week,
+      matchup: `${context.awayTeam} @ ${context.homeTeam}`,
+      homeTeam: context.homeTeam,
+      awayTeam: context.awayTeam,
+    })
+    if (notesFindings.length > 0) {
+      findings.push(...notesFindings)
+      agentsWithFindings.add('notes')
     }
   }
 
