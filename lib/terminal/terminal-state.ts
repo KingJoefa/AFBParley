@@ -62,6 +62,7 @@ export function createInitialTerminalState(): TerminalState {
 /**
  * Compute a hash of scan-affecting inputs for staleness detection
  * Includes selectedAgents since agent scope is part of execution context
+ * MUST exactly match server-side computation in /api/terminal/build/route.ts
  */
 export function computeInputsHash(
   matchup: string,
@@ -71,11 +72,12 @@ export function computeInputsHash(
   oddsPaste: string,
   selectedAgents?: string[]
 ): string {
-  const agentKey = selectedAgents ? selectedAgents.slice().sort().join(',') : 'all'
-  const anchorKey = anchors.slice().sort().join(',')
-  const biasKey = scriptBias.slice().sort().join(',')
-  const payload = `${matchup}|anchors:${anchorKey}|bias:${biasKey}|${signals.sort().join(',')}|${oddsPaste || ''}|agents:${agentKey}`
-  // Simple string hash for client-side use
+  const agentKey = selectedAgents && selectedAgents.length > 0 ? selectedAgents.slice().sort().join(',') : 'all'
+  const anchorKey = anchors && anchors.length > 0 ? anchors.slice().sort().join(',') : ''
+  const biasKey = scriptBias && scriptBias.length > 0 ? scriptBias.slice().sort().join(',') : ''
+  const signalsKey = signals && signals.length > 0 ? signals.slice().sort().join(',') : ''
+  const payload = `${matchup}|anchors:${anchorKey}|bias:${biasKey}|${signalsKey}|${oddsPaste || ''}|agents:${agentKey}`
+  // Simple 32-bit hash - must match server
   let hash = 0
   for (let i = 0; i < payload.length; i++) {
     const char = payload.charCodeAt(i)

@@ -155,7 +155,12 @@ export default function AssistedBuilder() {
     setIsBuilding(true)
 
     try {
+      // Compute payload_hash for staleness validation (must match server computation)
+      const buildPayloadHash = computeInputsHash(matchup, anchors, scriptBias, signals_raw, oddsPaste, selectedAgents)
+
       // Call Phase 2 endpoint with inline alerts/findings
+      // Note: signals_raw is sent for hash validation (matches client hash computation)
+      // signals (normalized) is used for script generation
       const res = await fetch('/api/terminal/build', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -166,9 +171,12 @@ export default function AssistedBuilder() {
           output_type: outputType,
           anchor: anchorSummary.trim() || undefined,
           signals,
+          signals_raw,
           odds_paste: oddsPaste || undefined,
           anchors,
           script_bias: scriptBias,
+          selected_agents: selectedAgents,
+          payload_hash: buildPayloadHash,
         }),
       })
 
@@ -201,7 +209,7 @@ export default function AssistedBuilder() {
     } finally {
       setIsBuilding(false)
     }
-  }, [matchup, anchorSummary, anchors, scriptBias, signals, oddsPaste, outputType, terminalState])
+  }, [matchup, anchorSummary, anchors, scriptBias, signals, signals_raw, oddsPaste, outputType, terminalState, selectedAgents])
 
   // Abort scan on input change
   useEffect(() => {

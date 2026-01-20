@@ -11,6 +11,8 @@ import {
 import { hashObject, generateRequestId } from '@/lib/terminal/engine/provenance'
 import { checkRequestLimits, estimateTokens } from '@/lib/terminal/engine/guardrails'
 import type { BuildView, OutputType } from '@/lib/terminal/terminal-state'
+import { SwantailResponseSchema, type SwantailResponse } from '@/lib/swantail/schema'
+import OpenAI from 'openai'
 
 /**
  * /api/terminal/build
@@ -28,10 +30,13 @@ const BuildRequestSchema = z.object({
   alerts: z.array(z.any()).min(0), // Inline Alert[] from Phase 1
   findings: z.array(z.any()).min(0), // Inline Finding[] from Phase 1
   output_type: z.enum(['prop', 'story', 'parlay']),
+  payload_hash: z.string().optional().describe('Hash from client - validated server-side for staleness'),
+  selected_agents: z.array(z.string()).optional().describe('Agent IDs that were selected'),
   anchor: z.string().optional(),
   anchors: z.array(z.string()).optional(),
   script_bias: z.array(z.string()).optional(),
-  signals: z.array(z.string()).optional(),
+  signals: z.array(z.string()).optional().describe('Normalized signal tags for script generation'),
+  signals_raw: z.array(z.string()).optional().describe('Raw signals for hash validation'),
   odds_paste: z.string().optional(),
   options: z.object({
     max_legs: z.number().min(2).max(6).default(4),
@@ -40,6 +45,50 @@ const BuildRequestSchema = z.object({
 })
 
 type BuildRequest = z.infer<typeof BuildRequestSchema>
+
+/**
+ * Compute expected payload hash for staleness validation
+ * MUST exactly mirror client-side computation in terminal-state.ts:computeInputsHash
+ */
+function computeBuildPayloadHash(params: {
+  matchup: string
+  selected_agents?: string[]
+  anchors?: string[]
+  script_bias?: string[]
+  signals?: string[]
+  odds_paste?: string
+}): string {
+  const { matchup, selected_agents, anchors, script_bias, signals, odds_paste } = params
+
+  // Normalize arrays with sort() - must match client
+  const agentKey = selected_agents && selected_agents.length > 0
+    ? selected_agents.slice().sort().join(',')
+    : 'all'
+
+  const anchorKey = anchors && anchors.length > 0
+    ? anchors.slice().sort().join(',')
+    : ''
+
+  const biasKey = script_bias && script_bias.length > 0
+    ? script_bias.slice().sort().join(',')
+    : ''
+
+  const signalsKey = signals && signals.length > 0
+    ? signals.slice().sort().join(',')
+    : ''
+
+  // Build payload string - MUST match client format exactly
+  const payload = `${matchup}|anchors:${anchorKey}|bias:${biasKey}|${signalsKey}|${odds_paste || ''}|agents:${agentKey}`
+
+  // Simple 32-bit hash - MUST match client algorithm
+  let hash = 0
+  for (let i = 0; i < payload.length; i++) {
+    const char = payload.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // Convert to 32bit integer
+  }
+  return `h_${Math.abs(hash).toString(16)}`
+}
 
 /**
  * Calculate combined confidence for a parlay script
@@ -182,8 +231,190 @@ async function buildTerminalView(
   }
 }
 
+// Lazy-init OpenAI client
+let openaiClient: OpenAI | null = null
+
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY not configured')
+    }
+    openaiClient = new OpenAI({ apiKey })
+  }
+  return openaiClient
+}
+
 /**
- * Build swantail view (LLM narratives)
+ * Build prompt for story mode script generation
+ */
+function buildStoryModePrompt(
+  matchup: string,
+  alerts: Alert[],
+  findings: Finding[],
+  anchor?: string,
+  signals?: string[],
+  script_bias?: string[]
+): string {
+  const alertsSection = alerts.length > 0
+    ? `## Alerts from Scan\n\n${alerts.map(a => `- ${a.claim} (${a.agent}, confidence: ${a.confidence})`).join('\n')}`
+    : '## Alerts from Scan\n\nNo alerts generated. Build general parlays based on the matchup.'
+
+  const findingsSection = findings.length > 0
+    ? `## Raw Findings\n\n${JSON.stringify(findings.slice(0, 5), null, 2)}`
+    : ''
+
+  const anchorSection = anchor ? `\n## Line Focus\n\n${anchor}` : ''
+  const signalsSection = signals && signals.length > 0 ? `\n## Betting Angles\n\n${signals.join(', ')}` : ''
+  const biasSection = script_bias && script_bias.length > 0 ? `\n## Script Bias\n\n${script_bias.join(', ')}` : ''
+
+  return `You are a sports betting analyst generating narrative-driven parlay scripts.
+
+## Matchup
+
+${matchup}
+${anchorSection}${signalsSection}${biasSection}
+
+${alertsSection}
+
+${findingsSection}
+
+## Your Task
+
+Generate 3 narrative-driven parlay scripts for this matchup. Each script should:
+1. Tell a coherent story about how the game might unfold
+2. Include 3-4 legs that support the narrative
+3. Use illustrative American odds (typically -110)
+4. Include parlay math showing the payout calculation
+
+## Output Format
+
+Return ONLY valid JSON matching this exact schema:
+
+\`\`\`json
+{
+  "assumptions": {
+    "matchup": "${matchup}",
+    "line_focus": "${anchor || ''}",
+    "angles": ${JSON.stringify(signals || [])},
+    "voice": "analyst"
+  },
+  "scripts": [
+    {
+      "title": "Descriptive Title",
+      "narrative": "2-3 sentence story explaining the betting thesis",
+      "legs": [
+        {
+          "market": "Game Total",
+          "selection": "Under 44.5",
+          "american_odds": -110,
+          "odds_source": "illustrative"
+        },
+        {
+          "market": "Player Props",
+          "selection": "Drake Maye Over 245.5 Passing Yards",
+          "american_odds": -110,
+          "odds_source": "illustrative"
+        },
+        {
+          "market": "Player Props",
+          "selection": "DeMario Douglas Over 5.5 Receptions",
+          "american_odds": -110,
+          "odds_source": "illustrative"
+        }
+      ],
+      "parlay_math": {
+        "stake": 1,
+        "leg_decimals": [1.91, 1.91, 1.91],
+        "product_decimal": 6.97,
+        "payout": 6.97,
+        "profit": 5.97,
+        "steps": "1.91 × 1.91 × 1.91 = 6.97"
+      },
+      "notes": [
+        "No guarantees; high variance by design.",
+        "Odds are illustrative."
+      ],
+      "offer_opposite": "Want the other side of this story?"
+    }
+  ]
+}
+\`\`\`
+
+## Rules
+
+1. Output ONLY valid JSON - no markdown, no explanation
+2. Generate exactly 3 scripts
+3. Each script must have 3-4 legs
+4. All odds_source should be "illustrative" unless user provided specific odds
+5. Parlay math must be accurate (decimal odds, product, payout, profit)
+6. Narratives should be specific to this matchup, not generic
+7. Use the alerts and findings to inform your scripts
+8. Always include the two standard notes about guarantees and odds
+
+Respond with ONLY the JSON object, no surrounding text.`
+}
+
+/**
+ * Build swantail view using direct LLM call (default)
+ */
+async function buildSwantailViewDirect(
+  matchup: string,
+  alerts: Alert[],
+  findings: Finding[],
+  anchor?: string,
+  signals?: string[],
+  script_bias?: string[]
+): Promise<BuildView> {
+  const client = getOpenAIClient()
+
+  const prompt = buildStoryModePrompt(matchup, alerts, findings, anchor, signals, script_bias)
+
+  const response = await client.chat.completions.create({
+    model: 'gpt-4o',
+    temperature: 0.7,
+    max_tokens: 3000,
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a sports betting analyst. Output only valid JSON matching the SwantailResponse schema. No markdown, no explanation.',
+      },
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ],
+  })
+
+  const content = response.choices[0]?.message?.content
+  if (!content) {
+    throw new Error('LLM returned empty response')
+  }
+
+  // Parse and validate response
+  let parsed: unknown
+  try {
+    // Strip markdown code blocks if present
+    const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    parsed = JSON.parse(cleaned)
+  } catch (e) {
+    throw new Error(`Failed to parse LLM output as JSON: ${(e as Error).message}`)
+  }
+
+  const validated = SwantailResponseSchema.safeParse(parsed)
+  if (!validated.success) {
+    console.error('[Build] SwantailResponse validation failed:', validated.error.flatten())
+    throw new Error('LLM output does not match SwantailResponse schema')
+  }
+
+  return {
+    kind: 'swantail',
+    data: validated.data,
+  }
+}
+
+/**
+ * Build swantail view using wrapper (fallback only)
  */
 async function buildSwantailView(
   matchup: string,
@@ -238,7 +469,46 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { matchup, alerts, findings, output_type, anchor, signals, odds_paste, options } = parsed.data
+    const { matchup, alerts, findings, output_type, anchor, anchors, signals, signals_raw, odds_paste, script_bias, selected_agents, payload_hash, options } = parsed.data
+
+    // Validate payload_hash if provided (staleness check)
+    // Use signals_raw for hash validation (matches client-side hash computation)
+    if (payload_hash) {
+      const expectedHash = computeBuildPayloadHash({
+        matchup,
+        selected_agents,
+        anchors,
+        script_bias,
+        signals: signals_raw || signals, // Prefer raw signals for hash, fallback to normalized
+        odds_paste,
+      })
+
+      if (payload_hash !== expectedHash) {
+        console.warn('[Build] Stale build attempt:', {
+          provided: payload_hash,
+          expected: expectedHash,
+          payload_debug: {
+            matchup,
+            selected_agents,
+            anchors,
+            script_bias,
+            signals,
+            odds_paste,
+          },
+        })
+        return Response.json(
+          {
+            error: 'Stale build',
+            message: 'The scan inputs have changed since the last scan. Please run Scan again.',
+            stale: true,
+            provided_hash: payload_hash,
+            expected_hash: expectedHash,
+            request_id: requestId,
+          },
+          { status: 409 }
+        )
+      }
+    }
 
     // Check guardrails
     const inputEstimate = estimateTokens(JSON.stringify({ alerts, findings }))
@@ -260,7 +530,16 @@ export async function POST(req: NextRequest) {
 
     if (output_type === 'story') {
       // Story mode: LLM-generated narratives
-      view = await buildSwantailView(matchup, anchor, signals, odds_paste)
+      // Use direct LLM call by default; wrapper as fallback only
+      const useWrapper = process.env.USE_WRAPPER_FALLBACK === 'true'
+
+      if (useWrapper) {
+        console.log('[Build] Using wrapper fallback for story mode')
+        view = await buildSwantailView(matchup, anchor, signals, odds_paste)
+      } else {
+        console.log('[Build] Using direct LLM for story mode')
+        view = await buildSwantailViewDirect(matchup, alerts, findings, anchor, signals, script_bias)
+      }
     } else {
       // Prop/Parlay modes: Terminal correlated parlays
       view = await buildTerminalView(alerts, findings, options)

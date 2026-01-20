@@ -455,6 +455,7 @@ export async function POST(req: NextRequest) {
         },
         alerts: [],
         findings: [], // Empty but present
+        selected_agents: agentIds || ALL_AGENT_IDS, // Echo back which agents were selected
         message: 'No significant findings for this matchup. All agents silent.',
         agents: {
           invoked: agentsInvoked,
@@ -502,6 +503,7 @@ export async function POST(req: NextRequest) {
       },
       alerts: analysisResult.alerts,
       findings, // Include raw findings for Phase 2
+      selected_agents: agentIds || ALL_AGENT_IDS, // Echo back which agents were selected
       agents: {
         invoked: agentsInvoked,
         silent: agentsSilent,

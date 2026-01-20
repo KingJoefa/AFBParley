@@ -13,6 +13,7 @@ export interface ScanResponse {
   alerts: Alert[]
   findings: Finding[]
   matchup: { home: string; away: string }
+  selected_agents: string[]  // Echo of which agents were selected for this scan
   agents: { invoked: string[]; silent: string[] }
   payload_hash: string
   timing_ms: number
