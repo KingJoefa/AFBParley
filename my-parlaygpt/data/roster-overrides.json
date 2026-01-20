@@ -1,0 +1,5 @@
+{
+  "add": [],
+  "remove": [],
+  "_comment": "Manual overrides for roster validation. 'add' includes players without props yet. 'remove' excludes late scratches. Request-level overrides take precedence."
+}

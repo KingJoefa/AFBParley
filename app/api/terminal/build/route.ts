@@ -13,15 +13,17 @@ import { checkRequestLimits, estimateTokens } from '@/lib/terminal/engine/guardr
 import type { BuildView, OutputType } from '@/lib/terminal/terminal-state'
 import { SwantailResponseSchema, type SwantailResponse } from '@/lib/swantail/schema'
 import OpenAI from 'openai'
-import { loadMatchupProjections } from '@/lib/terminal/engine/projections-loader'
 import {
-  buildAllowedRoster,
   extractPlayers,
   validatePlayers,
-  formatAllowedPlayersForPrompt,
   buildRetryPrompt,
-  type AllowedRoster,
 } from '@/lib/terminal/engine/roster-validator'
+import {
+  buildPropsRoster,
+  formatPropsRosterForPrompt,
+  type RosterOverrides,
+  type PropsRosterResult,
+} from '@/lib/terminal/engine/props-roster'
 
 /**
  * /api/terminal/build
@@ -34,6 +36,11 @@ import {
  *   - 'swantail': LLM-generated narrative scripts (story mode)
  */
 
+const RosterOverridesSchema = z.object({
+  add: z.array(z.string()).optional().describe('Players to add (e.g., props not posted yet)'),
+  remove: z.array(z.string()).optional().describe('Players to remove (e.g., late scratches)'),
+}).optional()
+
 const BuildRequestSchema = z.object({
   matchup: z.string().min(3).describe('e.g., "49ers @ Seahawks" or "SF @ SEA"'),
   alerts: z.array(z.any()).min(0), // Inline Alert[] from Phase 1
@@ -41,6 +48,7 @@ const BuildRequestSchema = z.object({
   output_type: z.enum(['prop', 'story', 'parlay']),
   payload_hash: z.string().optional().describe('Hash from client - validated server-side for staleness'),
   selected_agents: z.array(z.string()).optional().describe('Agent IDs that were selected'),
+  roster_overrides: RosterOverridesSchema.describe('Manual roster add/remove overrides'),
   anchor: z.string().optional(),
   anchors: z.array(z.string()).optional(),
   script_bias: z.array(z.string()).optional(),
@@ -58,6 +66,7 @@ type BuildRequest = z.infer<typeof BuildRequestSchema>
 /**
  * Compute expected payload hash for staleness validation
  * MUST exactly mirror client-side computation in terminal-state.ts:computeInputsHash
+ * NOTE: roster_overrides are included server-side for Build validation
  */
 function computeBuildPayloadHash(params: {
   matchup: string
@@ -66,8 +75,9 @@ function computeBuildPayloadHash(params: {
   script_bias?: string[]
   signals?: string[]
   odds_paste?: string
+  roster_overrides?: RosterOverrides
 }): string {
-  const { matchup, selected_agents, anchors, script_bias, signals, odds_paste } = params
+  const { matchup, selected_agents, anchors, script_bias, signals, odds_paste, roster_overrides } = params
 
   // Normalize arrays with sort() - must match client
   const agentKey = selected_agents && selected_agents.length > 0
@@ -86,8 +96,13 @@ function computeBuildPayloadHash(params: {
     ? signals.slice().sort().join(',')
     : ''
 
-  // Build payload string - MUST match client format exactly
-  const payload = `${matchup}|anchors:${anchorKey}|bias:${biasKey}|${signalsKey}|${odds_paste || ''}|agents:${agentKey}`
+  // Normalize roster overrides
+  const overridesKey = roster_overrides
+    ? `add:${(roster_overrides.add || []).slice().sort().join(',')};rm:${(roster_overrides.remove || []).slice().sort().join(',')}`
+    : ''
+
+  // Build payload string - includes overrides for server-side validation
+  const payload = `${matchup}|anchors:${anchorKey}|bias:${biasKey}|${signalsKey}|${odds_paste || ''}|agents:${agentKey}|overrides:${overridesKey}`
 
   // Simple 32-bit hash - MUST match client algorithm
   let hash = 0
@@ -477,8 +492,13 @@ function parseMatchupTeams(matchup: string): { home: string; away: string } | nu
 
 interface BuildSwantailResult {
   view: BuildView
+  roster_info: {
+    allowed_roster_source: 'xo_props' | 'fallback_projections' | 'none'
+    allowed_players: string[]
+    player_props_enabled: boolean
+    debug?: PropsRosterResult['debug']
+  }
   validation?: {
-    roster_loaded: boolean
     players_checked: number
     invalid_players?: string[]
     regenerated?: boolean
@@ -488,37 +508,37 @@ interface BuildSwantailResult {
 
 /**
  * Build swantail view using direct LLM call (default)
- * With roster validation and retry logic
+ * With props-based roster and validation/retry logic
  */
 async function buildSwantailViewDirect(
   matchup: string,
   alerts: Alert[],
   findings: Finding[],
   requestId: string,
+  rosterOverrides?: RosterOverrides,
   anchor?: string,
   signals?: string[],
   script_bias?: string[]
 ): Promise<BuildSwantailResult> {
   const client = getOpenAIClient()
 
-  // Step 1: Parse matchup and load roster
+  // Step 1: Load roster from XO props (with fallback to projections)
+  const rosterResult = await buildPropsRoster(matchup, rosterOverrides)
   const teams = parseMatchupTeams(matchup)
-  let roster: AllowedRoster | null = null
-  let rosterBlock = ''
+  const homeTeam = teams?.home || 'HOME'
+  const awayTeam = teams?.away || 'AWAY'
 
-  if (teams) {
-    try {
-      const players = await loadMatchupProjections(teams.home, teams.away)
-      if (players.length > 0) {
-        roster = buildAllowedRoster(players, teams.home, teams.away)
-        rosterBlock = formatAllowedPlayersForPrompt(roster, teams.home, teams.away)
-        console.log(`[Build] Loaded roster: ${roster.all.length} players for ${teams.away} @ ${teams.home}`)
-      } else {
-        console.warn(`[Build] No roster data for ${teams.away} @ ${teams.home}`)
-      }
-    } catch (e) {
-      console.warn(`[Build] Failed to load roster: ${(e as Error).message}`)
-    }
+  console.log(`[Build] Roster source: ${rosterResult.source}, players: ${rosterResult.players.length}, props_enabled: ${rosterResult.player_props_enabled}`)
+
+  // Build roster block for prompt
+  const rosterBlock = formatPropsRosterForPrompt(rosterResult, homeTeam, awayTeam)
+
+  // Prepare roster info for response
+  const rosterInfo: BuildSwantailResult['roster_info'] = {
+    allowed_roster_source: rosterResult.source,
+    allowed_players: rosterResult.players.map(p => p.name),
+    player_props_enabled: rosterResult.player_props_enabled,
+    debug: rosterResult.debug,
   }
 
   // Step 2: Initial LLM call with roster grounding
@@ -526,9 +546,14 @@ async function buildSwantailViewDirect(
   let result = await callLLM(client, initialPrompt)
 
   // Step 3: Validate players if roster available
-  if (roster && roster.all.length > 0) {
-    const extractedPlayers = extractPlayers(result.scripts, roster.aliasSet)
-    const validation = validatePlayers(extractedPlayers, roster)
+  if (rosterResult.player_props_enabled && rosterResult.players.length > 0) {
+    const extractedPlayers = extractPlayers(result.scripts, rosterResult.aliasSet)
+    const validation = validatePlayers(extractedPlayers, {
+      home: rosterResult.players.filter(p => p.team === homeTeam),
+      away: rosterResult.players.filter(p => p.team === awayTeam),
+      all: rosterResult.players,
+      aliasSet: rosterResult.aliasSet,
+    })
 
     console.log(`[Build] Player validation: ${validation.matched.length} matched, ${validation.invalid.length} invalid`)
 
@@ -537,6 +562,7 @@ async function buildSwantailViewDirect(
       console.warn('[Build] llm_invalid_player', {
         request_id: requestId,
         matchup,
+        roster_source: rosterResult.source,
         invalid_players: validation.invalid,
       })
 
@@ -549,28 +575,32 @@ async function buildSwantailViewDirect(
 
       try {
         const retryResult = await callLLM(client, retryPrompt)
-        const retryExtracted = extractPlayers(retryResult.scripts, roster.aliasSet)
-        const retryValidation = validatePlayers(retryExtracted, roster)
+        const retryExtracted = extractPlayers(retryResult.scripts, rosterResult.aliasSet)
+        const retryValidation = validatePlayers(retryExtracted, {
+          home: rosterResult.players.filter(p => p.team === homeTeam),
+          away: rosterResult.players.filter(p => p.team === awayTeam),
+          all: rosterResult.players,
+          aliasSet: rosterResult.aliasSet,
+        })
 
         if (retryValidation.valid) {
           console.log('[Build] Retry succeeded, all players valid')
           return {
             view: { kind: 'swantail', data: retryResult },
+            roster_info: rosterInfo,
             validation: {
-              roster_loaded: true,
               players_checked: retryExtracted.length,
               invalid_players: validation.invalid,
               regenerated: true,
             },
           }
         } else {
-          // Still invalid after retry - log and return anyway with warning
+          // Still invalid after retry - log and return with warning
           console.warn('[Build] Retry still has invalid players:', retryValidation.invalid)
-          // TODO: Could fall back to game-level-only script here
           return {
             view: { kind: 'swantail', data: retryResult },
+            roster_info: rosterInfo,
             validation: {
-              roster_loaded: true,
               players_checked: retryExtracted.length,
               invalid_players: retryValidation.invalid,
               regenerated: true,
@@ -580,11 +610,10 @@ async function buildSwantailViewDirect(
         }
       } catch (retryError) {
         console.error('[Build] Retry failed:', (retryError as Error).message)
-        // Return original result if retry fails
         return {
           view: { kind: 'swantail', data: result },
+          roster_info: rosterInfo,
           validation: {
-            roster_loaded: true,
             players_checked: extractedPlayers.length,
             invalid_players: validation.invalid,
             regenerated: false,
@@ -596,20 +625,17 @@ async function buildSwantailViewDirect(
     // Validation passed on first attempt
     return {
       view: { kind: 'swantail', data: result },
+      roster_info: rosterInfo,
       validation: {
-        roster_loaded: true,
         players_checked: extractedPlayers.length,
       },
     }
   }
 
-  // No roster available - return without validation
+  // No roster or props disabled - return without validation
   return {
     view: { kind: 'swantail', data: result },
-    validation: {
-      roster_loaded: false,
-      players_checked: 0,
-    },
+    roster_info: rosterInfo,
   }
 }
 
@@ -669,10 +695,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { matchup, alerts, findings, output_type, anchor, anchors, signals, signals_raw, odds_paste, script_bias, selected_agents, payload_hash, options } = parsed.data
+    const { matchup, alerts, findings, output_type, anchor, anchors, signals, signals_raw, odds_paste, script_bias, selected_agents, roster_overrides, payload_hash, options } = parsed.data
 
     // Validate payload_hash if provided (staleness check)
     // Use signals_raw for hash validation (matches client-side hash computation)
+    // Include roster_overrides in hash so toggling overrides invalidates prior builds
     if (payload_hash) {
       const expectedHash = computeBuildPayloadHash({
         matchup,
@@ -681,6 +708,7 @@ export async function POST(req: NextRequest) {
         script_bias,
         signals: signals_raw || signals, // Prefer raw signals for hash, fallback to normalized
         odds_paste,
+        roster_overrides,
       })
 
       if (payload_hash !== expectedHash) {
@@ -727,6 +755,7 @@ export async function POST(req: NextRequest) {
 
     // Build appropriate view based on output_type
     let view: BuildView
+    let rosterInfo: BuildSwantailResult['roster_info'] | undefined
     let rosterValidation: BuildSwantailResult['validation'] | undefined
 
     if (output_type === 'story') {
@@ -738,9 +767,13 @@ export async function POST(req: NextRequest) {
         console.log('[Build] Using wrapper fallback for story mode')
         view = await buildSwantailView(matchup, anchor, signals, odds_paste)
       } else {
-        console.log('[Build] Using direct LLM for story mode with roster validation')
-        const result = await buildSwantailViewDirect(matchup, alerts, findings, requestId, anchor, signals, script_bias)
+        console.log('[Build] Using direct LLM for story mode with props-based roster')
+        const result = await buildSwantailViewDirect(
+          matchup, alerts, findings, requestId,
+          roster_overrides, anchor, signals, script_bias
+        )
         view = result.view
+        rosterInfo = result.roster_info
         rosterValidation = result.validation
       }
     } else {
@@ -748,7 +781,7 @@ export async function POST(req: NextRequest) {
       view = await buildTerminalView(alerts, findings, options)
     }
 
-    // Return BuildResult with discriminated union
+    // Return BuildResult with roster_info for debugging
     return Response.json({
       build_id: `build-${requestId}`,
       request_id: requestId,
@@ -757,6 +790,7 @@ export async function POST(req: NextRequest) {
       view,
       created_at: new Date().toISOString(),
       timing_ms: Date.now() - startTime,
+      ...(rosterInfo && { roster_info: rosterInfo }),
       ...(rosterValidation && { roster_validation: rosterValidation }),
     })
   } catch (error) {
