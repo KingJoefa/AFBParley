@@ -574,9 +574,33 @@ export default function SwantailTerminalPanel(props: {
         </div>
       </div>
 
-      {/* execution context */}
+      {/* terminal + execution context */}
       <div className="grid gap-4 p-4">
-        <div className="grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-3">
+        <div
+          ref={scrollerRef}
+          className="h-[340px] overflow-auto rounded-2xl border border-white/10 bg-black/40 p-4 font-mono text-[12px] leading-relaxed"
+        >
+          {/* ASCII Art Logo */}
+          <pre className="mb-4 text-[10px] leading-[1.1] text-emerald-400/80 select-none">
+{`███████╗██╗    ██╗ █████╗ ███╗   ██╗████████╗ █████╗ ██╗██╗
+██╔════╝██║    ██║██╔══██╗████╗  ██║╚══██╔══╝██╔══██╗██║██║
+███████╗██║ █╗ ██║███████║██╔██╗ ██║   ██║   ███████║██║██║
+╚════██║██║███╗██║██╔══██║██║╚██╗██║   ██║   ██╔══██║██║██║
+███████║╚███╔███╔╝██║  ██║██║ ╚████║   ██║   ██║  ██║██║███████╗
+╚══════╝ ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝╚═╝╚══════╝`}
+          </pre>
+          {buffer.map(line => (
+            <div key={line.id} className={fmtTone(line.tone)}>{line.text}</div>
+          ))}
+          <div className="mt-4 text-white/40">
+            {matchup.trim() ? `current matchup: ${matchup}` : 'no matchup selected'}
+            {anchors.length ? ` • anchors: ${anchors.join(' + ')}` : ''}
+            {scriptBias.length ? ` • bias: ${scriptBias.join(', ')}` : ''}
+            {angles.length ? ` • signals: ${angles.length}` : ''}
+          </div>
+        </div>
+
+        <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
           <div className="grid gap-2">
             <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Matchup</div>
             <div className="flex items-center gap-2">
@@ -706,7 +730,7 @@ export default function SwantailTerminalPanel(props: {
               type="button"
               onClick={onScanClick}
               disabled={!canAct || !selectedAgents.length || (analysisMeta?.status === 'scanning')}
-              className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {analysisMeta?.status === 'scanning' ? 'Scanning…' : 'Scan'}
             </button>
@@ -730,13 +754,13 @@ export default function SwantailTerminalPanel(props: {
             </button>
           </div>
 
-          <div className="grid gap-2">
+          <div className="grid gap-1.5">
             <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Anchors</div>
-            <div className="grid gap-2">
+            <div className="grid gap-1.5">
               {anchorGroups.map(group => (
                 <div key={group.id} className="flex items-center gap-2">
                   <span className="text-[10px] font-mono text-white/40">{group.label}</span>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {group.options.map(option => {
                       const isSelected = anchors.includes(option.label)
                       const groupSelected = group.options.some(item => anchors.includes(item.label))
@@ -747,7 +771,7 @@ export default function SwantailTerminalPanel(props: {
                           type="button"
                           onClick={() => toggleAnchor(group.id, option.label)}
                           disabled={isDisabled}
-                          className={`rounded-full border px-3 py-1.5 text-[11px] font-medium transition ${
+                          className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
                             isSelected
                               ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
                               : 'border-white/10 bg-white/5 text-white/60 hover:text-white/80'
@@ -761,28 +785,27 @@ export default function SwantailTerminalPanel(props: {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="grid gap-2">
-            <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Script Bias</div>
-            <div className="flex flex-wrap gap-2">
-              {scriptBiasOptions.map(option => {
-                const isSelected = scriptBias.includes(option)
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => toggleBias(option)}
-                    className={`rounded-full border px-3 py-1.5 text-[11px] font-medium transition ${
-                      isSelected
-                        ? 'border-white/20 bg-white/10 text-white'
-                        : 'border-white/10 bg-white/5 text-white/55 hover:text-white/75'
-                    }`}
-                  >
-                    {option}
-                  </button>
-                )
-              })}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/40">Script Bias</span>
+              <div className="flex flex-wrap gap-1.5">
+                {scriptBiasOptions.map(option => {
+                  const isSelected = scriptBias.includes(option)
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => toggleBias(option)}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                        isSelected
+                          ? 'border-white/20 bg-white/10 text-white'
+                          : 'border-white/10 bg-white/5 text-white/55 hover:text-white/75'
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
 
@@ -818,30 +841,6 @@ export default function SwantailTerminalPanel(props: {
                 scan stale — re-scan to update
               </span>
             )}
-          </div>
-        </div>
-
-        <div
-          ref={scrollerRef}
-          className="h-[340px] overflow-auto rounded-2xl border border-white/10 bg-black/40 p-4 font-mono text-[12px] leading-relaxed"
-        >
-          {/* ASCII Art Logo */}
-          <pre className="mb-4 text-[10px] leading-[1.1] text-emerald-400/80 select-none">
-{`███████╗██╗    ██╗ █████╗ ███╗   ██╗████████╗ █████╗ ██╗██╗
-██╔════╝██║    ██║██╔══██╗████╗  ██║╚══██╔══╝██╔══██╗██║██║
-███████╗██║ █╗ ██║███████║██╔██╗ ██║   ██║   ███████║██║██║
-╚════██║██║███╗██║██╔══██║██║╚██╗██║   ██║   ██╔══██║██║██║
-███████║╚███╔███╔╝██║  ██║██║ ╚████║   ██║   ██║  ██║██║███████╗
-╚══════╝ ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝╚═╝╚══════╝`}
-          </pre>
-          {buffer.map(line => (
-            <div key={line.id} className={fmtTone(line.tone)}>{line.text}</div>
-          ))}
-          <div className="mt-4 text-white/40">
-            {matchup.trim() ? `current matchup: ${matchup}` : 'no matchup selected'}
-            {anchors.length ? ` • anchors: ${anchors.join(' + ')}` : ''}
-            {scriptBias.length ? ` • bias: ${scriptBias.join(', ')}` : ''}
-            {angles.length ? ` • signals: ${angles.length}` : ''}
           </div>
         </div>
       </div>
