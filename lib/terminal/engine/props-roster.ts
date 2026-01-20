@@ -77,7 +77,18 @@ function mergeOverrides(
 }
 
 /**
+ * Normalize player name for consistent storage
+ * Trims, collapses spaces, title cases
+ */
+function normalizePlayerName(first?: string, last?: string): string {
+  const raw = [first, last].filter(Boolean).join(' ')
+  // Trim, collapse spaces, preserve original casing (don't force title case to keep "CJ" etc.)
+  return raw.trim().replace(/\s+/g, ' ')
+}
+
+/**
  * Extract unique players from XO combos
+ * Normalizes names at extraction time for consistent validation
  */
 function extractPlayersFromCombos(combos: XoCombo[]): Player[] {
   const playerMap = new Map<string, Player>()
@@ -89,7 +100,8 @@ function extractPlayersFromCombos(combos: XoCombo[]): Player[] {
       const { first, last, team, position } = leg.player
       if (!first && !last) continue
 
-      const name = [first, last].filter(Boolean).join(' ')
+      // Normalize at extraction time
+      const name = normalizePlayerName(first, last)
       const key = normalizeName(name)
 
       if (!playerMap.has(key)) {
@@ -107,6 +119,7 @@ function extractPlayersFromCombos(combos: XoCombo[]): Player[] {
 
 /**
  * Apply overrides to player list
+ * Normalizes override names at application time for consistent matching
  */
 function applyOverrides(
   players: Player[],
@@ -116,10 +129,9 @@ function applyOverrides(
   const result = [...players]
   const applied = { added: [] as string[], removed: [] as string[] }
 
-  // Remove players
+  // Remove players (normalize for matching)
   if (overrides.remove && overrides.remove.length > 0) {
     const removeSet = new Set(overrides.remove.map(normalizeName))
-    const before = result.length
     const filtered = result.filter(p => !removeSet.has(normalizeName(p.name)))
     applied.removed = overrides.remove.filter(name =>
       result.some(p => normalizeName(p.name) === normalizeName(name))
@@ -128,19 +140,20 @@ function applyOverrides(
     result.push(...filtered)
   }
 
-  // Add players
+  // Add players (normalize storage, preserve display name)
   if (overrides.add && overrides.add.length > 0) {
-    for (const name of overrides.add) {
-      const normalized = normalizeName(name)
+    for (const rawName of overrides.add) {
+      const displayName = rawName.trim().replace(/\s+/g, ' ') // Normalize whitespace
+      const normalized = normalizeName(displayName)
       const exists = result.some(p => normalizeName(p.name) === normalized)
       if (!exists) {
         // Infer team from the matchup if possible (first team code as default)
         result.push({
-          name,
+          name: displayName,
           team: teamCodes[0] || 'UNK',
           pos: 'UNK',
         })
-        applied.added.push(name)
+        applied.added.push(displayName)
       }
     }
   }
@@ -286,6 +299,18 @@ export async function buildPropsRoster(
 
   // Build alias set for validation
   const aliasSet = buildAliasSet(finalPlayers)
+
+  // First-class telemetry for roster source tracking
+  console.log('[PropsRoster] roster_source_telemetry', {
+    allowed_roster_source: source,
+    player_count: finalPlayers.length,
+    player_props_enabled: source !== 'none' && finalPlayers.length >= MIN_PLAYERS_THRESHOLD,
+    matchup,
+    xo_players_found: xoCount,
+    projections_fallback: source === 'fallback_projections',
+    overrides_add_count: applied.added.length,
+    overrides_remove_count: applied.removed.length,
+  })
 
   return {
     source,
