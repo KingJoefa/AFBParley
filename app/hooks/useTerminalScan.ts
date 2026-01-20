@@ -110,6 +110,7 @@ export function useTerminalScan() {
         alerts: json.alerts || [],
         findings: json.findings || [],
         matchup: json.matchup,
+        selected_agents: json.selected_agents || [],
         agents: json.agents,
         payload_hash: json.payload_hash || json.provenance?.payload_hash || json.request_id,
         timing_ms: json.timing_ms,
