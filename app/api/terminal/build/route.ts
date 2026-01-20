@@ -96,13 +96,17 @@ function computeBuildPayloadHash(params: {
     ? signals.slice().sort().join(',')
     : ''
 
-  // Normalize roster overrides
-  const overridesKey = roster_overrides
-    ? `add:${(roster_overrides.add || []).slice().sort().join(',')};rm:${(roster_overrides.remove || []).slice().sort().join(',')}`
+  // Normalize roster overrides - only include if non-empty to match client hash
+  const hasOverrides = roster_overrides &&
+    ((roster_overrides.add && roster_overrides.add.length > 0) ||
+     (roster_overrides.remove && roster_overrides.remove.length > 0))
+
+  const overridesSuffix = hasOverrides
+    ? `|overrides:add:${(roster_overrides!.add || []).slice().sort().join(',')};rm:${(roster_overrides!.remove || []).slice().sort().join(',')}`
     : ''
 
-  // Build payload string - includes overrides for server-side validation
-  const payload = `${matchup}|anchors:${anchorKey}|bias:${biasKey}|${signalsKey}|${odds_paste || ''}|agents:${agentKey}|overrides:${overridesKey}`
+  // Build payload string - matches client format, only adds overrides suffix if present
+  const payload = `${matchup}|anchors:${anchorKey}|bias:${biasKey}|${signalsKey}|${odds_paste || ''}|agents:${agentKey}${overridesSuffix}`
 
   // Simple 32-bit hash - MUST match client algorithm
   let hash = 0
