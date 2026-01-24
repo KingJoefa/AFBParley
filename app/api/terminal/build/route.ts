@@ -23,6 +23,7 @@ import {
   formatPropsRosterForPrompt,
   type RosterOverrides,
   type PropsRosterResult,
+  type PropLine,
 } from '@/lib/terminal/engine/props-roster'
 import { loadGameNotes } from '@/lib/terminal/engine/notes-loader'
 import type { Analytics, SGP } from '@/lib/terminal/analyst'
@@ -288,7 +289,8 @@ function buildStoryModePrompt(
   rosterBlock?: string,
   retryInstruction?: string,
   analytics?: Analytics,
-  sgps?: SGP[]
+  sgps?: SGP[],
+  propLines?: PropLine[]
 ): string {
   // Separate notes findings from other findings
   const notesFindings = findings.filter(f => f.agent === 'notes')
@@ -412,13 +414,40 @@ function buildStoryModePrompt(
     sgpExamplesSection = `\n## Seed SGPs (Analyst Suggestions - Use as Inspiration)\n\nThese are real analyst suggestions for this matchup. Use them as starting points but CREATE YOUR OWN variations:\n\n${sgpLines}\n`
   }
 
+  // Build prop lines section from XO sportsbook data
+  let propLinesSection = ''
+  if (propLines && propLines.length > 0) {
+    // Group by market type for readability
+    const byMarket = new Map<string, PropLine[]>()
+    for (const pl of propLines) {
+      const market = pl.market.replace(/_/g, ' ')
+      if (!byMarket.has(market)) byMarket.set(market, [])
+      byMarket.get(market)!.push(pl)
+    }
+
+    const marketSections: string[] = []
+    for (const [market, lines] of byMarket.entries()) {
+      // Take up to 8 lines per market, prioritizing "over" selections
+      const sorted = lines
+        .sort((a, b) => (a.selection === 'over' ? -1 : 1))
+        .slice(0, 8)
+      const lineStrs = sorted.map(pl => {
+        const odds = pl.americanOdds ? ` (${pl.americanOdds > 0 ? '+' : ''}${pl.americanOdds})` : ''
+        return `- ${pl.player} (${pl.team}): ${pl.selection} ${pl.line}${odds}`
+      }).join('\n')
+      marketSections.push(`**${market}**:\n${lineStrs}`)
+    }
+
+    propLinesSection = `\n## Available Prop Lines (Real Sportsbook Data)\n\n**IMPORTANT: Use these ACTUAL lines when building player props. Do NOT invent line numbers.**\n\n${marketSections.join('\n\n')}\n`
+  }
+
   return `You are a sports betting analyst generating narrative-driven parlay scripts.
 ${retrySection}
 ## Matchup
 
 ${matchup}
 ${anchorSection}${signalsSection}${biasSection}
-${rosterSection}${curatedNotesSection}${analyticsSection}${sgpExamplesSection}
+${rosterSection}${curatedNotesSection}${analyticsSection}${propLinesSection}${sgpExamplesSection}
 ${alertsSection}
 
 ${findingsSection}
@@ -706,7 +735,8 @@ async function buildSwantailViewDirect(
     matchup, alerts, findings, anchor, signals, script_bias, rosterBlock,
     undefined, // retryInstruction
     analytics,
-    sgps
+    sgps,
+    rosterResult.propLines
   )
   let result = await callLLM(client, initialPrompt)
 
@@ -735,7 +765,7 @@ async function buildSwantailViewDirect(
       const retryInstruction = buildRetryPrompt(validation.invalid)
       const retryPrompt = buildStoryModePrompt(
         matchup, alerts, findings, anchor, signals, script_bias,
-        rosterBlock, retryInstruction, analytics, sgps
+        rosterBlock, retryInstruction, analytics, sgps, rosterResult.propLines
       )
 
       try {

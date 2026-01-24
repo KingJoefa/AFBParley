@@ -28,16 +28,27 @@ export interface RosterOverrides {
   remove?: string[]  // Players to remove (e.g., "Bo Nix")
 }
 
+export interface PropLine {
+  player: string
+  team: string
+  market: string      // e.g., "rushing_yards", "receiving_yards", "pass_yards"
+  line: number        // e.g., 51.5
+  selection: string   // e.g., "over", "under"
+  americanOdds?: number
+}
+
 export interface PropsRosterResult {
   source: RosterSource
   players: Player[]
   aliasSet: Set<string>
   player_props_enabled: boolean
+  propLines: PropLine[]  // Actual lines from XO
   debug: {
     xo_players_found: number
     projections_players: number
     injuries_filtered: number
     overrides_applied: { added: string[]; removed: string[] }
+    prop_lines_extracted: number
   }
 }
 
@@ -118,6 +129,43 @@ function extractPlayersFromCombos(combos: XoCombo[]): Player[] {
 }
 
 /**
+ * Extract prop lines from XO combos
+ * Returns deduplicated lines per player/market/selection
+ */
+function extractPropLinesFromCombos(combos: XoCombo[]): PropLine[] {
+  const lineMap = new Map<string, PropLine>()
+
+  for (const combo of combos) {
+    for (const leg of combo.legs) {
+      if (!leg.player || leg.line === null || leg.line === undefined) continue
+
+      const { first, last, team } = leg.player
+      if (!first && !last) continue
+
+      const playerName = normalizePlayerName(first, last)
+      const market = leg.marketType || 'unknown'
+      const selection = leg.selectionType || 'over'
+
+      // Create unique key for deduplication
+      const key = `${normalizeName(playerName)}|${market}|${selection}|${leg.line}`
+
+      if (!lineMap.has(key)) {
+        lineMap.set(key, {
+          player: playerName,
+          team: team?.toUpperCase() || 'UNK',
+          market,
+          line: leg.line,
+          selection,
+          americanOdds: combo.americanOdds,
+        })
+      }
+    }
+  }
+
+  return Array.from(lineMap.values())
+}
+
+/**
  * Apply overrides to player list
  * Normalizes override names at application time for consistent matching
  */
@@ -162,20 +210,23 @@ function applyOverrides(
 }
 
 /**
- * Load players from XO props API
+ * Load players and prop lines from XO props API
  */
 async function loadFromXO(
   matchup: string,
   year: number,
   week: number
-): Promise<Player[]> {
+): Promise<{ players: Player[]; propLines: PropLine[] }> {
   try {
     const combos = await findCombosForMatchup({ year, week, matchup })
     console.log(`[PropsRoster] XO returned ${combos.length} combos for ${matchup}`)
-    return extractPlayersFromCombos(combos)
+    const players = extractPlayersFromCombos(combos)
+    const propLines = extractPropLinesFromCombos(combos)
+    console.log(`[PropsRoster] Extracted ${propLines.length} prop lines`)
+    return { players, propLines }
   } catch (e) {
     console.warn(`[PropsRoster] XO fetch failed: ${(e as Error).message}`)
-    return []
+    return { players: [], propLines: [] }
   }
 }
 
@@ -264,17 +315,18 @@ export async function buildPropsRoster(
   const overrides = mergeOverrides(defaultOverrides, requestOverrides)
 
   // Try XO props first
-  let xoPlayers = await loadFromXO(matchup, year, week)
-  const xoCount = xoPlayers.length
+  const xoResult = await loadFromXO(matchup, year, week)
+  const xoCount = xoResult.players.length
+  let propLines = xoResult.propLines
 
   let source: RosterSource = 'xo_props'
-  let players: Player[] = xoPlayers
+  let players: Player[] = xoResult.players
   let projectionsCount = 0
   let injuriesFiltered = 0
 
   // Fallback to projections if XO insufficient
-  if (xoPlayers.length < MIN_PLAYERS_THRESHOLD) {
-    console.log(`[PropsRoster] XO returned ${xoPlayers.length} players (< ${MIN_PLAYERS_THRESHOLD}), falling back to projections`)
+  if (xoResult.players.length < MIN_PLAYERS_THRESHOLD) {
+    console.log(`[PropsRoster] XO returned ${xoResult.players.length} players (< ${MIN_PLAYERS_THRESHOLD}), falling back to projections`)
 
     const projResult = await loadFromProjections(
       teamCodes[1] || teamCodes[0] || 'UNK', // home
@@ -287,10 +339,12 @@ export async function buildPropsRoster(
     if (projResult.players.length >= MIN_PLAYERS_THRESHOLD) {
       source = 'fallback_projections'
       players = projResult.players
+      propLines = [] // No prop lines from projections fallback
     } else {
       // Both sources failed - disable player props
       source = 'none'
       players = []
+      propLines = []
     }
   }
 
@@ -307,6 +361,7 @@ export async function buildPropsRoster(
     player_props_enabled: source !== 'none' && finalPlayers.length >= MIN_PLAYERS_THRESHOLD,
     matchup,
     xo_players_found: xoCount,
+    prop_lines_extracted: propLines.length,
     projections_fallback: source === 'fallback_projections',
     overrides_add_count: applied.added.length,
     overrides_remove_count: applied.removed.length,
@@ -317,11 +372,13 @@ export async function buildPropsRoster(
     players: finalPlayers,
     aliasSet,
     player_props_enabled: source !== 'none' && finalPlayers.length >= MIN_PLAYERS_THRESHOLD,
+    propLines,
     debug: {
       xo_players_found: xoCount,
       projections_players: projectionsCount,
       injuries_filtered: injuriesFiltered,
       overrides_applied: applied,
+      prop_lines_extracted: propLines.length,
     },
   }
 }
