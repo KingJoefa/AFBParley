@@ -27,6 +27,53 @@
         { "date": "2026-01-20", "text": "Jarrett Stidham named starter - 749 days since last pass attempt (Jan 7, 2024)" },
         { "date": "2026-01-21", "text": "Kayshon Boutte's one-handed 32-yard TD vs Texans highlights deep fade/go route success (4th TD, tied 2nd in NFL)" },
         { "date": "2026-01-21", "text": "Broncos set NFL record with 12 regular-season comeback wins, now at 13 including playoffs" }
+      ],
+      "analytics": {
+        "source": "KoalatyStats",
+        "model_spread": { "team": "NE", "line": -4.45, "adjusted": -6.5, "note": "Adjusted for Bo Nix injury - model lacks context" },
+        "model_scores": { "NE": 27.02, "DEN": 22.57 },
+        "pressure": {
+          "maye_scramble_rate_pressured": 0.1338,
+          "maye_scramble_rate_clean": 0.0724,
+          "maye_scramble_yards_rank": 2,
+          "den_pressure_rank": 2,
+          "all_defenses_pcp_above": 0.37,
+          "note": "Maye has toughest predicted pressure matchup but best ability to mitigate - should be determining factor"
+        },
+        "qb_grades": {
+          "stidham": {
+            "clean_pocket_pctl": 0,
+            "standard_dropback_pctl": 2,
+            "no_play_action_pctl": 0,
+            "avoiding_negatives_pctl": 16,
+            "under_pressure_pctl": 12,
+            "third_fourth_down_pctl": 0,
+            "sack_avoidance": "bottom since 2019",
+            "note": "Best stable metric is Avoiding Negatives at 16th percentile - atrocious across the board"
+          },
+          "bo_nix": {
+            "stable_metrics_pctl": 50,
+            "sack_avoidance": "tops in NFL this season",
+            "note": "Average at best but elite sack avoidance was redeeming quality"
+          }
+        },
+        "tprr_matchups": [
+          { "player": "RJ Harvey", "team": "DEN", "tprr": 0.31, "coverage": "MOFO", "vs_overall_delta": 7.3, "opp_rate": 0.41, "routes_10wk": 147, "routes_last": 28 },
+          { "player": "Pat Bryant", "team": "DEN", "tprr": 0.31, "coverage": "MOFO", "vs_overall_delta": 7.3, "opp_rate": 0.41, "routes_10wk": 146, "routes_last": 3 },
+          { "player": "Rhamondre Stevenson", "team": "NE", "tprr": 0.23, "coverage": "MOFC", "vs_overall_delta": 7.3, "opp_rate": 0.44, "routes_10wk": 177, "routes_last": 20 },
+          { "player": "Kyle Williams", "team": "NE", "tprr": 0.22, "coverage": "man", "vs_overall_delta": 5.5, "opp_rate": 0.28, "routes_10wk": 116, "routes_last": 14 },
+          { "player": "Kyle Williams", "team": "NE", "tprr": 0.27, "coverage": "single", "vs_overall_delta": 10.7, "opp_rate": 0.50, "routes_10wk": 116, "routes_last": 14 }
+        ],
+        "insights": [
+          "NE allows top 10 yards per route to TEs - unclear how Stidham will use his TEs",
+          "NE plays MOFO 41% of time (Top 5 Weeks 16-20)",
+          "DEN plays MOFC 44% of time (Weeks 16-20)",
+          "DEN plays single coverage 50% of time (Weeks 16-20)"
+        ]
+      },
+      "sgps": [
+        { "name": "NE Blowout", "legs": ["NE -13.5", "NE DST TD", "Stevenson 110+"], "odds": "+3300", "confidence": "high", "rationale": "Stidham grades support Patriots dominance" },
+        { "name": "Stidham Shocker", "legs": ["Stidham 250+", "DEN ML", "Harvey TD", "Bryant 70+"], "odds": "+4600", "confidence": "low", "rationale": "If Sean Payton pulls this off, he deserves 10 COTY awards" }
       ]
     },
     "LAR@SEA": {
@@ -54,6 +101,32 @@
         { "date": "2026-01-21", "text": "Seahawks held 49ers to 9 points combined in two games, #1 scoring defense" },
         { "date": "2026-01-21", "text": "Kyren Williams: 3+ catches in each of past 4 games, 2 TD, 117 yards vs Bears" },
         { "date": "2026-01-21", "text": "Seahawks 3-0 at home in conference championship games, 3-0 all-time in NFC Championship Games" }
+      ],
+      "analytics": {
+        "source": "KoalatyStats",
+        "model_spread": { "team": "SEA", "line": -1.13 },
+        "model_scores": { "SEA": 24.65, "LAR": 23.52 },
+        "pressure": {
+          "darnold_pcp_matchup": "best among conference championship QBs vs LAR defense",
+          "stafford_pressure_matchup": "good (relatively)",
+          "note": "LAR defense has been slacking lately compared to other elite defenses"
+        },
+        "tprr_matchups": [
+          { "player": "Colby Parkinson", "team": "LAR", "tprr": 0.23, "coverage": "all", "note": "team-leading" },
+          { "player": "Xavier Smith", "team": "LAR", "tprr": 0.19, "coverage": "single", "vs_overall_delta": 5.2, "opp_rate": 0.35, "routes_10wk": 108, "routes_last": 2 },
+          { "player": "AJ Barner", "team": "SEA", "tprr": 0.25, "coverage": "MOFO", "vs_overall_delta": 6.1, "opp_rate": 0.48, "routes_10wk": 222, "routes_last": 16 }
+        ],
+        "insights": [
+          "LAR is better overall team per analytics (Timo Riske PFF chart)",
+          "SEA defense is #1 funnel for RBs/TEs",
+          "SEA plays MOFO at top-5 rate; Stafford is #1 PFF graded QB vs MOFO",
+          "LAR bottom-10 in Missed Tackles Allowed; Kenneth Walker top-5 in MTF",
+          "Best 'attempts' advantage is LAR passing - LAR likes to pass and SEA allows more passes vs typical defenses"
+        ]
+      },
+      "sgps": [
+        { "name": "Stafford-Parkinson Stack", "legs": ["LAR ML", "Parkinson 50+", "Parkinson TD", "Stafford 300+"], "odds": "+3500", "confidence": "high", "rationale": "LAR wins through Stafford and Parkinson connection" },
+        { "name": "Barner Barn Yard", "legs": ["AJ Barner TD"], "odds": null, "confidence": "medium", "rationale": "25% TPRR vs MOFO, LAR plays MOFO 48%" }
       ]
     }
   }

@@ -57,12 +57,44 @@ export function loadRelevantSkillMds(
   return skillMds
 }
 
+export interface TPRRMatchup {
+  player: string
+  team?: string
+  tprr: number
+  coverage: string
+  vs_overall_delta?: number
+  opp_rate?: number
+  routes_10wk?: number
+  routes_last?: number
+  note?: string
+}
+
+export interface Analytics {
+  source?: string
+  model_spread?: { team: string; line: number; adjusted?: number; note?: string }
+  model_scores?: Record<string, number>
+  pressure?: Record<string, unknown>
+  qb_grades?: Record<string, Record<string, unknown>>
+  tprr_matchups?: TPRRMatchup[]
+  insights?: string[]
+}
+
+export interface SGP {
+  name?: string
+  legs: string[]
+  odds: string | null
+  confidence: string
+  rationale?: string
+}
+
 export interface GameNotesContext {
   notes?: string
   injuries?: Record<string, string[]>
   keyMatchups?: string[]
   totals?: { home: number; away: number }
   spread?: { favorite: string; line: number }
+  analytics?: Analytics
+  sgps?: SGP[]
 }
 
 /**
@@ -81,7 +113,7 @@ export function buildAnalystPrompt(
 
   // Build game notes section if available
   let gameNotesSection = ''
-  if (gameNotes?.notes || gameNotes?.injuries || gameNotes?.keyMatchups) {
+  if (gameNotes?.notes || gameNotes?.injuries || gameNotes?.keyMatchups || gameNotes?.analytics) {
     const parts: string[] = []
 
     if (gameNotes.totals || gameNotes.spread) {
@@ -104,6 +136,81 @@ export function buildAnalystPrompt(
 
     if (gameNotes.keyMatchups?.length) {
       parts.push(`Key Matchups:\n- ${gameNotes.keyMatchups.join('\n- ')}`)
+    }
+
+    // Build analytics section if available
+    if (gameNotes.analytics) {
+      const analyticsParts: string[] = []
+      const analytics = gameNotes.analytics
+
+      if (analytics.source) {
+        analyticsParts.push(`Source: ${analytics.source}`)
+      }
+
+      if (analytics.model_spread) {
+        const ms = analytics.model_spread
+        let spreadLine = `Model Spread: ${ms.team} ${ms.line}`
+        if (ms.adjusted) spreadLine += ` (Adjusted: ${ms.adjusted})`
+        if (ms.note) spreadLine += ` - ${ms.note}`
+        analyticsParts.push(spreadLine)
+      }
+
+      if (analytics.model_scores) {
+        const scores = Object.entries(analytics.model_scores)
+          .map(([team, score]) => `${team}: ${score}`)
+          .join(', ')
+        analyticsParts.push(`Predicted Scores: ${scores}`)
+      }
+
+      if (analytics.qb_grades) {
+        const qbLines = Object.entries(analytics.qb_grades)
+          .map(([qb, grades]) => {
+            const gradeStr = Object.entries(grades)
+              .filter(([k]) => k.endsWith('_pctl'))
+              .map(([k, v]) => `${k.replace('_pctl', '')}: ${v}th`)
+              .join(', ')
+            const note = (grades as Record<string, unknown>).note as string | undefined
+            return `${qb}: ${gradeStr}${note ? ` (${note})` : ''}`
+          })
+          .join('\n')
+        analyticsParts.push(`QB Grades (Percentile):\n${qbLines}`)
+      }
+
+      if (analytics.tprr_matchups?.length) {
+        const tprrLines = analytics.tprr_matchups
+          .map(m => {
+            let line = `${m.player} (${m.team || '?'}): ${(m.tprr * 100).toFixed(0)}% TPRR vs ${m.coverage}`
+            if (m.opp_rate) line += `, opp plays ${m.coverage} ${(m.opp_rate * 100).toFixed(0)}%`
+            if (m.vs_overall_delta) line += ` (+${m.vs_overall_delta} vs baseline)`
+            if (m.note) line += ` [${m.note}]`
+            return line
+          })
+          .join('\n')
+        analyticsParts.push(`TPRR Matchups:\n${tprrLines}`)
+      }
+
+      if (analytics.insights?.length) {
+        analyticsParts.push(`Insights:\n- ${analytics.insights.join('\n- ')}`)
+      }
+
+      if (analyticsParts.length > 0) {
+        parts.push(`\n### Analytics\n${analyticsParts.join('\n\n')}`)
+      }
+    }
+
+    // Build SGP suggestions if available
+    if (gameNotes.sgps?.length) {
+      const sgpLines = gameNotes.sgps
+        .map(sgp => {
+          let line = sgp.name ? `**${sgp.name}**: ` : ''
+          line += sgp.legs.join(' + ')
+          if (sgp.odds) line += ` → ${sgp.odds}`
+          line += ` [${sgp.confidence}]`
+          if (sgp.rationale) line += `\n  Rationale: ${sgp.rationale}`
+          return line
+        })
+        .join('\n\n')
+      parts.push(`\n### Suggested SGPs\n${sgpLines}`)
     }
 
     gameNotesSection = `

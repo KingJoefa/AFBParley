@@ -9,6 +9,36 @@ import type { GameNotesContext } from '../analyst'
  * Returns undefined if notes unavailable (graceful degradation).
  */
 
+interface TPRRMatchup {
+  player: string
+  team?: string
+  tprr: number
+  coverage: string
+  vs_overall_delta?: number
+  opp_rate?: number
+  routes_10wk?: number
+  routes_last?: number
+  note?: string
+}
+
+interface Analytics {
+  source?: string
+  model_spread?: { team: string; line: number; adjusted?: number; note?: string }
+  model_scores?: Record<string, number>
+  pressure?: Record<string, unknown>
+  qb_grades?: Record<string, Record<string, unknown>>
+  tprr_matchups?: TPRRMatchup[]
+  insights?: string[]
+}
+
+interface SGP {
+  name?: string
+  legs: string[]
+  odds: string | null
+  confidence: string
+  rationale?: string
+}
+
 interface GameNotesFixture {
   week: number
   season: number
@@ -22,6 +52,8 @@ interface GameNotesFixture {
     keyMatchups?: string[]
     weather?: { temp_f?: number; wind_mph?: number; snow_chance_pct?: number }
     prediction?: { home: number; away: number }
+    analytics?: Analytics
+    sgps?: SGP[]
   }>
 }
 
@@ -110,6 +142,8 @@ export function loadGameNotes(
         keyMatchups: reverseGame.keyMatchups,
         totals: reverseGame.totals,
         spread: reverseGame.spread,
+        analytics: reverseGame.analytics,
+        sgps: reverseGame.sgps,
       }
     }
     return undefined
@@ -121,6 +155,8 @@ export function loadGameNotes(
     keyMatchups: game.keyMatchups,
     totals: game.totals,
     spread: game.spread,
+    analytics: game.analytics,
+    sgps: game.sgps,
   }
 }
 
