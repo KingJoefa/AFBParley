@@ -5,20 +5,25 @@
  * If a player has a posted line, they're eligible for player props.
  *
  * Fallback chain:
- *   1. XO props API (players with live lines)
- *   2. Projections - Injuries (if XO fails or < MIN_PLAYERS)
+ *   1. The Odds API (primary - live sportsbook lines)
+ *   2. Projections - Injuries (if API fails or < MIN_PLAYERS)
  *   3. Game-only mode (if both fail)
  */
 
 import fs from 'fs'
 import path from 'path'
-import { findCombosForMatchup } from '@/lib/xo/client'
-import type { XoCombo, XoLeg } from '@/lib/xo/types'
+import {
+  getOddsProvider,
+  isOddsProviderConfigured,
+  type PropLine as OddsProviderPropLine,
+  type FetchResult,
+} from '@/lib/odds-provider'
+import { normalizeName as oddsNormalizeName } from '@/lib/odds-provider'
 import { loadMatchupProjections, getCurrentWeekYear } from './projections-loader'
 import { fetchInjuriesContext } from '@/lib/context/injuries'
 import { normalizeName, buildAliasSet, type Player } from './roster-validator'
 
-// Minimum players required from XO before falling back
+// Minimum players required before falling back
 const MIN_PLAYERS_THRESHOLD = 6
 
 export type RosterSource = 'xo_props' | 'fallback_projections' | 'none'
@@ -28,13 +33,27 @@ export interface RosterOverrides {
   remove?: string[]  // Players to remove (e.g., "Bo Nix")
 }
 
+// Legacy PropLine format for Build route compatibility
 export interface PropLine {
   player: string
   team: string
-  market: string      // e.g., "rushing_yards", "receiving_yards", "pass_yards"
+  market: string      // e.g., "player_rush_yds", "player_pass_yds"
   line: number        // e.g., 51.5
   selection: string   // e.g., "over", "under"
   americanOdds?: number
+}
+
+// Odds provider telemetry
+export interface OddsTelemetry {
+  source: string              // 'the-odds-api' | 'xo-fallback' | 'none'
+  cacheStatus: string         // 'HIT' | 'MISS' | 'STALE_FALLBACK' | 'ERROR'
+  fetchedAt: string
+  creditsSpent: number
+  bookmaker: string
+  propLinesCount: number
+  playersWithLines: number
+  incompleteLineCount: number
+  unresolvedTeamCount: number
 }
 
 export interface PropsRosterResult {
@@ -42,9 +61,10 @@ export interface PropsRosterResult {
   players: Player[]
   aliasSet: Set<string>
   player_props_enabled: boolean
-  propLines: PropLine[]  // Actual lines from XO
+  propLines: PropLine[]  // Legacy format for Build
+  odds: OddsTelemetry    // New: detailed telemetry
   debug: {
-    xo_players_found: number
+    xo_players_found: number  // Deprecated, use odds.playersWithLines
     projections_players: number
     injuries_filtered: number
     overrides_applied: { added: string[]; removed: string[] }
@@ -72,7 +92,6 @@ function loadDefaultOverrides(): RosterOverrides {
 
 /**
  * Merge request overrides with defaults
- * Request overrides take precedence
  */
 function mergeOverrides(
   defaults: RosterOverrides,
@@ -80,7 +99,6 @@ function mergeOverrides(
 ): RosterOverrides {
   if (!request) return defaults
 
-  // Request is authoritative - union adds, union removes
   const add = [...new Set([...(defaults.add || []), ...(request.add || [])])]
   const remove = [...new Set([...(defaults.remove || []), ...(request.remove || [])])]
 
@@ -88,86 +106,7 @@ function mergeOverrides(
 }
 
 /**
- * Normalize player name for consistent storage
- * Trims, collapses spaces, title cases
- */
-function normalizePlayerName(first?: string, last?: string): string {
-  const raw = [first, last].filter(Boolean).join(' ')
-  // Trim, collapse spaces, preserve original casing (don't force title case to keep "CJ" etc.)
-  return raw.trim().replace(/\s+/g, ' ')
-}
-
-/**
- * Extract unique players from XO combos
- * Normalizes names at extraction time for consistent validation
- */
-function extractPlayersFromCombos(combos: XoCombo[]): Player[] {
-  const playerMap = new Map<string, Player>()
-
-  for (const combo of combos) {
-    for (const leg of combo.legs) {
-      if (!leg.player) continue
-
-      const { first, last, team, position } = leg.player
-      if (!first && !last) continue
-
-      // Normalize at extraction time
-      const name = normalizePlayerName(first, last)
-      const key = normalizeName(name)
-
-      if (!playerMap.has(key)) {
-        playerMap.set(key, {
-          name,
-          team: team?.toUpperCase() || 'UNK',
-          pos: position?.toUpperCase() || 'UNK',
-        })
-      }
-    }
-  }
-
-  return Array.from(playerMap.values())
-}
-
-/**
- * Extract prop lines from XO combos
- * Returns deduplicated lines per player/market/selection
- */
-function extractPropLinesFromCombos(combos: XoCombo[]): PropLine[] {
-  const lineMap = new Map<string, PropLine>()
-
-  for (const combo of combos) {
-    for (const leg of combo.legs) {
-      if (!leg.player || leg.line === null || leg.line === undefined) continue
-
-      const { first, last, team } = leg.player
-      if (!first && !last) continue
-
-      const playerName = normalizePlayerName(first, last)
-      const market = leg.marketType || 'unknown'
-      const selection = leg.selectionType || 'over'
-
-      // Create unique key for deduplication
-      const key = `${normalizeName(playerName)}|${market}|${selection}|${leg.line}`
-
-      if (!lineMap.has(key)) {
-        lineMap.set(key, {
-          player: playerName,
-          team: team?.toUpperCase() || 'UNK',
-          market,
-          line: leg.line,
-          selection,
-          americanOdds: combo.americanOdds,
-        })
-      }
-    }
-  }
-
-  return Array.from(lineMap.values())
-}
-
-/**
  * Apply overrides to player list
- * Normalizes override names at application time for consistent matching
  */
 function applyOverrides(
   players: Player[],
@@ -177,7 +116,7 @@ function applyOverrides(
   const result = [...players]
   const applied = { added: [] as string[], removed: [] as string[] }
 
-  // Remove players (normalize for matching)
+  // Remove players
   if (overrides.remove && overrides.remove.length > 0) {
     const removeSet = new Set(overrides.remove.map(normalizeName))
     const filtered = result.filter(p => !removeSet.has(normalizeName(p.name)))
@@ -188,14 +127,13 @@ function applyOverrides(
     result.push(...filtered)
   }
 
-  // Add players (normalize storage, preserve display name)
+  // Add players
   if (overrides.add && overrides.add.length > 0) {
     for (const rawName of overrides.add) {
-      const displayName = rawName.trim().replace(/\s+/g, ' ') // Normalize whitespace
+      const displayName = rawName.trim().replace(/\s+/g, ' ')
       const normalized = normalizeName(displayName)
       const exists = result.some(p => normalizeName(p.name) === normalized)
       if (!exists) {
-        // Infer team from the matchup if possible (first team code as default)
         result.push({
           name: displayName,
           team: teamCodes[0] || 'UNK',
@@ -210,23 +148,122 @@ function applyOverrides(
 }
 
 /**
- * Load players and prop lines from XO props API
+ * Adapt new OddsProvider PropLine to legacy format
+ * TODO: Migrate Build to consume new format directly
  */
-async function loadFromXO(
-  matchup: string,
-  year: number,
-  week: number
-): Promise<{ players: Player[]; propLines: PropLine[] }> {
+function adaptToLegacyPropLines(props: OddsProviderPropLine[]): PropLine[] {
+  const legacyLines: PropLine[] = []
+
+  for (const p of props) {
+    for (const outcome of p.outcomes) {
+      legacyLines.push({
+        player: p.player,
+        team: p.team || 'UNK',
+        market: p.market,
+        line: outcome.point || 0,
+        selection: outcome.name.toLowerCase(),
+        americanOdds: outcome.price,
+      })
+    }
+  }
+
+  return legacyLines
+}
+
+/**
+ * Load prop lines from The Odds API (primary)
+ */
+async function loadPropLines(
+  homeTeam: string,
+  awayTeam: string,
+  roster: Map<string, string>  // normalized name -> team code
+): Promise<{
+  propLines: PropLine[]
+  odds: OddsTelemetry
+}> {
+  const emptyOdds: OddsTelemetry = {
+    source: 'none',
+    cacheStatus: 'ERROR',
+    fetchedAt: new Date().toISOString(),
+    creditsSpent: 0,
+    bookmaker: '',
+    propLinesCount: 0,
+    playersWithLines: 0,
+    incompleteLineCount: 0,
+    unresolvedTeamCount: 0,
+  }
+
+  // Check if odds provider is configured
+  if (!isOddsProviderConfigured() && process.env.ODDS_FALLBACK_XO !== 'true') {
+    console.warn('[props-roster] No odds provider configured')
+    return { propLines: [], odds: emptyOdds }
+  }
+
   try {
-    const combos = await findCombosForMatchup({ year, week, matchup })
-    console.log(`[PropsRoster] XO returned ${combos.length} combos for ${matchup}`)
-    const players = extractPlayersFromCombos(combos)
-    const propLines = extractPropLinesFromCombos(combos)
-    console.log(`[PropsRoster] Extracted ${propLines.length} prop lines`)
-    return { players, propLines }
-  } catch (e) {
-    console.warn(`[PropsRoster] XO fetch failed: ${(e as Error).message}`)
-    return { players: [], propLines: [] }
+    const provider = getOddsProvider()
+
+    // Find event by teams
+    const eventId = await provider.findEventByTeams(homeTeam, awayTeam)
+    if (!eventId) {
+      console.warn(`[props-roster] No event found for ${awayTeam}@${homeTeam}`)
+      return {
+        propLines: [],
+        odds: {
+          ...emptyOdds,
+          source: 'the-odds-api',
+        },
+      }
+    }
+
+    // Fetch props with roster for team resolution
+    const result = await provider.fetchEventProps(eventId, undefined, roster)
+
+    if (!result.data || result.cacheStatus === 'ERROR') {
+      return {
+        propLines: [],
+        odds: {
+          source: result.source,
+          cacheStatus: result.cacheStatus,
+          fetchedAt: result.fetchedAt,
+          creditsSpent: result.creditsSpent,
+          bookmaker: result.bookmaker,
+          propLinesCount: 0,
+          playersWithLines: 0,
+          incompleteLineCount: result.incompleteLineCount || 0,
+          unresolvedTeamCount: result.unresolvedTeamCount || 0,
+        },
+      }
+    }
+
+    // Convert to legacy format
+    const propLines = adaptToLegacyPropLines(result.data.props)
+
+    // Count unique players
+    const uniquePlayers = new Set(propLines.map(p => oddsNormalizeName(p.player)))
+
+    return {
+      propLines,
+      odds: {
+        source: result.source,
+        cacheStatus: result.cacheStatus,
+        fetchedAt: result.fetchedAt,
+        creditsSpent: result.creditsSpent,
+        bookmaker: result.bookmaker,
+        propLinesCount: propLines.length,
+        playersWithLines: uniquePlayers.size,
+        incompleteLineCount: result.incompleteLineCount || 0,
+        unresolvedTeamCount: result.unresolvedTeamCount || 0,
+      },
+    }
+  } catch (err) {
+    console.error('[props-roster] Odds provider error:', err)
+    return {
+      propLines: [],
+      odds: {
+        ...emptyOdds,
+        source: 'error',
+      },
+    }
   }
 }
 
@@ -238,14 +275,12 @@ async function loadFromProjections(
   awayTeam: string,
   week: number
 ): Promise<{ players: Player[]; injuriesFiltered: number }> {
-  // Load projections
   const projections = await loadMatchupProjections(homeTeam, awayTeam)
 
   if (projections.length === 0) {
     return { players: [], injuriesFiltered: 0 }
   }
 
-  // Load injuries and filter OUT/DOUBTFUL
   let injuriesFiltered = 0
   try {
     const injuries = await fetchInjuriesContext({
@@ -285,6 +320,30 @@ function parseTeamCodes(matchup: string): string[] {
     'seahawks': 'SEA', 'seattle': 'SEA', 'sea': 'SEA',
     'rams': 'LA', 'los angeles rams': 'LA', 'la': 'LA', 'lar': 'LA',
     'bears': 'CHI', 'chicago': 'CHI', 'chi': 'CHI',
+    'chiefs': 'KC', 'kansas city': 'KC', 'kc': 'KC',
+    'ravens': 'BAL', 'baltimore': 'BAL', 'bal': 'BAL',
+    'bengals': 'CIN', 'cincinnati': 'CIN', 'cin': 'CIN',
+    'browns': 'CLE', 'cleveland': 'CLE', 'cle': 'CLE',
+    'steelers': 'PIT', 'pittsburgh': 'PIT', 'pit': 'PIT',
+    'colts': 'IND', 'indianapolis': 'IND', 'ind': 'IND',
+    'jaguars': 'JAX', 'jacksonville': 'JAX', 'jax': 'JAX',
+    'titans': 'TEN', 'tennessee': 'TEN', 'ten': 'TEN',
+    'raiders': 'LV', 'las vegas': 'LV', 'lv': 'LV',
+    'chargers': 'LAC', 'lac': 'LAC',
+    'cowboys': 'DAL', 'dallas': 'DAL', 'dal': 'DAL',
+    'giants': 'NYG', 'nyg': 'NYG',
+    'eagles': 'PHI', 'philadelphia': 'PHI', 'phi': 'PHI',
+    'commanders': 'WAS', 'washington': 'WAS', 'was': 'WAS',
+    'lions': 'DET', 'detroit': 'DET', 'det': 'DET',
+    'packers': 'GB', 'green bay': 'GB', 'gb': 'GB',
+    'vikings': 'MIN', 'minnesota': 'MIN', 'min': 'MIN',
+    'falcons': 'ATL', 'atlanta': 'ATL', 'atl': 'ATL',
+    'panthers': 'CAR', 'carolina': 'CAR', 'car': 'CAR',
+    'saints': 'NO', 'new orleans': 'NO', 'no': 'NO',
+    'buccaneers': 'TB', 'tampa bay': 'TB', 'tb': 'TB', 'bucs': 'TB',
+    'cardinals': 'ARI', 'arizona': 'ARI', 'ari': 'ARI',
+    'dolphins': 'MIA', 'miami': 'MIA', 'mia': 'MIA',
+    'jets': 'NYJ', 'nyj': 'NYJ',
   }
 
   const codes: string[] = []
@@ -296,7 +355,7 @@ function parseTeamCodes(matchup: string): string[] {
     }
   }
 
-  return codes.slice(0, 2) // At most 2 teams
+  return codes.slice(0, 2)
 }
 
 /**
@@ -306,65 +365,63 @@ export async function buildPropsRoster(
   matchup: string,
   requestOverrides?: RosterOverrides
 ): Promise<PropsRosterResult> {
-  // Get current week/year
   const { week, year } = await getCurrentWeekYear()
   const teamCodes = parseTeamCodes(matchup)
+  const homeTeam = teamCodes[1] || teamCodes[0] || 'UNK'
+  const awayTeam = teamCodes[0] || 'UNK'
 
   // Merge overrides
   const defaultOverrides = loadDefaultOverrides()
   const overrides = mergeOverrides(defaultOverrides, requestOverrides)
 
-  // Try XO props first
-  const xoResult = await loadFromXO(matchup, year, week)
-  const xoCount = xoResult.players.length
-  let propLines = xoResult.propLines
+  // Build roster map for team resolution (normalized name -> team)
+  const projResult = await loadFromProjections(homeTeam, awayTeam, week)
+  const rosterMap = new Map<string, string>()
+  for (const p of projResult.players) {
+    rosterMap.set(oddsNormalizeName(p.name), p.team)
+  }
 
-  let source: RosterSource = 'xo_props'
-  let players: Player[] = xoResult.players
-  let projectionsCount = 0
-  let injuriesFiltered = 0
+  // Load prop lines from odds provider
+  const { propLines, odds } = await loadPropLines(homeTeam, awayTeam, rosterMap)
 
-  // Fallback to projections if XO insufficient
-  if (xoResult.players.length < MIN_PLAYERS_THRESHOLD) {
-    console.log(`[PropsRoster] XO returned ${xoResult.players.length} players (< ${MIN_PLAYERS_THRESHOLD}), falling back to projections`)
+  // Determine roster source and players
+  let source: RosterSource = 'none'
+  let players: Player[] = []
 
-    const projResult = await loadFromProjections(
-      teamCodes[1] || teamCodes[0] || 'UNK', // home
-      teamCodes[0] || 'UNK', // away
-      week
-    )
-    projectionsCount = projResult.players.length
-    injuriesFiltered = projResult.injuriesFiltered
-
-    if (projResult.players.length >= MIN_PLAYERS_THRESHOLD) {
-      source = 'fallback_projections'
-      players = projResult.players
-      propLines = [] // No prop lines from projections fallback
-    } else {
-      // Both sources failed - disable player props
-      source = 'none'
-      players = []
-      propLines = []
+  if (propLines.length >= MIN_PLAYERS_THRESHOLD && odds.cacheStatus !== 'ERROR') {
+    source = 'xo_props'  // Keep naming for compatibility, actual source in odds.source
+    // Extract unique players from prop lines
+    const playerMap = new Map<string, Player>()
+    for (const pl of propLines) {
+      const key = oddsNormalizeName(pl.player)
+      if (!playerMap.has(key)) {
+        playerMap.set(key, {
+          name: pl.player,
+          team: pl.team,
+          pos: 'UNK',
+        })
+      }
     }
+    players = Array.from(playerMap.values())
+  } else if (projResult.players.length >= MIN_PLAYERS_THRESHOLD) {
+    source = 'fallback_projections'
+    players = projResult.players
   }
 
   // Apply overrides
   const { players: finalPlayers, applied } = applyOverrides(players, overrides, teamCodes)
-
-  // Build alias set for validation
   const aliasSet = buildAliasSet(finalPlayers)
 
-  // First-class telemetry for roster source tracking
+  // Telemetry
   console.log('[PropsRoster] roster_source_telemetry', {
     allowed_roster_source: source,
+    odds_source: odds.source,
+    odds_cache_status: odds.cacheStatus,
+    odds_credits_spent: odds.creditsSpent,
     player_count: finalPlayers.length,
-    player_props_enabled: source !== 'none' && finalPlayers.length >= MIN_PLAYERS_THRESHOLD,
-    matchup,
-    xo_players_found: xoCount,
-    prop_lines_extracted: propLines.length,
-    projections_fallback: source === 'fallback_projections',
-    overrides_add_count: applied.added.length,
-    overrides_remove_count: applied.removed.length,
+    prop_lines_count: odds.propLinesCount,
+    players_with_lines: odds.playersWithLines,
+    player_props_enabled: source !== 'none',
   })
 
   return {
@@ -372,11 +429,12 @@ export async function buildPropsRoster(
     players: finalPlayers,
     aliasSet,
     player_props_enabled: source !== 'none' && finalPlayers.length >= MIN_PLAYERS_THRESHOLD,
-    propLines,
+    propLines: odds.cacheStatus !== 'ERROR' ? propLines : [], // Never return lines on ERROR
+    odds,
     debug: {
-      xo_players_found: xoCount,
-      projections_players: projectionsCount,
-      injuries_filtered: injuriesFiltered,
+      xo_players_found: odds.playersWithLines,  // Repurposed
+      projections_players: projResult.players.length,
+      injuries_filtered: projResult.injuriesFiltered,
       overrides_applied: applied,
       prop_lines_extracted: propLines.length,
     },
@@ -427,7 +485,7 @@ Do NOT include any player-specific props.`
     return `${team}:\n${lines.join('\n')}`
   }
 
-  return `## Allowed Players for This Matchup (Source: ${result.source})
+  return `## Allowed Players for This Matchup (Source: ${result.odds.source})
 
 ${formatTeam(awayTeam)}
 
