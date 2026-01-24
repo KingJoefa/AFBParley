@@ -24,6 +24,8 @@ import {
   type RosterOverrides,
   type PropsRosterResult,
 } from '@/lib/terminal/engine/props-roster'
+import { loadGameNotes } from '@/lib/terminal/engine/notes-loader'
+import type { Analytics, SGP } from '@/lib/terminal/analyst'
 
 /**
  * /api/terminal/build
@@ -284,7 +286,9 @@ function buildStoryModePrompt(
   signals?: string[],
   script_bias?: string[],
   rosterBlock?: string,
-  retryInstruction?: string
+  retryInstruction?: string,
+  analytics?: Analytics,
+  sgps?: SGP[]
 ): string {
   // Separate notes findings from other findings
   const notesFindings = findings.filter(f => f.agent === 'notes')
@@ -338,13 +342,83 @@ function buildStoryModePrompt(
   const rosterSection = rosterBlock ? `\n${rosterBlock}\n` : ''
   const retrySection = retryInstruction ? `\n## IMPORTANT RETRY INSTRUCTION\n\n${retryInstruction}\n` : ''
 
+  // Build analytics section from KoalatyStats data
+  let analyticsSection = ''
+  if (analytics) {
+    const analyticsParts: string[] = []
+
+    if (analytics.source) {
+      analyticsParts.push(`Source: ${analytics.source}`)
+    }
+
+    if (analytics.model_spread) {
+      const ms = analytics.model_spread
+      let spreadLine = `Model Spread: ${ms.team} ${ms.line}`
+      if (ms.adjusted) spreadLine += ` (Adjusted: ${ms.adjusted})`
+      if (ms.note) spreadLine += ` — ${ms.note}`
+      analyticsParts.push(spreadLine)
+    }
+
+    if (analytics.model_scores) {
+      const scores = Object.entries(analytics.model_scores)
+        .map(([team, score]) => `${team}: ${score}`)
+        .join(', ')
+      analyticsParts.push(`Predicted Scores: ${scores}`)
+    }
+
+    if (analytics.qb_grades) {
+      const qbLines = Object.entries(analytics.qb_grades)
+        .map(([qb, grades]) => {
+          const gradeEntries = Object.entries(grades as Record<string, unknown>)
+            .filter(([k]) => k.endsWith('_pctl'))
+            .map(([k, v]) => `${k.replace('_pctl', '').replace(/_/g, ' ')}: ${v}th pctl`)
+          const note = (grades as Record<string, unknown>).note as string | undefined
+          return `**${qb}**: ${gradeEntries.slice(0, 4).join(', ')}${note ? ` (${note})` : ''}`
+        })
+        .join('\n')
+      if (qbLines) analyticsParts.push(`QB Grades:\n${qbLines}`)
+    }
+
+    if (analytics.tprr_matchups && analytics.tprr_matchups.length > 0) {
+      const tprrLines = analytics.tprr_matchups.slice(0, 6).map(m => {
+        let line = `- **${m.player}** (${m.team || '?'}): ${(m.tprr * 100).toFixed(0)}% TPRR vs ${m.coverage}`
+        if (m.opp_rate) line += `, opponent uses ${m.coverage} ${(m.opp_rate * 100).toFixed(0)}% of snaps`
+        if (m.vs_overall_delta) line += ` (+${m.vs_overall_delta} pts vs baseline)`
+        return line
+      }).join('\n')
+      analyticsParts.push(`TPRR Matchups (Target Percentage on Routes Run):\n${tprrLines}`)
+    }
+
+    if (analytics.insights && analytics.insights.length > 0) {
+      analyticsParts.push(`Key Insights:\n${analytics.insights.map(i => `- ${i}`).join('\n')}`)
+    }
+
+    if (analyticsParts.length > 0) {
+      analyticsSection = `\n## Analytics Context (KoalatyStats)\n\n${analyticsParts.join('\n\n')}\n`
+    }
+  }
+
+  // Build SGP examples section from KoalatyStats suggested parlays
+  let sgpExamplesSection = ''
+  if (sgps && sgps.length > 0) {
+    const sgpLines = sgps.map(sgp => {
+      const legsStr = sgp.legs.join(' + ')
+      const confBadge = sgp.confidence === 'high' ? '★' : sgp.confidence === 'medium' ? '◆' : '○'
+      let line = `${confBadge} **${sgp.name || 'Suggested SGP'}**: ${legsStr}`
+      if (sgp.odds) line += ` → ${sgp.odds}`
+      if (sgp.rationale) line += `\n   _Rationale: ${sgp.rationale}_`
+      return line
+    }).join('\n\n')
+    sgpExamplesSection = `\n## Seed SGPs (Analyst Suggestions - Use as Inspiration)\n\nThese are real analyst suggestions for this matchup. Use them as starting points but CREATE YOUR OWN variations:\n\n${sgpLines}\n`
+  }
+
   return `You are a sports betting analyst generating narrative-driven parlay scripts.
 ${retrySection}
 ## Matchup
 
 ${matchup}
 ${anchorSection}${signalsSection}${biasSection}
-${rosterSection}${curatedNotesSection}
+${rosterSection}${curatedNotesSection}${analyticsSection}${sgpExamplesSection}
 ${alertsSection}
 
 ${findingsSection}
@@ -353,9 +427,23 @@ ${findingsSection}
 
 Generate 3 narrative-driven parlay scripts for this matchup. Each script should:
 1. Tell a coherent story about how the game might unfold
-2. Include 3-4 legs that support the narrative
-3. Use illustrative American odds (typically -110)
+2. Include 3-5 legs that support the narrative (vary the count across scripts)
+3. Use illustrative American odds (typically -110 to -130 for favorites, +100 to +200 for props)
 4. Include parlay math showing the payout calculation
+5. **CRITICAL: Mix leg types across different market families** (see Market Diversity below)
+
+## Market Diversity Requirements
+
+Each script MUST include legs from at least 3 different market families:
+- **Game/Team Markets**: Spread, Moneyline, Game Total O/U, Team Total O/U, 1H Spread, 1H Total
+- **QB Props**: Pass Yards, Pass TDs, Completions, INTs, Rushing Yards
+- **Skill Position Props**: Receiving Yards, Receptions, Rushing Yards, Rushing Attempts
+- **Big Play Props**: Longest Reception, Longest Rush, Anytime TD Scorer
+- **Defensive Props**: Sacks, INTs, Defensive/ST TD
+
+DO NOT repeat the same template (e.g., "Spread + Team Total + ML") across multiple scripts.
+DO leverage the TPRR matchups and QB grades from Analytics Context to identify specific player prop angles.
+${sgps && sgps.length > 0 ? 'DO use the Seed SGPs as inspiration but create NEW variations with different leg combinations.' : ''}
 
 ## Output Format
 
@@ -371,35 +459,41 @@ Return ONLY valid JSON matching this exact schema:
   },
   "scripts": [
     {
-      "title": "Descriptive Title",
-      "narrative": "2-3 sentence story explaining the betting thesis",
+      "title": "Descriptive Title Reflecting the Narrative",
+      "narrative": "2-3 sentence story explaining WHY these legs correlate based on the analytics and matchup context",
       "legs": [
         {
-          "market": "Game Total",
-          "selection": "Under 44.5",
+          "market": "Team Total",
+          "selection": "Patriots Over 24.5 Points",
           "american_odds": -110,
           "odds_source": "illustrative"
         },
         {
-          "market": "Player Props",
-          "selection": "Drake Maye Over 245.5 Passing Yards",
-          "american_odds": -110,
+          "market": "Anytime TD",
+          "selection": "Rhamondre Stevenson Anytime TD",
+          "american_odds": -120,
           "odds_source": "illustrative"
         },
         {
-          "market": "Player Props",
-          "selection": "DeMario Douglas Over 5.5 Receptions",
+          "market": "Rushing Props",
+          "selection": "Stevenson Over 74.5 Rushing Yards",
+          "american_odds": -115,
+          "odds_source": "illustrative"
+        },
+        {
+          "market": "QB Props",
+          "selection": "Jarrett Stidham Under 199.5 Pass Yards",
           "american_odds": -110,
           "odds_source": "illustrative"
         }
       ],
       "parlay_math": {
         "stake": 1,
-        "leg_decimals": [1.91, 1.91, 1.91],
-        "product_decimal": 6.97,
-        "payout": 6.97,
-        "profit": 5.97,
-        "steps": "1.91 × 1.91 × 1.91 = 6.97"
+        "leg_decimals": [1.91, 1.83, 1.87, 1.91],
+        "product_decimal": 6.21,
+        "payout": 6.21,
+        "profit": 5.21,
+        "steps": "1.91 × 1.83 × 1.87 × 1.91 = 6.21"
       },
       "notes": [
         "No guarantees; high variance by design.",
@@ -414,14 +508,15 @@ Return ONLY valid JSON matching this exact schema:
 ## Rules
 
 1. Output ONLY valid JSON - no markdown, no explanation
-2. Generate exactly 3 scripts
-3. Each script must have 3-4 legs
+2. Generate exactly 3 scripts with DIFFERENT narrative angles
+3. Each script must have 3-5 legs from at least 3 different market families
 4. All odds_source should be "illustrative" unless user provided specific odds
-5. Parlay math must be accurate (decimal odds, product, payout, profit)
-6. Narratives should be specific to this matchup, not generic
-7. Use the alerts and findings to inform your scripts
+5. Parlay math must be accurate (decimal odds = 1 + |american|/100 for minus odds, 1 + american/100 for plus odds)
+6. Narratives should reference SPECIFIC stats from Analytics Context (TPRR matchups, QB grades, model predictions)
+7. Use alerts and findings to inform scripts, but prioritize analytics for player-specific angles
 8. Always include the two standard notes about guarantees and odds
-${rosterBlock ? '9. ONLY use player names from the Allowed Players list. Do NOT invent player names.' : ''}
+9. DO NOT create 3 scripts that all follow the same "Spread + Team Total + ML" pattern
+${rosterBlock ? '10. ONLY use player names from the Allowed Players list. Do NOT invent player names.' : ''}
 
 Respond with ONLY the JSON object, no surrounding text.`
 }
@@ -546,6 +641,13 @@ interface BuildSwantailResult {
     regenerated?: boolean
     fallback_to_game_level?: boolean
   }
+  debug_context_used?: {
+    used_analytics: boolean
+    used_sgps: boolean
+    analytics_source?: string
+    tprr_matchups_count?: number
+    sgps_count?: number
+  }
 }
 
 /**
@@ -572,6 +674,22 @@ async function buildSwantailViewDirect(
 
   console.log(`[Build] Roster source: ${rosterResult.source}, players: ${rosterResult.players.length}, props_enabled: ${rosterResult.player_props_enabled}`)
 
+  // Step 1.5: Load game notes for analytics context (TPRR matchups, QB grades, SGPs)
+  const gameNotes = loadGameNotes(homeTeam, awayTeam)
+  const analytics = gameNotes?.analytics
+  const sgps = gameNotes?.sgps
+
+  // Track what context was available for debugging
+  const debugContextUsed: BuildSwantailResult['debug_context_used'] = {
+    used_analytics: !!analytics,
+    used_sgps: !!(sgps && sgps.length > 0),
+    analytics_source: analytics?.source,
+    tprr_matchups_count: analytics?.tprr_matchups?.length || 0,
+    sgps_count: sgps?.length || 0,
+  }
+
+  console.log(`[Build] Analytics context: source=${analytics?.source || 'none'}, tprr_matchups=${debugContextUsed.tprr_matchups_count}, sgps=${debugContextUsed.sgps_count}`)
+
   // Build roster block for prompt
   const rosterBlock = formatPropsRosterForPrompt(rosterResult, homeTeam, awayTeam)
 
@@ -583,8 +701,13 @@ async function buildSwantailViewDirect(
     debug: rosterResult.debug,
   }
 
-  // Step 2: Initial LLM call with roster grounding
-  const initialPrompt = buildStoryModePrompt(matchup, alerts, findings, anchor, signals, script_bias, rosterBlock)
+  // Step 2: Initial LLM call with roster grounding AND analytics context
+  const initialPrompt = buildStoryModePrompt(
+    matchup, alerts, findings, anchor, signals, script_bias, rosterBlock,
+    undefined, // retryInstruction
+    analytics,
+    sgps
+  )
   let result = await callLLM(client, initialPrompt)
 
   // Step 3: Validate players if roster available
@@ -612,7 +735,7 @@ async function buildSwantailViewDirect(
       const retryInstruction = buildRetryPrompt(validation.invalid)
       const retryPrompt = buildStoryModePrompt(
         matchup, alerts, findings, anchor, signals, script_bias,
-        rosterBlock, retryInstruction
+        rosterBlock, retryInstruction, analytics, sgps
       )
 
       try {
@@ -635,6 +758,7 @@ async function buildSwantailViewDirect(
               invalid_players: validation.invalid,
               regenerated: true,
             },
+            debug_context_used: debugContextUsed,
           }
         } else {
           // Still invalid after retry - log and return with warning
@@ -648,6 +772,7 @@ async function buildSwantailViewDirect(
               regenerated: true,
               fallback_to_game_level: false,
             },
+            debug_context_used: debugContextUsed,
           }
         }
       } catch (retryError) {
@@ -660,6 +785,7 @@ async function buildSwantailViewDirect(
             invalid_players: validation.invalid,
             regenerated: false,
           },
+          debug_context_used: debugContextUsed,
         }
       }
     }
@@ -671,6 +797,7 @@ async function buildSwantailViewDirect(
       validation: {
         players_checked: extractedPlayers.length,
       },
+      debug_context_used: debugContextUsed,
     }
   }
 
@@ -678,6 +805,7 @@ async function buildSwantailViewDirect(
   return {
     view: { kind: 'swantail', data: result },
     roster_info: rosterInfo,
+    debug_context_used: debugContextUsed,
   }
 }
 
@@ -799,6 +927,7 @@ export async function POST(req: NextRequest) {
     let view: BuildView
     let rosterInfo: BuildSwantailResult['roster_info'] | undefined
     let rosterValidation: BuildSwantailResult['validation'] | undefined
+    let debugContextUsed: BuildSwantailResult['debug_context_used'] | undefined
 
     if (output_type === 'story') {
       // Story mode: LLM-generated narratives
@@ -817,13 +946,14 @@ export async function POST(req: NextRequest) {
         view = result.view
         rosterInfo = result.roster_info
         rosterValidation = result.validation
+        debugContextUsed = result.debug_context_used
       }
     } else {
       // Prop/Parlay modes: Terminal correlated parlays
       view = await buildTerminalView(alerts, findings, options)
     }
 
-    // Return BuildResult with roster_info for debugging
+    // Return BuildResult with roster_info and debug_context_used for debugging
     return Response.json({
       build_id: `build-${requestId}`,
       request_id: requestId,
@@ -834,6 +964,7 @@ export async function POST(req: NextRequest) {
       timing_ms: Date.now() - startTime,
       ...(rosterInfo && { roster_info: rosterInfo }),
       ...(rosterValidation && { roster_validation: rosterValidation }),
+      ...(debugContextUsed && { debug_context_used: debugContextUsed }),
     })
   } catch (error) {
     return Response.json(

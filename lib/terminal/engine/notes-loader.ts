@@ -61,18 +61,40 @@ const NOTES_DIR = join(process.cwd(), 'data/notes')
 
 /**
  * Get current NFL week (rough estimate)
+ *
+ * NFL Postseason Schedule (typical):
+ * - Week 19: Wild Card (mid-January)
+ * - Week 20: Divisional (3rd week of January)
+ * - Week 21: Conference Championships (4th week of January)
+ * - Week 22: Super Bowl (early February)
  */
 function getCurrentWeek(): { season: number; week: number } {
   const now = new Date()
   const year = now.getFullYear()
+  const month = now.getMonth() // 0-indexed (0 = January)
+  const day = now.getDate()
+
   // NFL season starts around Sept 1
   const seasonStart = new Date(year, 8, 1) // Sept 1
 
   if (now < seasonStart) {
-    // Before season, use previous year's postseason
-    return { season: year - 1, week: 20 }
+    // Before September = previous year's season
+    // Determine postseason week based on calendar date
+    if (month === 0) {
+      // January: Wild Card (week 19) through Conference Championships (week 21)
+      if (day <= 13) return { season: year - 1, week: 19 } // Wild Card
+      if (day <= 20) return { season: year - 1, week: 20 } // Divisional
+      return { season: year - 1, week: 21 } // Conference Championships
+    } else if (month === 1) {
+      // February: Super Bowl (week 22) or offseason
+      if (day <= 15) return { season: year - 1, week: 22 } // Super Bowl
+      return { season: year - 1, week: 22 } // Post-Super Bowl
+    }
+    // March-August: Offseason, default to last available
+    return { season: year - 1, week: 22 }
   }
 
+  // September onwards: current season
   const weeksSinceStart = Math.ceil((now.getTime() - seasonStart.getTime()) / (7 * 24 * 60 * 60 * 1000))
   return { season: year, week: Math.min(weeksSinceStart + 1, 22) }
 }
