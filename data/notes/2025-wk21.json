@@ -8,6 +8,24 @@
       "totals": { "home": 18, "away": 23 },
       "spread": { "favorite": "NE", "line": -4.5 },
       "notes": "Bo Nix fractured right ankle in OT vs Bills - OUT for season. Jarrett Stidham has not thrown a pass since January 2024 (749 days since last attempt on Jan 7, 2024). Patriots favored by 4.5 points. Denver defense ranks 4th in sacks with 47 this season, 3rd in pass rush win rate. NE allowed 30 sacks on the season, finished 13th in pass block win rate - Drake Maye mobile enough to escape pressure with 10.3% scramble rate (led all QBs). Drake Maye led NFL in QBR and completion percentage over expectation. Kayshon Boutte: 4th receiving TD on deep fade/go route this season (tied 2nd in NFL), played 55.4% of offensive snaps, totaled 33 receptions for 551 yards and 6 touchdowns. Hunter Henry: Broncos allowed 59.7 receiving yards per game to opposing tight ends, Henry caught 5 touchdowns in the red zone this season. Broncos: 13th comeback win of the season (NFL record 12 in regular season), 6 wins trailing in 4th quarter. Patriots beat Texans 17-3 in Divisional with dominant defensive performance. DeMario Douglas leads NE with 110 targets, 8th in receiving EPA. Mile High altitude factor for visiting team. Cold weather expected (28-35°F range).",
+      "writeups": [
+        {
+          "perspective": "Subjective game script perspective (not ground truth).",
+          "source": "user-provided narrative",
+          "created_at": "2026-01-22T00:00:00Z",
+          "confidence": 0.58,
+          "blocks": [
+            { "tag": "angles", "text": "Denver plays man at a top-2 rate, creating QB-run lanes; Drake Maye finished 4th among QBs in rushing yards (450)." },
+            { "tag": "game_script", "text": "New England can stay on schedule enough to keep this close despite altitude and Denver talent, while a Stidham-led offense stays balanced and run-first." },
+            { "tag": "player_notes", "text": "Rhamondre Stevenson has out-snapped TreVeyon Henderson 80-51 in the playoffs, out-gained him 6.3 to 2.6 in yards per touch, and has not fumbled since Week 5." },
+            { "tag": "coverage_matchups", "text": "Denver is strong on the perimeter but softer over the middle (9th-most TE yards allowed); Hunter Henry is the primary beneficiary, with Austin Hooper as a sleeper." },
+            { "tag": "player_notes", "text": "Kayshon Boutte is hot (7/9 for 141 and a TD in two playoff games) but draws Patrick Surtain II/Riley Moss; Stefon Diggs remains volatile on sub-7 targets in 7 of the last 8 games." },
+            { "tag": "injury_watch", "text": "Bo Nix is out (ankle). Monitor J.K. Dobbins (foot) and C Luke Wattenberg (shoulder); both materially affect Denver's run game. Patriots CB Carlton Davis is in concussion protocol." },
+            { "tag": "player_notes", "text": "If Pat Bryant or Troy Franklin is limited, Marvin Mims Jr. can keep a featured role after 8/93/1 on eight targets vs Buffalo." },
+            { "tag": "score_pred", "text": "Patriots 21, Broncos 17." }
+          ]
+        }
+      ],
       "injuries": {
         "DEN": ["Bo Nix (ankle) - OUT for season, Jarrett Stidham starts"],
         "NE": []
@@ -81,6 +99,24 @@
       "totals": { "home": 25, "away": 22.5 },
       "spread": { "favorite": "SEA", "line": -2.5 },
       "notes": "Rams offense #1 in EPA per play this season, highest success rate on designed runs at 50%. Teams split regular season 1-1 (Rams 21-19 Week 11, Seahawks 38-37 OT Week 16). Seahawks dominated 49ers 41-6 in Divisional, held SF to 9 points combined in two games. Sam Darnold dealing with oblique injury but expected to play - PFF #4 QB when not pressured, but ranks 27th in QBR since Week 11 (when he first played Rams). Darnold's air yards per target dropped after Week 11. Matthew Stafford probable (finger sprain), potential MVP candidate. Seattle defense elite: league-low 6.0 YPA allowed, 4th-lowest passer rating (77.9), #1 defensive success rate on designed runs, best in NFL at 3.7 yards allowed per carry. Seahawks #1 special teams, #1 scoring defense, 3-0 at home in conference championship games. Puka Nacua and Davante Adams should challenge SEA secondary. Cooper Kupp game-time decision but trending towards playing. Kyren Williams: boost in receiving volume with at least 3 catches in each of past 4 games, coming off 2-touchdown, 117-yard performance vs Bears. Kenneth Walker/Zach Charbonnet near-even split, lean Charbonnet as grinder. Seattle's Tariq Woolen questionable (hamstring). Jaxon Smith-Njigba tagged SF for 6/84/0 and 9/124/0 this year - key target for Darnold.",
+      "writeups": [
+        {
+          "perspective": "Subjective game script perspective (not ground truth).",
+          "source": "user-provided narrative",
+          "created_at": "2026-01-22T00:00:00Z",
+          "confidence": 0.56,
+          "blocks": [
+            { "tag": "angles", "text": "Seattle's defense has held six of its last seven opponents to 16 points or fewer, and Stafford's recent efficiency is down (56.9% completion over last five)." },
+            { "tag": "game_script", "text": "Expect Seattle to keep Darnold in a game-manager box and lean heavily on Kenneth Walker III with Charbonnet out; the Rams may tilt toward 2- and 3-TE sets." },
+            { "tag": "coverage_matchups", "text": "Seattle allowed the 8th-fewest WR catches and 2nd-fewest WR yards, a tough draw for Nacua/Adams despite their talent." },
+            { "tag": "player_notes", "text": "Colby Parkinson has seven targets in four of the last six games and faces a defense that allowed the 5th-most TE catches and 6th-most TE yards." },
+            { "tag": "player_notes", "text": "Jaxon Smith-Njigba has cooked L.A. twice (9/105/0, 8/96/1), and the Rams have allowed multiple big WR lines since Week 14." },
+            { "tag": "injury_watch", "text": "LT Charles Cross (foot) is less than 100%, Sam Darnold (oblique) expected to play, Zach Charbonnet out (ACL). Stafford (finger) probable, Kupp (ankle) trending toward playing." },
+            { "tag": "player_notes", "text": "A.J. Barner logged two of his best games vs L.A. (10/70/0, 4/49/1) and profiles as a TD-or-dud dart even if Elijah Arroyo returns." },
+            { "tag": "score_pred", "text": "Seahawks 17, Rams 16." }
+          ]
+        }
+      ],
       "injuries": {
         "SEA": ["Sam Darnold (oblique) - expected to play", "Tariq Woolen (hamstring) - questionable"],
         "LAR": ["Matthew Stafford (finger) - probable", "Cooper Kupp (ankle) - game-time decision"]

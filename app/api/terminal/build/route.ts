@@ -24,9 +24,10 @@ import {
   type RosterOverrides,
   type PropsRosterResult,
   type PropLine,
+  type OddsTelemetry,
 } from '@/lib/terminal/engine/props-roster'
 import { loadGameNotes } from '@/lib/terminal/engine/notes-loader'
-import type { Analytics, SGP } from '@/lib/terminal/analyst'
+import type { Analytics, SGP, Writeup } from '@/lib/terminal/analyst'
 
 /**
  * /api/terminal/build
@@ -289,8 +290,10 @@ function buildStoryModePrompt(
   rosterBlock?: string,
   retryInstruction?: string,
   analytics?: Analytics,
+  writeups?: Writeup[],
   sgps?: SGP[],
-  propLines?: PropLine[]
+  propLines?: PropLine[],
+  oddsCacheStatus?: string  // 'HIT' | 'MISS' | 'STALE_FALLBACK' | 'ERROR'
 ): string {
   // Separate notes findings from other findings
   const notesFindings = findings.filter(f => f.agent === 'notes')
@@ -343,6 +346,25 @@ function buildStoryModePrompt(
   const biasSection = script_bias && script_bias.length > 0 ? `\n## Script Bias\n\n${script_bias.join(', ')}` : ''
   const rosterSection = rosterBlock ? `\n${rosterBlock}\n` : ''
   const retrySection = retryInstruction ? `\n## IMPORTANT RETRY INSTRUCTION\n\n${retryInstruction}\n` : ''
+
+  // Build perspective writeups section (non-factual narrative context)
+  let writeupsSection = ''
+  if (writeups && writeups.length > 0) {
+    const writeupLines = writeups.map((writeup, index) => {
+      const header = `Writeup ${index + 1}`
+      const metaParts = [
+        `perspective: ${writeup.perspective}`,
+        writeup.source ? `source: ${writeup.source}` : null,
+        writeup.created_at ? `created_at: ${writeup.created_at}` : null,
+        writeup.confidence !== undefined ? `confidence: ${writeup.confidence}` : null,
+      ].filter(Boolean)
+      const blocks = writeup.blocks
+        .map(block => `- [${block.tag}] ${block.text}`)
+        .join('\n')
+      return `${header}\n${metaParts.join(' | ')}\n${blocks}`
+    }).join('\n\n')
+    writeupsSection = `\n## Perspective Writeups (Subjective, Use for Narrative Only)\n\n${writeupLines}\n`
+  }
 
   // Build analytics section from KoalatyStats data
   let analyticsSection = ''
@@ -414,9 +436,20 @@ function buildStoryModePrompt(
     sgpExamplesSection = `\n## Seed SGPs (Analyst Suggestions - Use as Inspiration)\n\nThese are real analyst suggestions for this matchup. Use them as starting points but CREATE YOUR OWN variations:\n\n${sgpLines}\n`
   }
 
-  // Build prop lines section from XO sportsbook data
+  // Build prop lines section from sportsbook data
   let propLinesSection = ''
-  if (propLines && propLines.length > 0) {
+  if (oddsCacheStatus === 'ERROR') {
+    // Explicit ERROR state - no prop lines available, forbid player props
+    propLinesSection = `
+## Player Prop Lines Status: UNAVAILABLE
+
+**CRITICAL WARNING: Live prop lines could not be fetched (odds_source: ERROR)**
+
+You MUST NOT include ANY player props with specific yardage, reception, or TD numbers.
+If you include a player prop like "Stevenson Over 51.5 Rushing Yards", you are HALLUCINATING.
+This is strictly forbidden - use ONLY game-level markets (spread, total, moneyline, team props).
+`
+  } else if (propLines && propLines.length > 0) {
     // Group by market type for readability
     const byMarket = new Map<string, PropLine[]>()
     for (const pl of propLines) {
@@ -438,7 +471,7 @@ function buildStoryModePrompt(
       marketSections.push(`**${market}**:\n${lineStrs}`)
     }
 
-    propLinesSection = `\n## Available Prop Lines (Real Sportsbook Data)\n\n**IMPORTANT: Use these ACTUAL lines when building player props. Do NOT invent line numbers.**\n\n${marketSections.join('\n\n')}\n`
+    propLinesSection = `\n## Available Prop Lines (Live Sportsbook Data)\n\n**SOURCE: ${oddsCacheStatus === 'HIT' ? 'Cached' : oddsCacheStatus === 'STALE_FALLBACK' ? 'Stale Fallback' : 'Fresh'} | Use these EXACT lines - do NOT invent numbers**\n\n${marketSections.join('\n\n')}\n`
   }
 
   return `You are a sports betting analyst generating narrative-driven parlay scripts.
@@ -447,7 +480,7 @@ ${retrySection}
 
 ${matchup}
 ${anchorSection}${signalsSection}${biasSection}
-${rosterSection}${curatedNotesSection}${analyticsSection}${propLinesSection}${sgpExamplesSection}
+${rosterSection}${curatedNotesSection}${writeupsSection}${analyticsSection}${propLinesSection}${sgpExamplesSection}
 ${alertsSection}
 
 ${findingsSection}
@@ -677,6 +710,17 @@ interface BuildSwantailResult {
     tprr_matchups_count?: number
     sgps_count?: number
   }
+  odds_telemetry?: {
+    source: string              // 'the-odds-api' | 'xo-fallback' | 'none'
+    cache_status: string        // 'HIT' | 'MISS' | 'STALE_FALLBACK' | 'ERROR'
+    fetched_at: string
+    credits_spent: number
+    bookmaker: string
+    prop_lines_count: number
+    players_with_lines: number
+    incomplete_line_count: number
+    unresolved_team_count: number
+  }
 }
 
 /**
@@ -703,9 +747,26 @@ async function buildSwantailViewDirect(
 
   console.log(`[Build] Roster source: ${rosterResult.source}, players: ${rosterResult.players.length}, props_enabled: ${rosterResult.player_props_enabled}`)
 
+  // Log odds telemetry for visibility
+  console.log(`[Build] Odds telemetry: source=${rosterResult.odds.source}, cache_status=${rosterResult.odds.cacheStatus}, credits_spent=${rosterResult.odds.creditsSpent}, prop_lines=${rosterResult.odds.propLinesCount}`)
+
+  // Build odds telemetry object for response
+  const oddsTelemetry: BuildSwantailResult['odds_telemetry'] = {
+    source: rosterResult.odds.source,
+    cache_status: rosterResult.odds.cacheStatus,
+    fetched_at: rosterResult.odds.fetchedAt,
+    credits_spent: rosterResult.odds.creditsSpent,
+    bookmaker: rosterResult.odds.bookmaker,
+    prop_lines_count: rosterResult.odds.propLinesCount,
+    players_with_lines: rosterResult.odds.playersWithLines,
+    incomplete_line_count: rosterResult.odds.incompleteLineCount,
+    unresolved_team_count: rosterResult.odds.unresolvedTeamCount,
+  }
+
   // Step 1.5: Load game notes for analytics context (TPRR matchups, QB grades, SGPs)
   const gameNotes = loadGameNotes(homeTeam, awayTeam)
   const analytics = gameNotes?.analytics
+  const writeups = gameNotes?.writeups
   const sgps = gameNotes?.sgps
 
   // Track what context was available for debugging
@@ -735,8 +796,10 @@ async function buildSwantailViewDirect(
     matchup, alerts, findings, anchor, signals, script_bias, rosterBlock,
     undefined, // retryInstruction
     analytics,
+    writeups,
     sgps,
-    rosterResult.propLines
+    rosterResult.propLines,
+    rosterResult.odds.cacheStatus
   )
   let result = await callLLM(client, initialPrompt)
 
@@ -765,7 +828,8 @@ async function buildSwantailViewDirect(
       const retryInstruction = buildRetryPrompt(validation.invalid)
       const retryPrompt = buildStoryModePrompt(
         matchup, alerts, findings, anchor, signals, script_bias,
-        rosterBlock, retryInstruction, analytics, sgps, rosterResult.propLines
+        rosterBlock, retryInstruction, analytics, writeups, sgps, rosterResult.propLines,
+        rosterResult.odds.cacheStatus
       )
 
       try {
@@ -789,6 +853,7 @@ async function buildSwantailViewDirect(
               regenerated: true,
             },
             debug_context_used: debugContextUsed,
+            odds_telemetry: oddsTelemetry,
           }
         } else {
           // Still invalid after retry - log and return with warning
@@ -803,6 +868,7 @@ async function buildSwantailViewDirect(
               fallback_to_game_level: false,
             },
             debug_context_used: debugContextUsed,
+            odds_telemetry: oddsTelemetry,
           }
         }
       } catch (retryError) {
@@ -816,6 +882,7 @@ async function buildSwantailViewDirect(
             regenerated: false,
           },
           debug_context_used: debugContextUsed,
+          odds_telemetry: oddsTelemetry,
         }
       }
     }
@@ -828,6 +895,7 @@ async function buildSwantailViewDirect(
         players_checked: extractedPlayers.length,
       },
       debug_context_used: debugContextUsed,
+      odds_telemetry: oddsTelemetry,
     }
   }
 
@@ -836,6 +904,7 @@ async function buildSwantailViewDirect(
     view: { kind: 'swantail', data: result },
     roster_info: rosterInfo,
     debug_context_used: debugContextUsed,
+    odds_telemetry: oddsTelemetry,
   }
 }
 
@@ -958,6 +1027,7 @@ export async function POST(req: NextRequest) {
     let rosterInfo: BuildSwantailResult['roster_info'] | undefined
     let rosterValidation: BuildSwantailResult['validation'] | undefined
     let debugContextUsed: BuildSwantailResult['debug_context_used'] | undefined
+    let oddsTelemetry: BuildSwantailResult['odds_telemetry'] | undefined
 
     if (output_type === 'story') {
       // Story mode: LLM-generated narratives
@@ -977,6 +1047,7 @@ export async function POST(req: NextRequest) {
         rosterInfo = result.roster_info
         rosterValidation = result.validation
         debugContextUsed = result.debug_context_used
+        oddsTelemetry = result.odds_telemetry
       }
     } else {
       // Prop/Parlay modes: Terminal correlated parlays
@@ -995,6 +1066,7 @@ export async function POST(req: NextRequest) {
       ...(rosterInfo && { roster_info: rosterInfo }),
       ...(rosterValidation && { roster_validation: rosterValidation }),
       ...(debugContextUsed && { debug_context_used: debugContextUsed }),
+      ...(oddsTelemetry && { odds_telemetry: oddsTelemetry }),
     })
   } catch (error) {
     return Response.json(

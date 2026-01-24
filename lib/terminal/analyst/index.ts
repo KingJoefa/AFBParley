@@ -87,8 +87,22 @@ export interface SGP {
   rationale?: string
 }
 
+export interface WriteupBlock {
+  tag: string
+  text: string
+}
+
+export interface Writeup {
+  perspective: string
+  source?: string
+  created_at?: string
+  confidence?: number | string
+  blocks: WriteupBlock[]
+}
+
 export interface GameNotesContext {
   notes?: string
+  writeups?: Writeup[]
   injuries?: Record<string, string[]>
   keyMatchups?: string[]
   totals?: { home: number; away: number }
@@ -113,7 +127,7 @@ export function buildAnalystPrompt(
 
   // Build game notes section if available
   let gameNotesSection = ''
-  if (gameNotes?.notes || gameNotes?.injuries || gameNotes?.keyMatchups || gameNotes?.analytics) {
+  if (gameNotes?.notes || gameNotes?.writeups || gameNotes?.injuries || gameNotes?.keyMatchups || gameNotes?.analytics) {
     const parts: string[] = []
 
     if (gameNotes.totals || gameNotes.spread) {
@@ -125,6 +139,23 @@ export function buildAnalystPrompt(
 
     if (gameNotes.notes) {
       parts.push(`Scout Report: ${gameNotes.notes}`)
+    }
+
+    if (gameNotes.writeups?.length) {
+      const writeupLines = gameNotes.writeups.map((writeup, index) => {
+        const header = `Writeup ${index + 1}`
+        const metaParts = [
+          `perspective: ${writeup.perspective}`,
+          writeup.source ? `source: ${writeup.source}` : null,
+          writeup.created_at ? `created_at: ${writeup.created_at}` : null,
+          writeup.confidence !== undefined ? `confidence: ${writeup.confidence}` : null,
+        ].filter(Boolean)
+        const blocks = writeup.blocks
+          .map(block => `- [${block.tag}] ${block.text}`)
+          .join('\n')
+        return `${header}\n${metaParts.join(' | ')}\n${blocks}`
+      }).join('\n\n')
+      parts.push(`Perspective Writeups (Non-Factual):\n${writeupLines}`)
     }
 
     if (gameNotes.injuries) {

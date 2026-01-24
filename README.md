@@ -99,6 +99,9 @@ OPENAI_API_KEY=sk-...
 LINES_API_URL=https://...
 LINES_API_KEY=...
 
+# Optional: The Odds API for live sportsbook prop lines
+THE_ODDS_API_KEY=...  # Get from https://the-odds-api.com
+
 # Optional: Feature flags
 TERMINAL_PROP_ENABLED=true    # Enable /api/terminal/prop
 TERMINAL_STORY_ENABLED=true   # Enable /api/terminal/story

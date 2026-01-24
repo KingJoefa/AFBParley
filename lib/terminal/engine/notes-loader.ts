@@ -31,6 +31,19 @@ interface Analytics {
   insights?: string[]
 }
 
+interface WriteupBlock {
+  tag: string
+  text: string
+}
+
+interface Writeup {
+  perspective: string
+  source?: string
+  created_at?: string
+  confidence?: number | string
+  blocks: WriteupBlock[]
+}
+
 interface SGP {
   name?: string
   legs: string[]
@@ -48,6 +61,7 @@ interface GameNotesFixture {
     totals?: { home: number; away: number }
     spread?: { favorite: string; line: number }
     notes?: string
+    writeups?: Writeup[]
     injuries?: Record<string, string[]>
     keyMatchups?: string[]
     weather?: { temp_f?: number; wind_mph?: number; snow_chance_pct?: number }
@@ -160,6 +174,7 @@ export function loadGameNotes(
     if (reverseGame) {
       return {
         notes: reverseGame.notes,
+        writeups: reverseGame.writeups,
         injuries: reverseGame.injuries,
         keyMatchups: reverseGame.keyMatchups,
         totals: reverseGame.totals,
@@ -173,6 +188,7 @@ export function loadGameNotes(
 
   return {
     notes: game.notes,
+    writeups: game.writeups,
     injuries: game.injuries,
     keyMatchups: game.keyMatchups,
     totals: game.totals,
