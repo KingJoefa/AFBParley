@@ -240,28 +240,9 @@ export default function SwantailTerminalPanel(props: {
       degraded = true
     }
 
-    // Backend (wrapper health/config)
-    try {
-      const res = await fetch('/api/afb/health', { cache: 'no-store' })
-      if (!res.ok) throw new Error(`afb health ${res.status}`)
-      const json = await res.json()
-      const configured = Boolean(json?.wrapper?.configured)
-      const probeOk = Boolean(json?.wrapper?.probe?.ok)
-      if (!configured) {
-        setBackend({ state: 'error', configured, probeOk })
-        append('builder… error (not configured)', 'err')
-        hardError = true
-      } else if (!probeOk) {
-        setBackend({ state: 'degraded', configured, probeOk })
-        append('builder… ready (degraded)', 'warn')
-      } else {
-        setBackend({ state: 'ready', configured, probeOk })
-        append('builder… ready', 'ok')
-      }
-    } catch (e: any) {
-      setBackend({ state: 'degraded', error: e?.message || 'health failed' })
-      append('builder… unknown (health check failed)', 'warn')
-    }
+    // Backend check - Terminal 2.0 is self-contained (no external wrapper needed)
+    setBackend({ state: 'ready', configured: true, probeOk: true })
+    append('builder… ready (terminal 2.0)', 'ok')
 
     setPhase(hardError ? 'error' : 'ready')
     append(

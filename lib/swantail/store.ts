@@ -1,5 +1,4 @@
 import type { SwantailResponse } from '@/lib/swantail/schema'
-import type { AfbError } from '@/lib/afb/error'
 import type { SignalTag } from './signals'
 
 export type CheckState = 'booting' | 'ready' | 'degraded' | 'error'
@@ -46,7 +45,7 @@ export type BuildStatus =
   | { state: 'ready' } // matchup set, ready to build
   | { state: 'running'; startedAt: number }
   | { state: 'success'; receivedAt: number }
-  | { state: 'error'; error: AfbError }
+  | { state: 'error'; error: string }
 
 export type SwantailState = {
   matchup: string

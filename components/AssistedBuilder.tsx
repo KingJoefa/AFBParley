@@ -1,6 +1,5 @@
 'use client'
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { useAfb } from '@/app/hooks/useAfb'
 import { useTerminalScan } from '@/app/hooks/useTerminalScan'
 import SwantailScriptsView from '@/components/SwantailScriptsView'
 import TerminalAlertsView from '@/components/TerminalAlertsView'
@@ -35,7 +34,6 @@ function invertLineFocus(value: string): string {
 }
 
 export default function AssistedBuilder() {
-  const { build, isLoading: afbLoading, error: afbError, errorDetails } = useAfb()
   const { scan, abort: abortScan, isLoading: scanLoading, error: scanError } = useTerminalScan()
   const [state, dispatch] = useReducer(swantailReducer, initialSwantailState)
   const voice: 'analyst' = 'analyst'
@@ -81,8 +79,8 @@ export default function AssistedBuilder() {
   }, [selectedAgents, terminalState.analysisMeta?.status])
 
   // Unified loading/error state
-  const isLoading = afbLoading || scanLoading || isBuilding
-  const error = afbError || scanError
+  const isLoading = scanLoading || isBuilding
+  const error = scanError
 
   const matchup = state.matchup
   const lineFocus = state.anchor
@@ -222,36 +220,11 @@ export default function AssistedBuilder() {
     }
   }, [matchup, anchors, scriptBias, signals_raw, oddsPaste, abortScan])
 
-  const onOpposite = useCallback(async (scriptIndex: number) => {
-    if (!matchup.trim()) return
-    // Add contrarian signals for opposite case
-    const oppositeSignals = Array.from(new Set([
-      ...signals,
-      'contrarian' as const,
-      'game_script' as const,
-    ]))
-    const oppositeLine = invertLineFocus(lineFocus)
-    track('ui_build_clicked', { voice, anglesCount: oppositeSignals.length, opposite: true, scriptIndex })
-    try {
-      dispatch({ type: 'set_data', value: null })
-      const res = await build({
-        matchup: matchup.trim(),
-        lineFocus: oppositeLine.trim() || undefined,
-        angles: oppositeSignals,
-        voice,
-        userSuppliedOdds: oddsEntries.map(o => ({ leg: o.selectionText, americanOdds: o.americanOdds }))
-      })
-      if (res.ok) {
-        dispatch({ type: 'set_data', value: res.data })
-        setRightTab('scripts')
-        track('ui_build_success')
-      } else {
-        track('ui_build_error', { message: res.error?.message })
-      }
-    } catch (e) {
-      track('ui_build_error', { message: (e as any)?.message })
-    }
-  }, [matchup, lineFocus, signals, voice, oddsEntries, build])
+  // Counter-story feature (legacy AFB) - deprecated, can be re-implemented with Terminal API
+  const onOpposite = useCallback(async (_scriptIndex: number) => {
+    console.log('[AssistedBuilder] Counter-story feature not yet implemented in Terminal 2.0')
+    track('ui_action_clicked', { action: 'opposite_deprecated' })
+  }, [])
 
   const showNoMatches = useMemo(() => {
     if (!data || oddsEntries.length === 0) return false
@@ -310,8 +283,8 @@ export default function AssistedBuilder() {
       dispatch({ type: 'set_build', value: { state: 'running', startedAt: Date.now() } })
       return
     }
-    if (errorDetails) {
-      dispatch({ type: 'set_build', value: { state: 'error', error: errorDetails } })
+    if (error) {
+      dispatch({ type: 'set_build', value: { state: 'error', error } })
       return
     }
     if (data || buildResult) {
@@ -323,7 +296,7 @@ export default function AssistedBuilder() {
     } else {
       dispatch({ type: 'set_build', value: { state: 'idle' } })
     }
-  }, [isLoading, errorDetails, data, buildResult, matchup])
+  }, [isLoading, error, data, buildResult, matchup])
 
   // Get current view from cache for rendering
   const currentView = viewCache.get(outputType)
