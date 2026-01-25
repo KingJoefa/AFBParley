@@ -22,12 +22,21 @@ export type LinesStatus = {
     exists: boolean
     mtimeMs?: number | null
   }
+  notes?: {
+    exists: boolean
+    path: string
+    mtimeMs?: number | null
+  }
 }
 
 export function linesFallbackRelPath(year: number, week: number): string {
   const w = String(week).padStart(2, '0')
   // Use posix to keep stable forward-slash paths (better for UI + tests).
   return path.posix.join('my-parlaygpt', 'data', 'lines', String(year), `week-${w}.json`)
+}
+
+export function notesRelPath(year: number, week: number): string {
+  return path.posix.join('data', 'notes', `${year}-wk${week}.json`)
 }
 
 type ComputeParams = {
@@ -70,11 +79,25 @@ export async function computeLinesStatus(p: ComputeParams): Promise<LinesStatus>
   const stat = p.fileStat?.(abs) ?? null
   const exists = Boolean(stat?.isFile)
 
+  // Also check for notes file (data/notes/{year}-wk{week}.json)
+  const notesRel = notesRelPath(year, week)
+  const notesAbs = path.join(p.cwd, notesRel)
+  const notesStat = p.fileStat?.(notesAbs) ?? null
+  const notesExists = Boolean(notesStat?.isFile)
+
+  // Either fallback file or notes file counts as having local data
+  const hasLocalData = exists || notesExists
+
   const apiUrl = (p.linesApiUrl || '').trim()
   const configured = apiUrl.length > 0
 
   // Default: no ping attempt
   let api: LinesStatus['api'] = { configured, attempted: false }
+
+  // Notes info for response
+  const notes: LinesStatus['notes'] = notesExists
+    ? { exists: true, path: notesRel, mtimeMs: notesStat?.mtimeMs ?? null }
+    : { exists: false, path: notesRel }
 
   if (configured && p.fetchFn && p.matchup && p.matchup.trim()) {
     api.attempted = true
@@ -95,28 +118,31 @@ export async function computeLinesStatus(p: ComputeParams): Promise<LinesStatus>
         expected: { rel, abs },
         api,
         fallback: { exists, mtimeMs: stat?.mtimeMs ?? null },
+        notes,
       }
     }
-    // API configured but ping failed: surface as degraded (even if fallback exists).
+    // API configured but ping failed: use fallback/notes if available, else degraded
     return {
       year,
       week,
-      mode: 'degraded',
+      mode: hasLocalData ? 'fallback' : 'degraded',
       expected: { rel, abs },
       api,
       fallback: { exists, mtimeMs: stat?.mtimeMs ?? null },
+      notes,
     }
   }
 
-  // No API configured (or no matchup to ping): use fallback file.
+  // No API configured (or no matchup to ping): use fallback file or notes.
   if (!configured) {
     return {
       year,
       week,
-      mode: exists ? 'fallback' : 'missing',
+      mode: hasLocalData ? 'fallback' : 'missing',
       expected: { rel, abs },
       api,
       fallback: { exists, mtimeMs: stat?.mtimeMs ?? null },
+      notes,
     }
   }
 
@@ -129,6 +155,7 @@ export async function computeLinesStatus(p: ComputeParams): Promise<LinesStatus>
     expected: { rel, abs },
     api,
     fallback: { exists, mtimeMs: stat?.mtimeMs ?? null },
+    notes,
   }
 }
 

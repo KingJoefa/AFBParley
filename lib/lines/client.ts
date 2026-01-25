@@ -56,17 +56,54 @@ export async function fetchDirectLines(params: {
 		if (!awayCode || !homeCode) return null
 		const w = String(params.week).padStart(2, '0')
 		const file = path.join(process.cwd(), 'my-parlaygpt', 'data', 'lines', String(params.year), `week-${w}.json`)
-		if (!fs.existsSync(file)) return null
-		const arr = JSON.parse(fs.readFileSync(file, 'utf8')) as Array<any>
-		const rec = arr.find(r => (r.awayCode === awayCode && r.homeCode === homeCode))
-		if (!rec) return null
-		return {
-			total: pick(Number(rec.total)),
-			spreadHome: pick(Number(rec.spreadHome)),
-			spreadAway: pick(Number(rec.spreadAway)),
-			source: String(rec.source || 'manual'),
-			timestamp: pick(Number(rec.timestamp)),
+		if (fs.existsSync(file)) {
+			const arr = JSON.parse(fs.readFileSync(file, 'utf8')) as Array<any>
+			const rec = arr.find(r => (r.awayCode === awayCode && r.homeCode === homeCode))
+			if (rec) {
+				return {
+					total: pick(Number(rec.total)),
+					spreadHome: pick(Number(rec.spreadHome)),
+					spreadAway: pick(Number(rec.spreadAway)),
+					source: String(rec.source || 'manual'),
+					timestamp: pick(Number(rec.timestamp)),
+				}
+			}
 		}
+
+		// Fallback to data/notes/{year}-wk{week}.json (curated notes with game lines)
+		const notesFile = path.join(process.cwd(), 'data', 'notes', `${params.year}-wk${params.week}.json`)
+		if (fs.existsSync(notesFile)) {
+			const notes = JSON.parse(fs.readFileSync(notesFile, 'utf8'))
+			const matchupKey = `${awayCode}@${homeCode}`
+			const game = notes.games?.[matchupKey]
+			if (game) {
+				// Parse totals: { home: 18, away: 23 } -> total = 41
+				const gameTotal = game.totals
+					? (game.totals.home || 0) + (game.totals.away || 0)
+					: undefined
+				// Parse spread: { favorite: "NE", line: -4.5 }
+				let spreadHome: number | undefined
+				let spreadAway: number | undefined
+				if (game.spread) {
+					const line = Math.abs(game.spread.line || 0)
+					if (game.spread.favorite === homeCode) {
+						spreadHome = -line
+						spreadAway = line
+					} else {
+						spreadHome = line
+						spreadAway = -line
+					}
+				}
+				return {
+					total: pick(gameTotal),
+					spreadHome: pick(spreadHome),
+					spreadAway: pick(spreadAway),
+					source: 'notes',
+					timestamp: Date.now(),
+				}
+			}
+		}
+		return null
 	} catch {
 		return null
 	}

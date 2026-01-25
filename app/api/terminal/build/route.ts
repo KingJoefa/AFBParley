@@ -574,11 +574,12 @@ Return ONLY valid JSON matching this exact schema:
 3. Each script must have 3-5 legs from at least 3 different market families
 4. All odds_source should be "illustrative" unless user provided specific odds
 5. Parlay math must be accurate (decimal odds = 1 + |american|/100 for minus odds, 1 + american/100 for plus odds)
-6. Narratives should reference SPECIFIC stats from Analytics Context (TPRR matchups, QB grades, model predictions)
-7. Use alerts and findings to inform scripts, but prioritize analytics for player-specific angles
-8. Always include the two standard notes about guarantees and odds
-9. DO NOT create 3 scripts that all follow the same "Spread + Team Total + ML" pattern
-${rosterBlock ? '10. ONLY use player names from the Allowed Players list. Do NOT invent player names.' : ''}
+6. american_odds must be a plain integer (e.g., 120 or -110), never with a leading "+"
+7. Narratives should reference SPECIFIC stats from Analytics Context (TPRR matchups, QB grades, model predictions)
+8. Use alerts and findings to inform scripts, but prioritize analytics for player-specific angles
+9. Always include the two standard notes about guarantees and odds
+10. DO NOT create 3 scripts that all follow the same "Spread + Team Total + ML" pattern
+${rosterBlock ? '11. ONLY use player names from the Allowed Players list. Do NOT invent player names.' : ''}
 
 Respond with ONLY the JSON object, no surrounding text.`
 }
@@ -611,12 +612,17 @@ async function callLLM(
     throw new Error('LLM returned empty response')
   }
 
+  const sanitizeLenientJson = (raw: string): string => {
+    // Fix invalid JSON numbers like +120 (JSON doesn't allow leading '+').
+    return raw.replace(/([:\[,]\s*)\+(\d+(?:\.\d+)?)/g, '$1$2')
+  }
+
   // Parse and validate response
   let parsed: unknown
   try {
     // Strip markdown code blocks if present
     const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    parsed = JSON.parse(cleaned)
+    parsed = JSON.parse(sanitizeLenientJson(cleaned))
   } catch (e) {
     throw new Error(`Failed to parse LLM output as JSON: ${(e as Error).message}`)
   }
