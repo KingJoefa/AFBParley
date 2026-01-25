@@ -11,7 +11,7 @@ import {
   createInitialRunState,
   resetRun,
 } from '@/lib/terminal/run-state'
-import { computeInputsHash, type AnalysisMeta } from '@/lib/terminal/terminal-state'
+import { computeScanHash, type AnalysisMeta } from '@/lib/terminal/terminal-state'
 
 type CheckState = 'booting' | 'ready' | 'degraded' | 'error'
 
@@ -327,20 +327,22 @@ export default function SwantailTerminalPanel(props: {
     onRunStateChange?.(newState)
   }, [onRunStateChange])
 
-  // Compute current inputs hash for staleness detection
-  const analysisPayloadHash = useMemo(() =>
-    computeInputsHash(matchup, anchors, scriptBias, angles, oddsPaste || '', selectedAgents),
-    [matchup, anchors, scriptBias, angles, oddsPaste, selectedAgents]
+  // Compute scan-only hash (matchup + agents) for staleness detection
+  // Anchors, scriptBias, signals, oddsPaste are BUILD-phase choices made AFTER seeing findings
+  const scanPayloadHash = useMemo(() =>
+    computeScanHash(matchup, selectedAgents),
+    [matchup, selectedAgents]
   )
 
-  // Compute canBuild: requires successful scan with MATCHING hash (not stale)
+  // Compute canBuild: requires successful scan for same matchup + agents
+  // Anchors/bias changes do NOT require re-scan (they're post-scan thesis choices)
   const canBuild = useMemo(() => {
     return canAct &&
       anchors.length > 0 &&
       analysisMeta?.status === 'success' &&
-      analysisMeta?.scan_hash === analysisPayloadHash &&  // Enforce hash match
+      analysisMeta?.scan_hash === scanPayloadHash &&  // Only check matchup + agents match
       !isBuilding
-  }, [canAct, anchors.length, analysisMeta, analysisPayloadHash, isBuilding])
+  }, [canAct, anchors.length, analysisMeta, scanPayloadHash, isBuilding])
 
   const onHelp = useCallback(() => {
     append('help:', 'muted')
@@ -718,21 +720,6 @@ export default function SwantailTerminalPanel(props: {
             <div className={`rounded-full border px-2 py-1 text-[10px] font-mono ${analysisMeta?.scannedAt ? 'border-emerald-400/20 bg-emerald-500/10 text-emerald-200' : 'border-white/10 text-white/40'}`}>
               DATA {getFreshnessLabel(analysisMeta?.scannedAt)}
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-[11px] text-white/50">
-            <span className="font-mono">signals:</span>
-            <span className="max-w-[320px] truncate font-mono text-white/70">{signalDraft.trim() || '--'}</span>
-            <button
-              type="button"
-              onClick={onCopySignals}
-              disabled={!signalDraft.trim()}
-              className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-white/50 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Copy signals"
-              title="Copy signals"
-            >
-              ⎘
-            </button>
           </div>
 
           <div className="grid gap-1.5">

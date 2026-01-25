@@ -21,6 +21,7 @@ import {
   markScanning,
   markScanError,
   markScanStale,
+  computeScanHash,
   computeInputsHash,
 } from '@/lib/terminal/terminal-state'
 
@@ -103,7 +104,8 @@ export default function AssistedBuilder() {
 
     // Use passed agentIds or fall back to current selection
     const agentsToScan = options?.agentIds ?? selectedAgents
-    const scanHash = computeInputsHash(matchup, anchors, scriptBias, signals_raw, oddsPaste, agentsToScan)
+    // Scan hash only includes matchup + agents (not anchors/bias which are BUILD-phase choices)
+    const scanHash = computeScanHash(matchup, agentsToScan)
     track('ui_scan_clicked', { anglesCount: signals.length, agentIds: agentsToScan })
 
     // Clear previous build results on new scan

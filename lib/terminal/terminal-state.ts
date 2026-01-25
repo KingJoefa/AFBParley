@@ -84,8 +84,28 @@ export function createInitialTerminalState(): TerminalState {
 }
 
 /**
- * Compute a hash of scan-affecting inputs for staleness detection
- * Includes selectedAgents since agent scope is part of execution context
+ * Compute a hash of SCAN-affecting inputs only (matchup + agents)
+ * Anchors, scriptBias, signals, oddsPaste are BUILD-phase choices made AFTER seeing findings
+ * This hash determines if a re-scan is needed
+ */
+export function computeScanHash(
+  matchup: string,
+  selectedAgents?: string[]
+): string {
+  const agentKey = selectedAgents && selectedAgents.length > 0 ? selectedAgents.slice().sort().join(',') : 'all'
+  const payload = `scan:${matchup}|agents:${agentKey}`
+  let hash = 0
+  for (let i = 0; i < payload.length; i++) {
+    const char = payload.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash
+  }
+  return `s_${Math.abs(hash).toString(16)}`
+}
+
+/**
+ * Compute a hash of ALL inputs for Build phase validation
+ * Used by server to detect stale build requests
  * MUST exactly match server-side computation in /api/terminal/build/route.ts
  */
 export function computeInputsHash(
