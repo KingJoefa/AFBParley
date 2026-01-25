@@ -526,25 +526,25 @@ Return ONLY valid JSON matching this exact schema:
       "legs": [
         {
           "market": "Team Total",
-          "selection": "Patriots Over 24.5 Points",
+          "selection": "[TEAM] Over [LINE] Points",
           "american_odds": -110,
           "odds_source": "illustrative"
         },
         {
           "market": "Anytime TD",
-          "selection": "Rhamondre Stevenson Anytime TD",
+          "selection": "[PLAYER_NAME] Anytime TD",
           "american_odds": -120,
           "odds_source": "illustrative"
         },
         {
           "market": "Rushing Props",
-          "selection": "Stevenson Over 74.5 Rushing Yards",
+          "selection": "[PLAYER_NAME] Over [USE_REAL_LINE_FROM_PROP_LINES_SECTION] Rushing Yards",
           "american_odds": -115,
           "odds_source": "illustrative"
         },
         {
           "market": "QB Props",
-          "selection": "Jarrett Stidham Under 199.5 Pass Yards",
+          "selection": "[QB_NAME] Under [LINE] Pass Yards",
           "american_odds": -110,
           "odds_source": "illustrative"
         }
@@ -579,7 +579,8 @@ Return ONLY valid JSON matching this exact schema:
 8. Use alerts and findings to inform scripts, but prioritize analytics for player-specific angles
 9. Always include the two standard notes about guarantees and odds
 10. DO NOT create 3 scripts that all follow the same "Spread + Team Total + ML" pattern
-${rosterBlock ? '11. ONLY use player names from the Allowed Players list. Do NOT invent player names.' : ''}
+11. **CRITICAL: For player props, you MUST use the EXACT lines from the "Available Prop Lines" section above.** Do NOT invent numbers. If a player's line shows "Over 51.5", use 51.5 - not 74.5 or any other number.
+${rosterBlock ? '12. ONLY use player names from the Allowed Players list. Do NOT invent player names.' : ''}
 
 Respond with ONLY the JSON object, no surrounding text.`
 }
