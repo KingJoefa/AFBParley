@@ -350,7 +350,22 @@ function buildStoryModePrompt(
 
   const anchorSection = anchor ? `\n## Line Focus\n\n${anchor}` : ''
   const signalsSection = signals && signals.length > 0 ? `\n## Betting Angles\n\n${signals.join(', ')}` : ''
-  const biasSection = script_bias && script_bias.length > 0 ? `\n## Script Bias\n\n${script_bias.join(', ')}` : ''
+  // Build script bias section with explanations
+  let biasSection = ''
+  if (script_bias && script_bias.length > 0) {
+    const biasDescriptions: Record<string, string> = {
+      'Shootout': 'High-scoring game (expect 50+ total points), lots of passing, weak defenses or fast pace',
+      'Grind': 'Low-scoring defensive battle, run-heavy, clock management, field position game',
+      'Blowout': 'One team wins by 14+ points (2+ scores), or 7-10 points beyond the current spread. Emphasize garbage time, prevent defense, backups getting snaps',
+      'Pass-heavy': 'Emphasize passing attack, air yards, WR/TE production over rushing',
+      'Run-heavy': 'Emphasize ground game, RB volume, short passes, ball control',
+    }
+    const biasLines = script_bias.map(b => {
+      const desc = biasDescriptions[b]
+      return desc ? `- **${b}**: ${desc}` : `- ${b}`
+    }).join('\n')
+    biasSection = `\n## Script Bias\n\nShape the narrative around these game script expectations:\n${biasLines}`
+  }
   const rosterSection = rosterBlock ? `\n${rosterBlock}\n` : ''
   const retrySection = retryInstruction ? `\n## IMPORTANT RETRY INSTRUCTION\n\n${retryInstruction}\n` : ''
 

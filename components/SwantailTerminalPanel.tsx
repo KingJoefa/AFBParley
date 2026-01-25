@@ -320,6 +320,7 @@ export default function SwantailTerminalPanel(props: {
   const scriptBiasOptions = useMemo(() => ([
     'Shootout',
     'Grind',
+    'Blowout',
     'Pass-heavy',
     'Run-heavy',
   ]), [])
