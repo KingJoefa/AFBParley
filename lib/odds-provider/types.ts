@@ -27,12 +27,36 @@ export interface PropLine {
   }
 }
 
+/**
+ * Game-level lines (spreads, totals, moneylines)
+ */
+export interface GameLines {
+  total?: {
+    line: number        // 43.5
+    overPrice: number   // -110
+    underPrice: number  // -110
+  }
+  spread?: {
+    favorite: string    // 'NE'
+    line: number        // 3.5 (always positive, favorite implied)
+    homePrice: number   // -110
+    awayPrice: number   // -110
+  }
+  moneyline?: {
+    home: number        // -150
+    away: number        // +130
+  }
+  bookmaker: string     // 'draftkings'
+  lastUpdate?: string   // ISO timestamp
+}
+
 export interface EventProps {
   eventId: string
   homeTeam: string
   awayTeam: string
   commenceTime: string
   props: PropLine[]
+  gameLines?: GameLines  // Game-level lines (spreads, totals)
 }
 
 export interface FetchResult {

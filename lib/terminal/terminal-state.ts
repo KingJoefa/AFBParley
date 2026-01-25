@@ -39,6 +39,28 @@ export type BuildView =
   | { kind: 'swantail'; data: SwantailResponse }
   | { kind: 'terminal'; scripts: Script[]; alerts: Alert[] }
 
+/** Odds telemetry from Build (story mode); used for Context panel */
+export type OddsTelemetry = {
+  source: string
+  cache_status: string
+  fetched_at: string
+  credits_spent: number
+  bookmaker: string
+  prop_lines_count: number
+  players_with_lines: number
+  incomplete_line_count: number
+  unresolved_team_count: number
+}
+
+/** Debug context from Build (story mode); used for Context panel */
+export type DebugContextUsed = {
+  used_analytics: boolean
+  used_sgps: boolean
+  analytics_source?: string
+  tprr_matchups_count?: number
+  sgps_count?: number
+}
+
 export type BuildResult = {
   build_id: string         // Stable ID for lazy-fetching other views
   request_id: string
@@ -46,6 +68,8 @@ export type BuildResult = {
   output_type: OutputType  // Which view was built
   view: BuildView          // Single view returned (1x LLM cost)
   created_at: string
+  odds_telemetry?: OddsTelemetry
+  debug_context_used?: DebugContextUsed
 }
 
 /**

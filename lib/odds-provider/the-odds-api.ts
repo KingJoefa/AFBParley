@@ -11,6 +11,7 @@ import type {
   EventProps,
   PropLine,
   BookSelectionStrategy,
+  GameLines,
 } from './types'
 import { DEFAULT_BOOK_STRATEGY, V1_MARKETS, OU_MARKETS } from './types'
 import {
@@ -274,6 +275,84 @@ export class TheOddsApiProvider implements OddsProvider {
     }
 
     return eventProps
+  }
+
+  /**
+   * Fetch game-level lines (spreads, totals) for an event
+   * Separate call to not mix with player props caching
+   */
+  async fetchGameLines(eventId: string): Promise<GameLines | null> {
+    try {
+      const url =
+        `${API_BASE}/sports/${SPORT}/events/${eventId}/odds?` +
+        `apiKey=${this.apiKey}&regions=us&markets=spreads,totals&oddsFormat=american`
+
+      const res = await fetch(url, { cache: 'no-store' })
+      if (!res.ok) {
+        console.warn(`[the-odds-api] Game lines fetch failed: ${res.status}`)
+        return null
+      }
+
+      const raw = await res.json()
+
+      // Select bookmaker by preference
+      const bookmakers = raw.bookmakers || []
+      const selectedBook = this.bookStrategy.preferred.find(pref =>
+        bookmakers.some((b: any) => b.key === pref)
+      )
+      const bookData = bookmakers.find((b: any) => b.key === selectedBook)
+
+      if (!bookData) {
+        console.warn('[the-odds-api] No preferred bookmaker for game lines')
+        return null
+      }
+
+      const gameLines: GameLines = {
+        bookmaker: selectedBook!,
+        lastUpdate: bookData.last_update,
+      }
+
+      for (const market of bookData.markets || []) {
+        if (market.key === 'totals') {
+          const over = market.outcomes.find((o: any) => o.name === 'Over')
+          const under = market.outcomes.find((o: any) => o.name === 'Under')
+          if (over && under) {
+            gameLines.total = {
+              line: over.point,
+              overPrice: over.price,
+              underPrice: under.price,
+            }
+          }
+        }
+
+        if (market.key === 'spreads') {
+          const outcomes = market.outcomes || []
+          // Find which team is favored (negative spread)
+          const fav = outcomes.find((o: any) => o.point < 0)
+          const dog = outcomes.find((o: any) => o.point > 0)
+          if (fav && dog) {
+            const homeTeam = normalizeTeamCode(raw.home_team)
+            const favTeam = normalizeTeamCode(fav.name)
+            gameLines.spread = {
+              favorite: favTeam,
+              line: Math.abs(fav.point),
+              homePrice: fav.name.includes(raw.home_team) ? fav.price : dog.price,
+              awayPrice: fav.name.includes(raw.home_team) ? dog.price : fav.price,
+            }
+          }
+        }
+      }
+
+      console.log(
+        `[the-odds-api] Game lines: total=${gameLines.total?.line}, ` +
+          `spread=${gameLines.spread?.favorite} -${gameLines.spread?.line}`
+      )
+
+      return gameLines
+    } catch (err) {
+      console.error('[the-odds-api] fetchGameLines error:', err)
+      return null
+    }
   }
 
   /**

@@ -15,6 +15,8 @@ import {
   type TerminalState,
   type BuildView,
   type BuildResult,
+  type OddsTelemetry,
+  type DebugContextUsed,
   createInitialTerminalState,
   updateStateFromScan,
   markScanning,
@@ -37,7 +39,7 @@ export default function AssistedBuilder() {
   const { scan, abort: abortScan, isLoading: scanLoading, error: scanError } = useTerminalScan()
   const [state, dispatch] = useReducer(swantailReducer, initialSwantailState)
   const voice: 'analyst' = 'analyst'
-  const [rightTab, setRightTab] = useState<'scripts' | 'stats'>('scripts')
+  const [rightTab, setRightTab] = useState<'scripts' | 'context'>('scripts')
 
   // Two-phase terminal state
   const [terminalState, setTerminalState] = useState<TerminalState>(createInitialTerminalState)
@@ -187,7 +189,7 @@ export default function AssistedBuilder() {
         return
       }
 
-      // Store build result
+      // Store build result (include odds_telemetry / debug_context for Context panel)
       const result: BuildResult = {
         build_id: json.build_id,
         request_id: json.request_id,
@@ -195,6 +197,8 @@ export default function AssistedBuilder() {
         output_type: json.output_type,
         view: json.view,
         created_at: json.created_at,
+        ...(json.odds_telemetry && { odds_telemetry: json.odds_telemetry as OddsTelemetry }),
+        ...(json.debug_context_used && { debug_context_used: json.debug_context_used as DebugContextUsed }),
       }
       setBuildResult(result)
 
@@ -396,7 +400,7 @@ export default function AssistedBuilder() {
           <div className="space-y-4">
             {/* Right panel tabs */}
             <div className="flex items-center gap-2">
-              {(['scripts', 'stats'] as const).map(tab => (
+              {(['scripts', 'context'] as const).map(tab => (
                 <button
                   key={tab}
                   type="button"
@@ -407,53 +411,62 @@ export default function AssistedBuilder() {
                       : 'border border-white/10 bg-white/5 text-white/60 hover:bg-white/10'
                   }`}
                 >
-                  {tab === 'scripts' ? 'Scripts' : 'Stats'}
+                  {tab === 'scripts' ? 'Scripts' : 'Context'}
                 </button>
               ))}
             </div>
 
             {rightTab === 'scripts' && renderScriptPanel()}
 
-            {rightTab === 'stats' && (
+            {rightTab === 'context' && (
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
-                <div className="text-xs uppercase tracking-wide text-white/50">System status</div>
-                {state.preflight.state === 'booting' ? (
-                  <div className="mt-3 text-white/60">Open Terminal to run preflights.</div>
-                ) : (
+                <div className="text-xs uppercase tracking-wide text-white/50">Odds &amp; build context</div>
+                {(buildResult?.odds_telemetry || buildResult?.debug_context_used) ? (
                   <div className="mt-3 space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
+                    {buildResult.odds_telemetry && (
+                      <div className="space-y-2">
+                        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+                          <div className="text-[11px] uppercase tracking-wide text-white/50">Odds</div>
+                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-white/80">
+                            <span>source: {buildResult.odds_telemetry.source}</span>
+                            <span>cache: {buildResult.odds_telemetry.cache_status}</span>
+                            {buildResult.odds_telemetry.credits_spent >= 0 && (
+                              <span>credits: {buildResult.odds_telemetry.credits_spent}</span>
+                            )}
+                            {buildResult.odds_telemetry.bookmaker && (
+                              <span>book: {buildResult.odds_telemetry.bookmaker}</span>
+                            )}
+                          </div>
+                          <div className="mt-1 text-[12px] text-white/50">
+                            {buildResult.odds_telemetry.prop_lines_count} prop lines • {buildResult.odds_telemetry.players_with_lines} players
+                            {buildResult.odds_telemetry.incomplete_line_count > 0 && ` • ${buildResult.odds_telemetry.incomplete_line_count} incomplete`}
+                            {buildResult.odds_telemetry.unresolved_team_count > 0 && ` • ${buildResult.odds_telemetry.unresolved_team_count} unresolved team`}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {buildResult.debug_context_used && (
                       <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                        <div className="text-[11px] uppercase tracking-wide text-white/50">Schedule</div>
-                        <div className="mt-1 text-white/80">
-                          {state.preflight.checks.schedule.state.toUpperCase()}
-                          {typeof state.preflight.checks.schedule.games === 'number' ? ` • ${state.preflight.checks.schedule.games} games` : ''}
-                        </div>
-                        <div className="mt-1 text-[12px] text-white/50">
-                          {state.preflight.checks.schedule.season ? `Season ${state.preflight.checks.schedule.season}` : ''}{state.preflight.checks.schedule.week ? ` • Week ${state.preflight.checks.schedule.week}` : ''}
-                        </div>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                        <div className="text-[11px] uppercase tracking-wide text-white/50">Lines</div>
-                        <div className="mt-1 text-white/80">
-                          {state.preflight.checks.lines.state.toUpperCase()}
-                          {state.preflight.checks.lines.mode ? ` • ${state.preflight.checks.lines.mode}` : ''}
-                        </div>
-                        <div className="mt-1 text-[12px] text-white/50">
-                          {state.preflight.checks.lines.mode === 'fallback' ? 'Using fallback/manual pricing.' : ''}
+                        <div className="text-[11px] uppercase tracking-wide text-white/50">Context used</div>
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-white/80">
+                          {buildResult.debug_context_used.analytics_source && (
+                            <span>analytics: {buildResult.debug_context_used.analytics_source}</span>
+                          )}
+                          {typeof buildResult.debug_context_used.tprr_matchups_count === 'number' && (
+                            <span>TPRR: {buildResult.debug_context_used.tprr_matchups_count}</span>
+                          )}
+                          {typeof buildResult.debug_context_used.sgps_count === 'number' && (
+                            <span>SGPs: {buildResult.debug_context_used.sgps_count}</span>
+                          )}
+                          {buildResult.debug_context_used.used_analytics && <span>analytics ✓</span>}
+                          {buildResult.debug_context_used.used_sgps && <span>sgps ✓</span>}
                         </div>
                       </div>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                      <div className="text-[11px] uppercase tracking-wide text-white/50">Builder</div>
-                      <div className="mt-1 text-white/80">
-                        {state.preflight.checks.backend.state.toUpperCase()}
-                        {typeof state.preflight.checks.backend.configured === 'boolean' ? ` • configured: ${state.preflight.checks.backend.configured ? 'yes' : 'no'}` : ''}
-                        {typeof state.preflight.checks.backend.probeOk === 'boolean' ? ` • health: ${state.preflight.checks.backend.probeOk ? 'ok' : 'no'}` : ''}
-                      </div>
-                      <div className="mt-1 text-[12px] text-white/50">
-                        {state.preflight.checks.backend.state === 'degraded' ? 'Health probe failed; builds may still work.' : ''}
-                      </div>
-                    </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-3 text-white/60">
+                    Run <strong>Build (Story)</strong> to see odds source, cache status, and context used for this matchup.
                   </div>
                 )}
               </div>

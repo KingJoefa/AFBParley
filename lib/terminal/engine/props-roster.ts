@@ -17,7 +17,9 @@ import {
   isOddsProviderConfigured,
   type PropLine as OddsProviderPropLine,
   type FetchResult,
+  type GameLines,
 } from '@/lib/odds-provider'
+import { TheOddsApiProvider } from '@/lib/odds-provider/the-odds-api'
 import { normalizeName as oddsNormalizeName } from '@/lib/odds-provider'
 import { loadMatchupProjections, getCurrentWeekYear } from './projections-loader'
 import { fetchInjuriesContext } from '@/lib/context/injuries'
@@ -43,6 +45,17 @@ export interface PropLine {
   americanOdds?: number
 }
 
+// Live game lines from sportsbook
+export interface LiveGameLines {
+  total?: number        // 43.5
+  spread?: {
+    favorite: string    // 'NE'
+    line: number        // 3.5
+  }
+  bookmaker: string
+  lastUpdate?: string
+}
+
 // Odds provider telemetry
 export interface OddsTelemetry {
   source: string              // 'the-odds-api' | 'xo-fallback' | 'none'
@@ -54,6 +67,7 @@ export interface OddsTelemetry {
   playersWithLines: number
   incompleteLineCount: number
   unresolvedTeamCount: number
+  gameLines?: LiveGameLines   // Live game-level lines (spreads, totals)
 }
 
 export interface PropsRosterResult {
@@ -171,7 +185,7 @@ function adaptToLegacyPropLines(props: OddsProviderPropLine[]): PropLine[] {
 }
 
 /**
- * Load prop lines from The Odds API (primary)
+ * Load prop lines AND game lines from The Odds API (primary)
  */
 async function loadPropLines(
   homeTeam: string,
@@ -218,6 +232,23 @@ async function loadPropLines(
     // Fetch props with roster for team resolution
     const result = await provider.fetchEventProps(eventId, undefined, roster)
 
+    // Also fetch game lines (spreads, totals) - separate call
+    let liveGameLines: LiveGameLines | undefined
+    if (provider instanceof TheOddsApiProvider) {
+      const gameLines = await provider.fetchGameLines(eventId)
+      if (gameLines) {
+        liveGameLines = {
+          total: gameLines.total?.line,
+          spread: gameLines.spread ? {
+            favorite: gameLines.spread.favorite,
+            line: gameLines.spread.line,
+          } : undefined,
+          bookmaker: gameLines.bookmaker,
+          lastUpdate: gameLines.lastUpdate,
+        }
+      }
+    }
+
     if (!result.data || result.cacheStatus === 'ERROR') {
       return {
         propLines: [],
@@ -231,6 +262,7 @@ async function loadPropLines(
           playersWithLines: 0,
           incompleteLineCount: result.incompleteLineCount || 0,
           unresolvedTeamCount: result.unresolvedTeamCount || 0,
+          gameLines: liveGameLines,
         },
       }
     }
@@ -253,6 +285,7 @@ async function loadPropLines(
         playersWithLines: uniquePlayers.size,
         incompleteLineCount: result.incompleteLineCount || 0,
         unresolvedTeamCount: result.unresolvedTeamCount || 0,
+        gameLines: liveGameLines,
       },
     }
   } catch (err) {

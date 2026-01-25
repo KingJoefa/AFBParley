@@ -25,6 +25,7 @@ import {
   type PropsRosterResult,
   type PropLine,
   type OddsTelemetry,
+  type LiveGameLines,
 } from '@/lib/terminal/engine/props-roster'
 import { loadGameNotes } from '@/lib/terminal/engine/notes-loader'
 import type { Analytics, SGP, Writeup } from '@/lib/terminal/analyst'
@@ -293,7 +294,10 @@ function buildStoryModePrompt(
   writeups?: Writeup[],
   sgps?: SGP[],
   propLines?: PropLine[],
-  oddsCacheStatus?: string  // 'HIT' | 'MISS' | 'STALE_FALLBACK' | 'ERROR'
+  oddsCacheStatus?: string,  // 'HIT' | 'MISS' | 'STALE_FALLBACK' | 'ERROR'
+  liveGameLines?: LiveGameLines,  // Live game-level lines (spreads, totals)
+  notesTotals?: { home: number; away: number },  // Notes-derived totals (fallback)
+  notesSpread?: { favorite: string; line: number }  // Notes-derived spread (fallback)
 ): string {
   // Separate notes findings from other findings
   const notesFindings = findings.filter(f => f.agent === 'notes')
@@ -474,13 +478,38 @@ This is strictly forbidden - use ONLY game-level markets (spread, total, moneyli
     propLinesSection = `\n## Available Prop Lines (Live Sportsbook Data)\n\n**SOURCE: ${oddsCacheStatus === 'HIT' ? 'Cached' : oddsCacheStatus === 'STALE_FALLBACK' ? 'Stale Fallback' : 'Fresh'} | Use these EXACT lines - do NOT invent numbers**\n\n${marketSections.join('\n\n')}\n`
   }
 
+  // Build game lines section - prefer live lines over notes
+  let gameLinesSection = ''
+  if (liveGameLines && (liveGameLines.total || liveGameLines.spread)) {
+    // Live lines available - use these as authoritative
+    const lines: string[] = []
+    if (liveGameLines.total) {
+      lines.push(`**Game Total**: ${liveGameLines.total} (LIVE from ${liveGameLines.bookmaker})`)
+    }
+    if (liveGameLines.spread) {
+      lines.push(`**Spread**: ${liveGameLines.spread.favorite} -${liveGameLines.spread.line} (LIVE from ${liveGameLines.bookmaker})`)
+    }
+    gameLinesSection = `\n## Game Lines (LIVE - Use These)\n\n${lines.join('\n')}\n\n**CRITICAL: Use these EXACT game lines for spreads and totals. Do NOT use any other numbers.**\n`
+  } else if (notesTotals || notesSpread) {
+    // No live lines - show notes as stale fallback with warning
+    const lines: string[] = []
+    if (notesTotals) {
+      const total = notesTotals.home + notesTotals.away
+      lines.push(`**Game Total**: ~${total} (STALE - from notes snapshot, may have moved)`)
+    }
+    if (notesSpread) {
+      lines.push(`**Spread**: ${notesSpread.favorite} -${notesSpread.line} (STALE - from notes snapshot, may have moved)`)
+    }
+    gameLinesSection = `\n## Game Lines (STALE NOTES SNAPSHOT - Use With Caution)\n\n${lines.join('\n')}\n\n**WARNING: These lines are from a pre-game notes snapshot and may not reflect current market. Live odds API unavailable. Use approximate values or omit game-level markets if uncertain.**\n`
+  }
+
   return `You are a sports betting analyst generating narrative-driven parlay scripts.
 ${retrySection}
 ## Matchup
 
 ${matchup}
 ${anchorSection}${signalsSection}${biasSection}
-${rosterSection}${curatedNotesSection}${writeupsSection}${analyticsSection}${propLinesSection}${sgpExamplesSection}
+${rosterSection}${gameLinesSection}${curatedNotesSection}${writeupsSection}${analyticsSection}${propLinesSection}${sgpExamplesSection}
 ${alertsSection}
 
 ${findingsSection}
@@ -806,7 +835,10 @@ async function buildSwantailViewDirect(
     writeups,
     sgps,
     rosterResult.propLines,
-    rosterResult.odds.cacheStatus
+    rosterResult.odds.cacheStatus,
+    rosterResult.odds.gameLines,  // Live game lines from The Odds API
+    gameNotes?.totals,            // Notes fallback for totals
+    gameNotes?.spread             // Notes fallback for spread
   )
   let result = await callLLM(client, initialPrompt)
 
@@ -836,7 +868,10 @@ async function buildSwantailViewDirect(
       const retryPrompt = buildStoryModePrompt(
         matchup, alerts, findings, anchor, signals, script_bias,
         rosterBlock, retryInstruction, analytics, writeups, sgps, rosterResult.propLines,
-        rosterResult.odds.cacheStatus
+        rosterResult.odds.cacheStatus,
+        rosterResult.odds.gameLines,  // Live game lines from The Odds API
+        gameNotes?.totals,            // Notes fallback for totals
+        gameNotes?.spread             // Notes fallback for spread
       )
 
       try {
