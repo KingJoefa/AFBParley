@@ -1,59 +1,48 @@
-# Swantail Terminal — Agent-First Script Builder
+# Swantail Terminal 2.0
 
-Terminal-first, agent-driven execution surface for discovering game insights, forming a clear game script, and generating a story-driven betting output. Agents surface evidence, anchors express the user thesis, and Build Script commits it all into one coherent payload. The product is anchored on a strict Scan → Build contract.
+Swantail Terminal 2.0 is an agent-driven parlay builder where users run specialized Agents (including Factors) to discover game-specific findings, then choose Build Preferences and an outcome framing (e.g., Team A wins under) to generate scripts; the Build step interprets the selected outcome by emphasizing the most relevant agent findings, while suggestions are explainable and non-binding, and optional Advanced User Insight can be provided as supplemental context.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Swantail Terminal UI                                   │
-│  Matchup → Agents → Scan → Anchors → Bias → Build        │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Swantail Terminal UI                                       │
+│  Matchup → Select Agents → Run Agents → Anchors → Build     │
+└─────────────────────────────────────────────────────────────┘
         │
         ▼
-┌─────────────────────────────────────────────────────────┐
-│  /api/terminal/scan                                     │
-│  Agent Runner → Analyst (Finding[] → Alert[])           │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  /api/terminal/scan                                         │
+│  Agent Runner → Analyst (Finding[] → Alert[])               │
+└─────────────────────────────────────────────────────────────┘
         │
         ▼
-┌─────────────────────────────────────────────────────────┐
-│  /api/terminal/build                                    │
-│  Thesis + Evidence → Script View                         │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  /api/terminal/build                                        │
+│  Outcome Framing + Agent Findings → Script View             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Execution Flow
+## Core Concepts
 
-1. Matchup selection
-2. Agent selection (scope only, session-persistent)
-3. Scan (runs selected agents; logs evidence)
-4. Anchors (user thesis; required)
-5. Script Bias (optional modifier)
-6. Build Script (commit action)
-
-Build Script is disabled unless a scan has run, at least one anchor is selected, and the scan hash matches the current inputs (matchup, anchors, script bias, signals, odds paste, selected agents).
-
-## Agents
-
-Agents surface evidence; they never define the story. Two categories:
+### Agents
+Agents are the primary discovery mechanism. They run code, analyze data, and produce findings. Users select which agents to run; findings are the source of truth.
 
 **Prop Discovery Agents**
-- **QB** - Quarterback efficiency and matchup advantages
-- **HB** - Halfback workload and game script correlations
-- **WR** - Receiver target share and coverage exploits
-- **TE** - Tight end red zone and usage patterns
+- **QB** — Quarterback efficiency and matchup advantages
+- **HB** — Halfback workload and game script correlations
+- **WR** — Receiver target share and coverage exploits
+- **TE** — Tight end red zone and usage patterns
 
-**Game Angle Agents**
-- **EPA** - Expected points added efficiency mismatches
-- **Pressure** - Pass rush and protection edges
-- **Weather** - Wind/precipitation impact chains
+**Factors** (Game-Level Agents)
+- **EPA** — Expected points added efficiency mismatches
+- **Pressure** — Pass rush and protection edges
+- **Weather** — Wind/precipitation impact chains
 
-Each agent returns `Finding[]` when thresholds are met, which the analyst transforms into actionable `Alert[]`. Alert[] is the only terminal contract between Scan and Build.
+Each agent returns `Finding[]` when thresholds are met. The analyst transforms these into actionable `Alert[]`.
 
-## Anchors (Required)
-
-Anchors express user thesis and are required before Build Script:
+### Anchors (Required)
+Anchors express the user's outcome framing and are required before Build Scripts:
 
 - Totals: Over / Under (mutually exclusive)
 - Side: Home win / Away win (mutually exclusive)
@@ -61,24 +50,38 @@ Anchors express user thesis and are required before Build Script:
 
 Multiple compatible anchors may be selected (e.g., Away win + Under).
 
-## Script Bias (Optional)
-
-Script bias shapes the narrative without selecting markets:
+### Build Preferences (Optional)
+Build Preferences shape the narrative without selecting markets:
 
 - Shootout
 - Grind
 - Pass-heavy
 - Run-heavy
 
-## Signals and Odds (Optional)
+### User Insight (Advanced, Optional)
+Free-text input for power users to inject external context ("I heard X..."). This does not unlock agents or trigger special logic—it's passed to the LLM as supplemental context only.
 
-- Signals (aka angles) are free-form tags that modify the analysis and narrative.
-- Odds paste allows optional leg context and correlations for script building.
+## Execution Flow
 
-## Requirements
+1. **Matchup Selection** — Pick the game
+2. **Agent Selection** — Choose which agents to run (session-persistent)
+3. **Run Agents** — Execute selected agents; produces findings
+4. **Anchors** — Select outcome framing (required)
+5. **Build Preferences** — Optional narrative modifier
+6. **Build Scripts** — Generate outcome-conditioned script
 
-- Node.js 18+
-- Environment variables (see below)
+Build Scripts is disabled unless agents have run, at least one anchor is selected, and the inputs match the current state.
+
+## Outcome-Conditioned Build (Key Behavior)
+
+When a user selects a Build like "Team A wins under", the system:
+
+1. Treats the selection as a hypothesis, not a label
+2. Re-ranks and emphasizes agent findings that best support that outcome
+3. Expresses *how* that outcome happens (run-heavy, stalled red zone, FG volume, clock bleed)
+4. Never invents facts or overrides agent outputs
+
+**Rule:** Build may reweight, emphasize, and suppress findings—but may not fabricate or contradict agents.
 
 ## Quick Start
 
@@ -87,72 +90,55 @@ npm install
 npm run dev
 ```
 
-Visit `http://localhost:3000/` for the Swantail Terminal (root page).
+Visit `http://localhost:3000/` for the Swantail Terminal.
 
 ## Environment Variables
 
-```bash
-# Required for LLM analysis (falls back to rule-based if missing)
-OPENAI_API_KEY=sk-...
+### Required
 
-# Optional: Lines API for live odds
-LINES_API_URL=https://...
+```bash
+OPENAI_API_KEY=sk-...           # LLM analysis (falls back to rule-based if missing)
+THE_ODDS_API_KEY=...            # Live sportsbook prop lines
+```
+
+### Optional
+
+```bash
+LINES_API_URL=https://...       # Game-level lines (spreads, totals)
 LINES_API_KEY=...
 
-# Optional: The Odds API for live sportsbook prop lines
-THE_ODDS_API_KEY=...  # Get from https://the-odds-api.com
+# Feature flags
+TERMINAL_PROP_ENABLED=true
+TERMINAL_STORY_ENABLED=true
+TERMINAL_PARLAY_ENABLED=true
+TERMINAL_LIVE_DATA=false
+TERMINAL_LLM_ANALYST=true
+TERMINAL_AGENT_CARDS=true
+TERMINAL_SCRIPTS_METADATA=true
 
-# Optional: Feature flags
-TERMINAL_PROP_ENABLED=true    # Enable /api/terminal/prop
-TERMINAL_STORY_ENABLED=true   # Enable /api/terminal/story
-TERMINAL_PARLAY_ENABLED=true  # Enable /api/terminal/parlay
-TERMINAL_LIVE_DATA=false      # Use real data vs mock
-TERMINAL_LLM_ANALYST=true     # Use LLM vs fallback
-TERMINAL_AGENT_CARDS=true     # Render agent cards in UI
-TERMINAL_SCRIPTS_METADATA=true # Add metadata in scripts view
+# Logging
+LOG_LEVEL=warn                  # debug/info/warn/error (default: warn in prod, debug in dev)
 ```
 
 ## API Reference
 
 ### Terminal Routes
-- `POST /api/terminal/scan` - Phase 1. Run selected agents and return `Alert[]` + `Finding[]`
-- `POST /api/terminal/build` - Phase 2. Build script view from anchors + evidence
-- `POST /api/terminal/prop` - Direct action route (prop mode)
-- `POST /api/terminal/story` - Direct action route (story mode)
-- `POST /api/terminal/parlay` - Direct action route (parlay mode)
-- `POST /api/terminal/bet` - Betting ladder output
+- `POST /api/terminal/scan` — Run selected agents, return `Alert[]` + `Finding[]`
+- `POST /api/terminal/build` — Build script from anchors + agent findings
+- `POST /api/terminal/prop` — Direct prop mode
+- `POST /api/terminal/story` — Direct story mode
+- `POST /api/terminal/parlay` — Direct parlay mode
 
 ### Supporting Routes
-- `GET /api/nfl/schedule` - Current week schedule
-- `GET /api/lines/status` - Lines source health check
-- `GET/POST /api/memory` - Profile memory (dev only)
-
-## Scan → Build Contract (Essentials)
-
-### Scan Request (Phase 1)
-- Required: `matchup`
-- Optional: `signals`, `anchor`, `agentIds`
-
-### Scan Response (Phase 1)
-- `alerts`: Alert[]
-- `findings`: Finding[]
-- `request_id`, `scan_hash`
-
-### Build Request (Phase 2)
-- Required: `matchup`, `alerts`, `findings`, `output_type`
-- Optional: `anchors`, `anchor`, `script_bias`, `signals`, `odds_paste`, `selected_agents`, `payload_hash`, `options`
-
-### Build Response (Phase 2)
-- `view`: BuildView (terminal or swantail narrative output)
-- `payload_hash` used for staleness validation
+- `GET /api/nfl/schedule` — Current week schedule
+- `GET /api/lines/status` — Lines source health check
 
 ## Project Structure
 
 ```
 app/
 ├── api/terminal/       # Terminal route handlers
-├── hooks/              # useTerminal, useAfb
-├── terminal/           # Terminal page
+├── page.tsx            # Root page (Terminal UI)
 components/
 ├── SwantailTerminalPanel.tsx   # Main terminal UI
 ├── AssistedBuilder.tsx         # Builder orchestration
@@ -162,9 +148,10 @@ lib/
 │   ├── analyst/        # Finding[] → Alert[] transformation
 │   ├── engine/         # Agent runner, provenance
 │   ├── schemas/        # Alert, Finding, Script types
-│   ├── feature-flags.ts
-│   └── run-state.ts    # Agent orchestration state
-├── swantail/           # Store, signals, odds parsing
+│   └── feature-flags.ts
+├── swantail/           # Store, user insight parsing, odds
+├── logger.ts           # Production-safe logging
+├── telemetry.ts        # Dev-only telemetry
 ```
 
 ## Scripts
@@ -175,25 +162,6 @@ npm run build    # Production build
 npm run test     # Run test suite
 npm start        # Production server
 ```
-
-## Testing
-
-```bash
-npm test              # Run all tests
-npm test -- --watch   # Watch mode
-```
-
-Tests cover:
-- Terminal route contracts and invariants
-- Agent threshold logic
-- Analyst transformation
-- Schema validation
-- Provenance tracking
-
-## Future / Legacy Context
-
-- `/api/afb` is legacy AFB script generation and is not the primary product flow.
-- README focuses on the Scan → Build terminal contract and current UI path.
 
 ## License
 
