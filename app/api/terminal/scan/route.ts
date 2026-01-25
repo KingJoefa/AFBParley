@@ -5,6 +5,7 @@ import { buildProvenance, generateRequestId, hashObject } from '@/lib/terminal/e
 import { shouldUseFallback } from '@/lib/terminal/engine/fallback-renderer'
 import { checkRequestLimits, estimateTokens } from '@/lib/terminal/engine/guardrails'
 import { analyzeFindings, generateFallbackAlerts } from '@/lib/terminal/analyst'
+import { loadGameNotes } from '@/lib/terminal/engine/notes-loader'
 import { ALL_AGENT_IDS } from '@/lib/terminal/run-state'
 import type { AgentType } from '@/lib/terminal/schemas'
 
@@ -503,8 +504,22 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // Load rich game notes context (injuries, analytics, SGPs, writeups)
+    const gameNotes = loadGameNotes(
+      teams.homeTeam,
+      teams.awayTeam,
+      matchupContext.week,
+      matchupContext.year
+    )
+
     // Run LLM analyst to transform Finding[] → Alert[]
-    const analysisResult = await analyzeFindings(findings, matchupContext.dataVersion)
+    // Pass gameNotes so LLM has full context (injuries, Stidham grades, etc.)
+    const analysisResult = await analyzeFindings(
+      findings,
+      matchupContext.dataVersion,
+      {}, // default LLM options
+      gameNotes
+    )
 
     // Update provenance with LLM info
     const finalProvenance = buildProvenance({
