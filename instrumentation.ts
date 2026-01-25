@@ -1,7 +1,6 @@
 import path from 'path'
 import { existsSync, readdirSync } from 'fs'
 import { startNflScheduleAutoUpdate } from './lib/nfl/autoUpdate'
-import { startXoComboPoller } from './lib/xo/poller'
 
 type EnvReport = {
   name: string
@@ -55,11 +54,4 @@ export async function register() {
 
   // Kick off optional NFL schedule auto-update loop (no-op without env source)
   try { startNflScheduleAutoUpdate() } catch {}
-
-  // Start XO combination odds poller (server-side only, no UI)
-  try {
-    // Build origin for internal calls (Next dev server or prod host)
-    const host = process.env.NEXT_INTERNAL_ORIGIN || `http://127.0.0.1:${process.env.PORT || 3000}`
-    startXoComboPoller(host)
-  } catch {}
 }
