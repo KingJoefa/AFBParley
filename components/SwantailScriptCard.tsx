@@ -1,5 +1,5 @@
 'use client'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { computeParlayMath, mathDiffers } from '@/lib/swantail/math'
 import { matchOdds } from '@/lib/swantail/odds'
 import type { SwantailScript } from '@/lib/swantail/schema'
@@ -13,10 +13,11 @@ const REQUIRED_NOTES = [
 type Props = {
   script: SwantailScript
   oddsEntries: OddsPasteEntry[]
-  onOpposite: () => void
+  oddsCacheStatus?: string
 }
 
-export default function SwantailScriptCard({ script, oddsEntries, onOpposite }: Props) {
+export default function SwantailScriptCard({ script, oddsEntries, oddsCacheStatus }: Props) {
+  const [mathOpen, setMathOpen] = useState(false)
   const enriched = useMemo(() => {
     let matchCount = 0
     const legs = script.legs.map(leg => {
@@ -32,6 +33,11 @@ export default function SwantailScriptCard({ script, oddsEntries, onOpposite }: 
   }, [script, oddsEntries])
 
   const notes = Array.isArray(script.notes) && script.notes.length ? script.notes : REQUIRED_NOTES
+  const mathAvailable = Boolean(script.parlay_math) && oddsCacheStatus !== 'ERROR'
+  const disclaimerTooltip = notes.join('\n')
+  const exposureLine = `Exposure · $1 stake · est payout $${enriched.math.payout.toFixed(2)}`
+  const mathSteps = `${enriched.math.leg_decimals.map(d => d.toFixed(2)).join(' × ')} = ${enriched.math.product_decimal.toFixed(2)}`
+  const payoutLine = `Payout $${enriched.math.payout.toFixed(2)} · Profit $${enriched.math.profit.toFixed(2)}`
 
   return (
     <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 p-6 shadow-xl">
@@ -63,30 +69,48 @@ export default function SwantailScriptCard({ script, oddsEntries, onOpposite }: 
       </div>
 
       <div className="mt-4 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/70">
-        <div className="text-[11px] uppercase tracking-[0.2em] text-white/50">Exposure</div>
-        <div className="mt-1 text-[11px] text-white/50">$1 baseline · deterministic math</div>
-        <div className="mt-2">{enriched.math.steps}</div>
+        {mathAvailable ? (
+          <>
+            <div className="text-[11px] text-white/80">{exposureLine}</div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setMathOpen(open => !open)}
+                className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] text-white/70 transition hover:bg-white/10"
+              >
+                {mathOpen ? 'Math ▴' : 'Math ▾'}
+              </button>
+              {oddsEntries.length === 0 && (
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/50">
+                  Re-price not applied
+                </span>
+              )}
+            </div>
+            {mathOpen && (
+              <div className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-white/70">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-white/50">Math (Illustrative)</div>
+                <div className="mt-2 font-mono text-[11px] text-white/80">{mathSteps}</div>
+                <div className="mt-2 text-[11px] text-white/60">{payoutLine}</div>
+              </div>
+            )}
+          </>
+        ) : (
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/60">
+            Lines unavailable
+          </span>
+        )}
       </div>
 
-      <div className="mt-3 text-xs text-white/60">
-        {notes.map((note, idx) => (
-          <div key={`${note}-${idx}`}>• {note}</div>
-        ))}
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-xs text-white/50">
-          {oddsEntries.length > 0 ? `Re-price: ${enriched.matchCount} applied` : 'Re-price not applied'}
-        </div>
-        <button
-          onClick={onOpposite}
-          className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/20"
+      <div className="mt-3 flex items-center gap-2 text-[11px] text-white/60">
+        <span>Illustrative lines · High variance</span>
+        <span
+          className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/20 text-[10px] text-white/50"
+          title={disclaimerTooltip}
+          aria-label="Disclaimer details"
         >
-          View counter-story
-        </button>
+          ⓘ
+        </span>
       </div>
-
-      <div className="mt-3 text-[11px] text-white/50">{script.offer_opposite}</div>
     </div>
   )
 }

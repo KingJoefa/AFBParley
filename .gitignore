@@ -86,3 +86,4 @@ out/
 
 # Worktrees
 .worktrees/
+scripts/check-*.mjs

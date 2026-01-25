@@ -8,10 +8,10 @@ const DISCLAIMER = 'Informational only. High variance by design. No guarantees.'
 type Props = {
   data: SwantailResponse | null
   oddsEntries: OddsPasteEntry[]
-  onOpposite: (scriptIndex: number) => void
+  oddsCacheStatus?: string
 }
 
-export default function SwantailScriptsView({ data, oddsEntries, onOpposite }: Props) {
+export default function SwantailScriptsView({ data, oddsEntries, oddsCacheStatus }: Props) {
   if (!data) {
     return (
       <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center text-white/70">
@@ -28,7 +28,7 @@ export default function SwantailScriptsView({ data, oddsEntries, onOpposite }: P
           key={`${script.title}-${idx}`}
           script={script}
           oddsEntries={oddsEntries}
-          onOpposite={() => onOpposite(idx)}
+          oddsCacheStatus={oddsCacheStatus}
         />
       ))}
       <div className="text-center text-xs text-white/50">{DISCLAIMER}</div>
