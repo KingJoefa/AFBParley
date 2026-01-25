@@ -106,9 +106,7 @@ export default function SwantailTerminalPanel(props: {
   const runState = externalRunState ?? internalRunState
   const [games, setGames] = useState<Array<{ id: string; display: string; time: string; isPopular?: boolean }>>([])
 
-  const [buffer, setBuffer] = useState<OutputLine[]>(() => ([
-    { id: uid(), text: 'initializing terminal…', tone: 'muted' },
-  ]))
+  const [buffer, setBuffer] = useState<OutputLine[]>(() => ([]))
   const [draft, setDraft] = useState('')
   const [signalDraft, setSignalDraft] = useState('')
   const [oddsDraft, setOddsDraft] = useState('')
@@ -160,14 +158,13 @@ export default function SwantailTerminalPanel(props: {
     setLines({ state: 'booting' })
     setBackend({ state: 'booting' })
 
-    append('loading modules… done', 'muted')
-    append('running preflight checks…', 'muted')
-
     let hardError = false
     let degraded = false
     let derivedYear = 2025
     let derivedWeek = 20
     let schedulePayload: any | null = null
+    let gameCount = 0
+    let linesLive = false
 
     // Schedule
     try {
@@ -179,27 +176,23 @@ export default function SwantailTerminalPanel(props: {
       const derived = deriveYearWeekFromSchedule({ scheduleJson: json, fallbackYear: derivedYear, fallbackWeek: derivedWeek })
       derivedYear = derived.year
       derivedWeek = derived.week
+      gameCount = list.length
       setGames(list)
       if (derived.degraded) {
         degraded = true
         setSchedule({ state: 'degraded', games: list.length, week: derivedWeek, season: derivedYear, error: 'missing season/week in schedule payload' })
-        append(`schedule… degraded (using ${derivedYear} wk ${derivedWeek})`, 'warn')
       } else {
         setSchedule({ state: 'ready', games: list.length, week: derivedWeek, season: derivedYear })
-        append(`schedule… ready (${list.length} games)`, 'ok')
       }
     } catch (e: any) {
       degraded = true
-      // Fall back to safe defaults; keep terminal usable.
       derivedYear = 2025
       derivedWeek = 20
       setSchedule({ state: 'degraded', season: derivedYear, week: derivedWeek, error: e?.message || 'schedule failed' })
-      append(`schedule… degraded (failed; using ${derivedYear} wk ${derivedWeek})`, 'warn')
     }
 
     // Lines
     try {
-      // Use derived year/week from schedule. Include a matchup so API ping can be real.
       const sampleMatchup = matchup.trim() || (Array.isArray(schedulePayload?.games) && schedulePayload.games[0]?.display) || ''
       const u = new URL('/api/lines/status', window.location.origin)
       u.searchParams.set('year', String(derivedYear))
@@ -212,44 +205,42 @@ export default function SwantailTerminalPanel(props: {
       const expectedRel = String(json?.expected?.rel || '')
       const expectedAbs = String(json?.expected?.abs || '')
       if (mode === 'api') {
+        linesLive = true
         setLines({ state: 'ready', mode, expectedRel, expectedAbs })
-        append(`lines… ready (api wk-${String(derivedWeek).padStart(2, '0')})`, 'ok')
       } else if (mode === 'fallback') {
         setLines({ state: 'ready', mode, expectedRel, expectedAbs })
-        append(`lines… ready (fallback ${expectedRel.split('/').pop()})`, 'warn')
       } else if (mode === 'missing') {
         setLines({ state: 'error', mode, expectedRel, expectedAbs })
-        append(`lines… attention (missing ${expectedRel.split('/').pop()}; expected ${expectedRel})`, 'err')
         hardError = true
       } else {
-        // degraded
         const hasFallback = Boolean(json?.fallback?.exists)
         setLines({ state: hasFallback ? 'degraded' : 'error', mode, expectedRel, expectedAbs, error: String(json?.api?.error || '') })
-        append(
-          hasFallback
-            ? `lines… degraded (api unreachable; fallback ${expectedRel.split('/').pop()})`
-            : `lines… attention (api unreachable; missing ${expectedRel.split('/').pop()}; expected ${expectedRel})`,
-          hasFallback ? 'warn' : 'err'
-        )
         if (!hasFallback) hardError = true
         else degraded = true
       }
     } catch (e: any) {
       setLines({ state: 'degraded', error: e?.message || 'lines status failed' })
-      append('lines… unknown (status check failed)', 'warn')
       degraded = true
     }
 
-    // Backend check - Terminal 2.0 is self-contained (no external wrapper needed)
+    // Backend - Terminal 2.0 is self-contained
     setBackend({ state: 'ready', configured: true, probeOk: true })
-    append('builder… ready (terminal 2.0)', 'ok')
 
     setPhase(hardError ? 'error' : 'ready')
-    append(
-      hardError ? 'system: attention required' : (degraded ? 'system: DEGRADED' : 'system: READY'),
-      hardError ? 'warn' : (degraded ? 'warn' : 'ok')
-    )
-    append('tip: pick a featured matchup below, then press Build (Story).', 'muted')
+
+    // Capability-focused ready state (no process text)
+    if (hardError) {
+      append('swantail — attention required', 'warn')
+      append('lines unavailable. check configuration.', 'err')
+    } else {
+      append('swantail ready — 7 agents standing by', 'ok')
+      // Game count + lines (only show "lines live" if actually live API)
+      const statusParts = [`${gameCount} game${gameCount !== 1 ? 's' : ''}`]
+      if (linesLive) statusParts.push('lines live')
+      append(statusParts.join(' • '), 'muted')
+      append('', 'muted') // spacer
+      append('pick a matchup. run agents. build your thesis.', 'muted')
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [append])
 
@@ -268,17 +259,31 @@ export default function SwantailTerminalPanel(props: {
   // Mirror build output into terminal buffer
   useEffect(() => {
     if (!data) return
-    append('received scripts.', 'ok')
-    for (const s of data.scripts.slice(0, 3)) {
-      append(`- ${s.title}`, 'muted')
-    }
-    append('open “Scripts” tab to view the full cards.', 'muted')
+    const scriptCount = data.scripts?.length ?? 0
+    append(`build complete — ${scriptCount} script${scriptCount !== 1 ? 's' : ''} generated`, 'ok')
   }, [data, append])
 
   useEffect(() => {
     if (!error) return
     append(`error: ${error}`, 'err')
   }, [error, append])
+
+  // Post-scan escalation: earned specificity after agents complete
+  const prevAnalysisStatusRef = useRef<string | null>(null)
+  useEffect(() => {
+    const prevStatus = prevAnalysisStatusRef.current
+    const currentStatus = analysisMeta?.status
+    prevAnalysisStatusRef.current = currentStatus ?? null
+
+    // Only show summary on transition to 'success' (not on mount or re-render)
+    if (prevStatus === 'scanning' && currentStatus === 'success' && analysisMeta) {
+      const alertCount = analysisMeta.alertCount
+      const parts = [`scan complete — ${alertCount} alert${alertCount !== 1 ? 's' : ''} surfaced`]
+      append(parts.join(''), 'ok')
+      append('', 'muted') // spacer
+      append('select anchors. build your thesis.', 'muted')
+    }
+  }, [analysisMeta, append])
 
   const featuredGames = useMemo(() => {
     const featured = games.filter(g => g.isPopular)
