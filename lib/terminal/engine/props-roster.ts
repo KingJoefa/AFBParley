@@ -499,7 +499,7 @@ Do NOT include any player-specific props.`
 
   const formatTeam = (team: string): string => {
     const players = byTeam[team] || []
-    if (players.length === 0) return `${team}: No players available`
+    if (players.length === 0) return `**${team}**: (no players available)`
 
     const byPos: Record<string, string[]> = {}
     for (const p of players) {
@@ -515,14 +515,19 @@ Do NOT include any player-specific props.`
       }
     }
 
-    return `${team}:\n${lines.join('\n')}`
+    return `**${team}** players ONLY:\n${lines.join('\n')}`
   }
 
-  return `## Allowed Players for This Matchup (Source: ${result.odds.source})
+  return `## Player-Team Roster (STRICT BOUNDARIES)
 
 ${formatTeam(awayTeam)}
 
 ${formatTeam(homeTeam)}
 
-CRITICAL: You MUST ONLY use player names from this list for player props. If a player is not listed, use game-level markets instead. Do NOT invent or guess player names.`
+**TEAM ASSIGNMENT RULES:**
+1. Players listed under ${awayTeam} play for ${awayTeam} ONLY
+2. Players listed under ${homeTeam} play for ${homeTeam} ONLY
+3. Do NOT swap teams - if Stidham is under DEN, he is a Bronco, NOT a Patriot
+4. Do NOT invent players not on this list
+5. When referencing a player, their team context must match this roster`
 }

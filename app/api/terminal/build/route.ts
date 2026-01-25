@@ -627,7 +627,8 @@ Return ONLY valid JSON matching this exact schema:
 9. Always include the two standard notes about guarantees and odds
 10. DO NOT create 3 scripts that all follow the same "Spread + Team Total + ML" pattern
 11. **CRITICAL: For player props, you MUST use the EXACT lines from the "Available Prop Lines" section above.** Do NOT invent numbers. If a player's line shows "Over 51.5", use 51.5 - not 74.5 or any other number.
-${rosterBlock ? '12. ONLY use player names from the Allowed Players list. Do NOT invent player names.' : ''}
+${rosterBlock ? `12. ONLY use player names from the Player-Team Roster. Do NOT invent player names.
+13. **TEAM BOUNDARIES ARE STRICT**: A player listed under team X plays for team X ONLY. Do NOT assign players to the wrong team. If "Jarrett Stidham" is listed under DEN, he is the Broncos QB. If "Kayshon Boutte" is listed under NE, he is a Patriots receiver. Never swap teams.` : ''}
 
 Respond with ONLY the JSON object, no surrounding text.`
 }
