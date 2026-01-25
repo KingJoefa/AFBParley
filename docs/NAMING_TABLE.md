@@ -1,5 +1,22 @@
 # Swantail Terminal 2.0 — Naming Table
 
+> **Internal document (engineer-facing).** The product-facing documentation is `README.md`. This migration guide exists to help contributors execute renames without reintroducing legacy terms.
+
+---
+
+## Acceptance Check
+
+Before merging any documentation or UI copy changes, verify:
+
+```bash
+# Must return zero matches
+grep -iE "AFB|XO|Socket\.io|chat app|ParlayGPT" README.md
+```
+
+If any matches appear, the change reintroduces legacy terminology.
+
+---
+
 ## UI Copy / Code Terminology (Old → New)
 
 | Old Term | New Term | Scope | Notes |
