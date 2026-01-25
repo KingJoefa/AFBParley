@@ -1,4 +1,5 @@
 import type { Finding, AgentType } from '../schemas'
+import { createLogger } from '@/lib/logger'
 import { checkEpaThresholds } from '../agents/epa/thresholds'
 import { checkPressureThresholds } from '../agents/pressure/thresholds'
 import { checkWeatherThresholds } from '../agents/weather/thresholds'
@@ -7,6 +8,8 @@ import { checkHbThresholds } from '../agents/hb/thresholds'
 import { checkWrThresholds } from '../agents/wr/thresholds'
 import { checkTeThresholds } from '../agents/te/thresholds'
 import { runNotesAgent } from '../agents/notes/thresholds'
+
+const log = createLogger('scan')
 
 /**
  * Agent Runner
@@ -120,7 +123,7 @@ export async function runAgents(
   const agentsToRun = agentIds || ALL_AGENTS
 
   // Log which agents are running for verification
-  console.log('[scan] agents:', agentsToRun.join(', '))
+  log.debug('Running agents', { count: agentsToRun.length })
 
   const findings: Finding[] = []
   const agentsWithFindings = new Set<AgentType>()

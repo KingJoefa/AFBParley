@@ -1,6 +1,9 @@
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
+import { createLogger } from '@/lib/logger'
 import type { GameNotesContext } from '../analyst'
+
+const log = createLogger('notes-loader')
 
 /**
  * Game Notes Loader
@@ -128,7 +131,7 @@ function loadNotesFixture(season: number, week: number): GameNotesFixture | null
     const content = readFileSync(filepath, 'utf-8')
     return JSON.parse(content) as GameNotesFixture
   } catch (e) {
-    console.warn(`[notes-loader] Failed to parse ${filename}:`, e)
+    log.warn('Failed to parse notes file')
     return null
   }
 }

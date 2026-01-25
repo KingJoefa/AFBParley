@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
+import { createLogger } from '@/lib/logger'
 import {
   ScriptSchema,
   identifyCorrelations,
@@ -8,6 +9,8 @@ import {
   type Finding,
   type CorrelationType,
 } from '@/lib/terminal/schemas'
+
+const log = createLogger('Build')
 import { hashObject, generateRequestId } from '@/lib/terminal/engine/provenance'
 import { checkRequestLimits, estimateTokens } from '@/lib/terminal/engine/guardrails'
 import type { BuildView, OutputType } from '@/lib/terminal/terminal-state'
@@ -659,7 +662,7 @@ async function callLLM(
 
   const validated = SwantailResponseSchema.safeParse(parsed)
   if (!validated.success) {
-    console.error('[Build] SwantailResponse validation failed:', validated.error.flatten())
+    log.error('SwantailResponse validation failed')
     throw new Error('LLM output does not match SwantailResponse schema')
   }
 
@@ -781,10 +784,9 @@ async function buildSwantailViewDirect(
   const homeTeam = teams?.home || 'HOME'
   const awayTeam = teams?.away || 'AWAY'
 
-  console.log(`[Build] Roster source: ${rosterResult.source}, players: ${rosterResult.players.length}, props_enabled: ${rosterResult.player_props_enabled}`)
+  log.debug('Roster loaded', { source: rosterResult.source, players: rosterResult.players.length, propsEnabled: rosterResult.player_props_enabled })
 
-  // Log odds telemetry for visibility
-  console.log(`[Build] Odds telemetry: source=${rosterResult.odds.source}, cache_status=${rosterResult.odds.cacheStatus}, credits_spent=${rosterResult.odds.creditsSpent}, prop_lines=${rosterResult.odds.propLinesCount}`)
+  log.debug('Odds telemetry', { source: rosterResult.odds.source, cacheStatus: rosterResult.odds.cacheStatus, propLines: rosterResult.odds.propLinesCount })
 
   // Build odds telemetry object for response
   const oddsTelemetry: BuildSwantailResult['odds_telemetry'] = {
@@ -814,7 +816,7 @@ async function buildSwantailViewDirect(
     sgps_count: sgps?.length || 0,
   }
 
-  console.log(`[Build] Analytics context: source=${analytics?.source || 'none'}, tprr_matchups=${debugContextUsed.tprr_matchups_count}, sgps=${debugContextUsed.sgps_count}`)
+  log.debug('Analytics context', { source: analytics?.source || 'none', tprrMatchups: debugContextUsed.tprr_matchups_count, sgps: debugContextUsed.sgps_count })
 
   // Build roster block for prompt
   const rosterBlock = formatPropsRosterForPrompt(rosterResult, homeTeam, awayTeam)
@@ -852,16 +854,11 @@ async function buildSwantailViewDirect(
       aliasSet: rosterResult.aliasSet,
     })
 
-    console.log(`[Build] Player validation: ${validation.matched.length} matched, ${validation.invalid.length} invalid`)
+    log.debug('Player validation', { matched: validation.matched.length, invalid: validation.invalid.length })
 
     if (!validation.valid) {
-      // Log invalid players for drift tracking
-      console.warn('[Build] llm_invalid_player', {
-        request_id: requestId,
-        matchup,
-        roster_source: rosterResult.source,
-        invalid_players: validation.invalid,
-      })
+      // Log invalid players for drift tracking (warn level - visible in prod)
+      log.warn('LLM hallucinated invalid players', { count: validation.invalid.length, rosterSource: rosterResult.source })
 
       // Step 4: Retry with explicit forbidden list
       const retryInstruction = buildRetryPrompt(validation.invalid)
@@ -885,7 +882,7 @@ async function buildSwantailViewDirect(
         })
 
         if (retryValidation.valid) {
-          console.log('[Build] Retry succeeded, all players valid')
+          log.debug('Retry succeeded, all players valid')
           return {
             view: { kind: 'swantail', data: retryResult },
             roster_info: rosterInfo,
@@ -899,7 +896,7 @@ async function buildSwantailViewDirect(
           }
         } else {
           // Still invalid after retry - log and return with warning
-          console.warn('[Build] Retry still has invalid players:', retryValidation.invalid)
+          log.warn('Retry still has invalid players', { count: retryValidation.invalid.length })
           return {
             view: { kind: 'swantail', data: retryResult },
             roster_info: rosterInfo,
@@ -914,7 +911,7 @@ async function buildSwantailViewDirect(
           }
         }
       } catch (retryError) {
-        console.error('[Build] Retry failed:', (retryError as Error).message)
+        log.error('Retry failed', retryError)
         return {
           view: { kind: 'swantail', data: result },
           roster_info: rosterInfo,
@@ -1023,18 +1020,7 @@ export async function POST(req: NextRequest) {
       })
 
       if (payload_hash !== expectedHash) {
-        console.warn('[Build] Stale build attempt:', {
-          provided: payload_hash,
-          expected: expectedHash,
-          payload_debug: {
-            matchup,
-            selected_agents,
-            anchors,
-            script_bias,
-            signals,
-            odds_paste,
-          },
-        })
+        log.warn('Stale build attempt - hash mismatch')
         return Response.json(
           {
             error: 'Stale build',
@@ -1077,10 +1063,10 @@ export async function POST(req: NextRequest) {
       const useWrapper = process.env.USE_WRAPPER_FALLBACK === 'true'
 
       if (useWrapper) {
-        console.log('[Build] Using wrapper fallback for story mode')
+        log.debug('Using wrapper fallback for story mode')
         view = await buildSwantailView(matchup, anchor, signals, odds_paste)
       } else {
-        console.log('[Build] Using direct LLM for story mode with props-based roster')
+        log.debug('Using direct LLM for story mode')
         const result = await buildSwantailViewDirect(
           matchup, alerts, findings, requestId,
           roster_overrides, anchor, signals, script_bias

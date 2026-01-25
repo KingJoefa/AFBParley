@@ -7,7 +7,10 @@
 
 import fs from 'fs'
 import path from 'path'
+import { createLogger } from '@/lib/logger'
 import type { Player } from './roster-validator'
+
+const log = createLogger('projections')
 
 interface ProjectionsFile {
   ts: number
@@ -99,7 +102,7 @@ export async function loadMatchupProjections(
   const allPlayers = await loadProjections(schedule)
 
   if (allPlayers.length === 0) {
-    console.warn(`[Build] No projections found for week ${schedule.week}, year ${schedule.year}`)
+    log.warn('No projections found')
     return []
   }
 
@@ -114,7 +117,7 @@ export async function loadMatchupProjections(
     return team === home || team === away
   })
 
-  console.log(`[Build] Loaded ${matchupPlayers.length} players for ${away} @ ${home}`)
+  log.debug('Loaded players for matchup', { count: matchupPlayers.length })
 
   return matchupPlayers
 }

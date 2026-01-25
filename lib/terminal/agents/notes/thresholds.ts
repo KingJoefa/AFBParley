@@ -10,8 +10,10 @@
 
 import fs from 'fs'
 import path from 'path'
+import { createLogger } from '@/lib/logger'
 import type { Finding, AgentType } from '../../schemas'
 
+const log = createLogger('NotesAgent')
 const AGENT: AgentType = 'notes'
 
 // Stat-like patterns for note_tendency extraction (tight whitelist)
@@ -78,14 +80,14 @@ function loadNotesFile(year: number, week: number): NotesFile | null {
 
   try {
     if (!fs.existsSync(filePath)) {
-      console.log(`[NotesAgent] No notes file at ${filePath}`)
+      log.debug('No notes file found')
       return null
     }
 
     const raw = fs.readFileSync(filePath, 'utf8')
     return JSON.parse(raw) as NotesFile
   } catch (e) {
-    console.warn(`[NotesAgent] Failed to load notes: ${(e as Error).message}`)
+    log.warn('Failed to load notes')
     return null
   }
 }
@@ -158,14 +160,14 @@ export function runNotesAgent(context: NotesContext): Finding[] {
   // Load notes file
   const notesFile = loadNotesFile(context.year, context.week)
   if (!notesFile) {
-    console.log(`[NotesAgent] No notes for ${context.year} week ${context.week}`)
+    log.debug('No notes available for week')
     return findings
   }
 
   // Find game entry
   const game = findGameEntry(notesFile.games, context.homeTeam, context.awayTeam)
   if (!game) {
-    console.log(`[NotesAgent] No game entry for ${context.awayTeam} @ ${context.homeTeam}`)
+    log.debug('No game entry found in notes')
     return findings
   }
 
@@ -295,6 +297,6 @@ export function runNotesAgent(context: NotesContext): Finding[] {
     }
   }
 
-  console.log(`[NotesAgent] Emitted ${findings.length} findings for ${context.awayTeam} @ ${context.homeTeam}`)
+  log.debug('Emitted findings', { count: findings.length })
   return findings
 }

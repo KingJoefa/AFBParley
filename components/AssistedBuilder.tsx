@@ -222,7 +222,10 @@ export default function AssistedBuilder() {
 
   // Counter-story feature (legacy AFB) - deprecated, can be re-implemented with Terminal API
   const onOpposite = useCallback(async (_scriptIndex: number) => {
-    console.log('[AssistedBuilder] Counter-story feature not yet implemented in Terminal 2.0')
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.log('[AssistedBuilder] Counter-story feature not yet implemented in Terminal 2.0')
+    }
     track('ui_action_clicked', { action: 'opposite_deprecated' })
   }, [])
 

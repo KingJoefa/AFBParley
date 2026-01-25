@@ -12,6 +12,7 @@
 
 import fs from 'fs'
 import path from 'path'
+import { createLogger } from '@/lib/logger'
 import {
   getOddsProvider,
   isOddsProviderConfigured,
@@ -19,6 +20,8 @@ import {
   type FetchResult,
   type GameLines,
 } from '@/lib/odds-provider'
+
+const log = createLogger('PropsRoster')
 import { TheOddsApiProvider } from '@/lib/odds-provider/the-odds-api'
 import { normalizeName as oddsNormalizeName } from '@/lib/odds-provider'
 import { loadMatchupProjections, getCurrentWeekYear } from './projections-loader'
@@ -209,7 +212,7 @@ async function loadPropLines(
 
   // Check if odds provider is configured
   if (!isOddsProviderConfigured() && process.env.ODDS_FALLBACK_XO !== 'true') {
-    console.warn('[props-roster] No odds provider configured')
+    log.warn('No odds provider configured')
     return { propLines: [], odds: emptyOdds }
   }
 
@@ -219,7 +222,7 @@ async function loadPropLines(
     // Find event by teams
     const eventId = await provider.findEventByTeams(homeTeam, awayTeam)
     if (!eventId) {
-      console.warn(`[props-roster] No event found for ${awayTeam}@${homeTeam}`)
+      log.warn('No event found for matchup')
       return {
         propLines: [],
         odds: {
@@ -289,7 +292,7 @@ async function loadPropLines(
       },
     }
   } catch (err) {
-    console.error('[props-roster] Odds provider error:', err)
+    log.error('Odds provider error', err)
     return {
       propLines: [],
       odds: {
@@ -330,7 +333,7 @@ async function loadFromProjections(
 
       const filtered = projections.filter(p => !outPlayers.has(normalizeName(p.name)))
       injuriesFiltered = projections.length - filtered.length
-      console.log(`[PropsRoster] Filtered ${injuriesFiltered} injured players`)
+      log.debug('Filtered injured players', { count: injuriesFiltered })
       return { players: filtered, injuriesFiltered }
     }
   } catch {
@@ -445,16 +448,13 @@ export async function buildPropsRoster(
   const { players: finalPlayers, applied } = applyOverrides(players, overrides, teamCodes)
   const aliasSet = buildAliasSet(finalPlayers)
 
-  // Telemetry
-  console.log('[PropsRoster] roster_source_telemetry', {
-    allowed_roster_source: source,
-    odds_source: odds.source,
-    odds_cache_status: odds.cacheStatus,
-    odds_credits_spent: odds.creditsSpent,
-    player_count: finalPlayers.length,
-    prop_lines_count: odds.propLinesCount,
-    players_with_lines: odds.playersWithLines,
-    player_props_enabled: source !== 'none',
+  // Telemetry (debug only - aggregate counts, no user data)
+  log.debug('Roster source telemetry', {
+    source,
+    oddsSource: odds.source,
+    cacheStatus: odds.cacheStatus,
+    playerCount: finalPlayers.length,
+    propLinesCount: odds.propLinesCount,
   })
 
   return {

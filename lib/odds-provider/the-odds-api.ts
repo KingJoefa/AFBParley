@@ -21,7 +21,9 @@ import {
   normalizeName,
 } from './normalize'
 import { getCached, upsertCache } from './cache'
+import { createLogger } from '@/lib/logger'
 
+const log = createLogger('the-odds-api')
 const API_BASE = 'https://api.the-odds-api.com/v4'
 const SPORT = 'americanfootball_nfl'
 
@@ -45,7 +47,7 @@ export class TheOddsApiProvider implements OddsProvider {
       const url = `${API_BASE}/sports/${SPORT}/events?apiKey=${this.apiKey}`
       const res = await fetch(url, { cache: 'no-store' })
       if (!res.ok) {
-        console.warn(`[the-odds-api] Events fetch failed: ${res.status}`)
+        log.warn('Events fetch failed', { status: res.status })
         return null
       }
 
@@ -65,10 +67,10 @@ export class TheOddsApiProvider implements OddsProvider {
         }
       }
 
-      console.warn(`[the-odds-api] No event found for ${awayTeam}@${homeTeam}`)
+      log.warn('No event found for matchup')
       return null
     } catch (err) {
-      console.error('[the-odds-api] findEventByTeams error:', err)
+      log.error('findEventByTeams error', err)
       return null
     }
   }
@@ -139,7 +141,7 @@ export class TheOddsApiProvider implements OddsProvider {
         unresolvedTeamCount,
       }
     } catch (err) {
-      console.error('[the-odds-api] Fetch error:', err)
+      log.error('Fetch error', err)
 
       // 4. Fallback to stale cache
       if (cached.data) {
@@ -271,7 +273,7 @@ export class TheOddsApiProvider implements OddsProvider {
     }
 
     if (unresolvedCount > 0) {
-      console.warn(`[the-odds-api] unresolved_team_count: ${unresolvedCount}`)
+      log.warn('Unresolved team count', { count: unresolvedCount })
     }
 
     return eventProps
@@ -289,7 +291,7 @@ export class TheOddsApiProvider implements OddsProvider {
 
       const res = await fetch(url, { cache: 'no-store' })
       if (!res.ok) {
-        console.warn(`[the-odds-api] Game lines fetch failed: ${res.status}`)
+        log.warn('Game lines fetch failed', { status: res.status })
         return null
       }
 
@@ -303,7 +305,7 @@ export class TheOddsApiProvider implements OddsProvider {
       const bookData = bookmakers.find((b: any) => b.key === selectedBook)
 
       if (!bookData) {
-        console.warn('[the-odds-api] No preferred bookmaker for game lines')
+        log.warn('No preferred bookmaker for game lines')
         return null
       }
 
@@ -343,14 +345,11 @@ export class TheOddsApiProvider implements OddsProvider {
         }
       }
 
-      console.log(
-        `[the-odds-api] Game lines: total=${gameLines.total?.line}, ` +
-          `spread=${gameLines.spread?.favorite} -${gameLines.spread?.line}`
-      )
+      log.debug('Game lines fetched', { total: gameLines.total?.line, spread: gameLines.spread?.line })
 
       return gameLines
     } catch (err) {
-      console.error('[the-odds-api] fetchGameLines error:', err)
+      log.error('fetchGameLines error', err)
       return null
     }
   }
@@ -375,10 +374,8 @@ export class TheOddsApiProvider implements OddsProvider {
 
           if (!hasOver || !hasUnder) {
             isComplete = false
-            console.warn(
-              `[the-odds-api] Incomplete line: ${prop.player} ${prop.market} ` +
-                `point=${point} (over=${hasOver}, under=${hasUnder})`
-            )
+            // Log incomplete lines at debug level (no player names in prod)
+            log.debug('Incomplete line detected', { market: prop.market, hasOver, hasUnder })
           }
         }
 
@@ -394,7 +391,7 @@ export class TheOddsApiProvider implements OddsProvider {
     }
 
     if (incomplete.length > 0) {
-      console.warn(`[the-odds-api] incomplete_line_count: ${incomplete.length}`)
+      log.warn('Incomplete lines detected', { count: incomplete.length })
     }
 
     return {

@@ -1,6 +1,8 @@
 import fs from 'fs'
 import path from 'path'
+import { createLogger } from '@/lib/logger'
 
+const log = createLogger('nfl')
 let started = false
 
 function getNextTuesdayMorningLocal(): number {
@@ -21,7 +23,7 @@ async function tryFetchScheduleFromSource(): Promise<any | null> {
     const data = await res.json()
     return data
   } catch (e) {
-    console.warn('[nfl] fetch failed from source', (e as Error)?.message)
+    log.warn('Fetch failed from source')
     return null
   }
 }
@@ -31,9 +33,9 @@ function writeOverride(data: unknown) {
     const target = path.join(process.cwd(), 'my-parlaygpt', 'data', 'schedule.override.json')
     fs.mkdirSync(path.dirname(target), { recursive: true })
     fs.writeFileSync(target, JSON.stringify(data, null, 2))
-    console.info('[nfl] wrote schedule override:', target)
+    log.info('Wrote schedule override')
   } catch (e) {
-    console.warn('[nfl] failed writing override', (e as Error)?.message)
+    log.warn('Failed writing override')
   }
 }
 
@@ -54,7 +56,7 @@ export function startNflScheduleAutoUpdate() {
 
   // start the loop
   scheduleNext()
-  console.info('[nfl] auto-update scheduled for next Tuesday morning (local time)')
+  log.info('Auto-update scheduled for next Tuesday morning')
 }
 
 
