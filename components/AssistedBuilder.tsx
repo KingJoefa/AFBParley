@@ -327,13 +327,14 @@ export default function AssistedBuilder() {
 
   // Get current view from cache for rendering
   const currentView = viewCache.get(outputType)
+  const oddsCacheStatus = buildResult?.odds_telemetry?.cache_status
 
   // Render script panel based on view kind
   const renderScriptPanel = () => {
     // If we have a cached view for the current output type, render based on kind
     if (currentView) {
       if (currentView.kind === 'swantail') {
-        return <SwantailScriptsView data={currentView.data} oddsEntries={oddsEntries} onOpposite={onOpposite} />
+        return <SwantailScriptsView data={currentView.data} oddsEntries={oddsEntries} oddsCacheStatus={oddsCacheStatus} />
       } else {
         // terminal kind - render alerts/scripts
         return <TerminalAlertsView data={{ alerts: currentView.alerts, mode: outputType, request_id: buildResult?.request_id || '', matchup: { home: '', away: '' }, agents: { invoked: [], silent: [] }, provenance: {} as any, timing_ms: 0 }} />
@@ -342,7 +343,7 @@ export default function AssistedBuilder() {
 
     // Fallback to legacy data if no build result
     if (data) {
-      return <SwantailScriptsView data={data} oddsEntries={oddsEntries} onOpposite={onOpposite} />
+      return <SwantailScriptsView data={data} oddsEntries={oddsEntries} oddsCacheStatus={oddsCacheStatus} />
     }
 
     // Empty state
