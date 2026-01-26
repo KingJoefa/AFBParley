@@ -20,10 +20,13 @@ const log = createLogger('scan')
 
 const ALL_AGENTS: AgentType[] = ['epa', 'pressure', 'weather', 'qb', 'hb', 'wr', 'te']
 
-interface PlayerData {
+export interface PlayerData {
   name: string
   team: string
   position: string
+  // Stable identifier (optional for backward compatibility)
+  player_id?: string
+
   // EPA fields
   receiving_epa_rank?: number
   rushing_epa_rank?: number
@@ -47,9 +50,23 @@ interface PlayerData {
   separation_rank?: number
   // TE fields
   red_zone_target_rank?: number
+
+  // NEW: Usage fields (2026-01-25) - 0-1 scale
+  snap_pct_season?: number
+  snap_pct_l4?: number
+  route_participation_season?: number
+  route_participation_l4?: number
+  target_share_season?: number
+  target_share_l4?: number
+
+  // Sample size for suppression
+  games_in_window?: number
+  routes_sample?: number
+  targets_sample?: number
+  injury_limited?: boolean
 }
 
-interface TeamStats {
+export interface TeamStats {
   // EPA defense
   epa_allowed_to_wr_rank?: number
   epa_allowed_to_rb_rank?: number
@@ -74,9 +91,15 @@ interface TeamStats {
   te_defense_rank?: number
   yards_allowed_to_te_rank?: number
   td_allowed_to_te_rank?: number
+
+  // NEW: Pace fields (2026-01-25) - raw inputs only
+  pace_rank?: number             // 1-32
+  plays_per_game?: number        // e.g., 64.5
+  seconds_per_play?: number      // e.g., 26.8
+  neutral_pace?: number          // pace when score within 7
 }
 
-interface WeatherData {
+export interface WeatherData {
   temperature: number
   wind_mph: number
   precipitation_chance: number
