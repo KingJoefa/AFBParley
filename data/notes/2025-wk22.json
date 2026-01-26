@@ -1,0 +1,83 @@
+{
+  "week": 22,
+  "season": 2025,
+  "round": "Super Bowl LX",
+  "games": {
+    "NE@SEA": {
+      "kickoff": "2026-02-08T23:30:00Z",
+      "totals": { "home": 22, "away": 21 },
+      "spread": { "favorite": "SEA", "line": -4.5 },
+      "notes": "Super Bowl LX at Caesars Superdome, New Orleans. NE beat DEN 24-17 in AFC Championship - Drake Maye outdueled Jarrett Stidham, Rhamondre Stevenson dominant. SEA beat LAR 27-24 in NFC Championship - Jaxon Smith-Njigba 9/142/1, defense held Stafford in check. First Super Bowl meeting between franchises. Patriots seeking 7th Super Bowl title, Seahawks seeking 2nd. Drake Maye: led NFL in QBR, 4th in rushing yards among QBs (450), elite under pressure. Sam Darnold: PFF #4 QB when not pressured, oblique fully healed. Seattle defense elite: league-low 6.0 YPA allowed, 4th-lowest passer rating (77.9), #1 defensive success rate vs designed runs, 3.7 YPC allowed (best in NFL). NE defense: 30 pressures vs LAC in Divisional, dominant in playoffs. Key skill players - NE: Stevenson, DeMario Douglas, Kayshon Boutte, Hunter Henry. SEA: Kenneth Walker III, JSN, Tyler Lockett, AJ Barner. Neutral site dome eliminates weather factor.",
+      "writeups": [
+        {
+          "perspective": "Subjective game script perspective (not ground truth).",
+          "source": "user-provided narrative",
+          "created_at": "2026-01-26T00:00:00Z",
+          "confidence": 0.55,
+          "blocks": [
+            { "tag": "angles", "text": "Seattle's defense held six of last eight opponents to 16 or fewer points; NE defense generated 30 pressures vs LAC and confused Herbert's reads." },
+            { "tag": "game_script", "text": "Expect low-scoring defensive battle. Both teams will try to establish the run early - Stevenson vs Walker/Charbonnet. Dome environment neutralizes weather." },
+            { "tag": "coverage_matchups", "text": "Seattle allowed 8th-fewest WR catches and 2nd-fewest WR yards - tough draw for Boutte/Douglas. NE secondary will be tested by JSN who torched LAR for 9/142/1." },
+            { "tag": "player_notes", "text": "Rhamondre Stevenson out-snapped Henderson 80-51 in playoffs, 6.3 to 2.6 YPT advantage, zero fumbles since Week 5. Volume king for NE." },
+            { "tag": "player_notes", "text": "JSN is the X-factor - 9/142/1 vs LAR, 6/84 and 9/124 vs SF regular season. NE must contain him to win." },
+            { "tag": "player_notes", "text": "Hunter Henry vs SEA TE coverage - Seattle allowed 5th-most TE receptions (105), 6th-most TE yards (1,080). Primary NE passing target." },
+            { "tag": "player_notes", "text": "Kenneth Walker vs NE run D - Patriots held LAC to 2.5 YPC, but Walker has elite missed tackle rate. Charbonnet out (ACL)." },
+            { "tag": "injury_watch", "text": "SEA: Charbonnet (ACL) OUT, Tariq Woolen (hamstring) questionable. NE: Healthy." },
+            { "tag": "score_pred", "text": "Seahawks 20, Patriots 17." }
+          ]
+        }
+      ],
+      "injuries": {
+        "NE": [],
+        "SEA": ["Zach Charbonnet (ACL) - OUT", "Tariq Woolen (hamstring) - questionable"]
+      },
+      "keyMatchups": [
+        "Drake Maye vs Seattle pressure (4th-best pressure rate in NFL)",
+        "Rhamondre Stevenson vs SEA run D (3.7 YPC allowed, best in NFL)",
+        "JSN vs NE secondary - game's most dangerous weapon",
+        "Hunter Henry vs SEA TE coverage (5th-most TE catches allowed)",
+        "Kenneth Walker vs NE run D (held LAC to 2.5 YPC)",
+        "NE pass rush vs Sam Darnold under pressure"
+      ],
+      "weather": { "temp_f": 72, "wind_mph": 0, "dome": true },
+      "prediction": { "home": 20, "away": 17 },
+      "news": [
+        { "date": "2026-01-26", "text": "Super Bowl LX set: Seattle Seahawks vs New England Patriots at Caesars Superdome" },
+        { "date": "2026-01-26", "text": "Seattle wins NFC Championship 27-24 over Rams - JSN 9/142/1" },
+        { "date": "2026-01-26", "text": "New England wins AFC Championship 24-17 over Broncos - Maye outduels Stidham" },
+        { "date": "2026-01-26", "text": "Patriots seeking 7th Super Bowl title, Seahawks seeking 2nd" }
+      ],
+      "analytics": {
+        "source": "KoalatyStats",
+        "model_spread": { "team": "SEA", "line": -4.2 },
+        "model_scores": { "SEA": 21.5, "NE": 20.3 },
+        "pressure": {
+          "maye_scramble_rate_pressured": 0.1338,
+          "maye_scramble_rate_clean": 0.0724,
+          "maye_scramble_yards_rank": 2,
+          "sea_pressure_rank": 4,
+          "darnold_clean_pocket_grade": 4,
+          "note": "Both QBs perform best in clean pocket - expect heavy blitz packages from both defenses"
+        },
+        "tprr_matchups": [
+          { "player": "Jaxon Smith-Njigba", "team": "SEA", "tprr": 0.28, "coverage": "all", "note": "Elite route runner, NE must bracket" },
+          { "player": "Hunter Henry", "team": "NE", "tprr": 0.24, "coverage": "zone", "vs_overall_delta": 5.8, "note": "SEA TE coverage vulnerable" },
+          { "player": "AJ Barner", "team": "SEA", "tprr": 0.25, "coverage": "MOFO", "vs_overall_delta": 6.1, "note": "Emerging weapon" },
+          { "player": "Rhamondre Stevenson", "team": "NE", "tprr": 0.23, "coverage": "MOFC", "note": "Receiving back role expanded in playoffs" }
+        ],
+        "insights": [
+          "Both teams top-10 in defensive efficiency - expect under to hit",
+          "SEA plays MOFO 41% (top 5) - Maye must attack middle of field",
+          "NE plays varied coverages - Darnold will face multiple looks",
+          "Dome environment favors passing but both teams run-first",
+          "Coin flip game per analytics - home crowd slight edge to SEA designation"
+        ]
+      },
+      "sgps": [
+        { "name": "Defensive Slugfest", "legs": ["Under 43.5", "Stevenson ATTS", "Walker 70+ rush"], "odds": "+450", "confidence": "high", "rationale": "Both elite defenses, run game focus" },
+        { "name": "JSN Super Bowl MVP", "legs": ["SEA ML", "JSN 100+ yards", "JSN TD", "SEA -2.5"], "odds": "+1200", "confidence": "medium", "rationale": "JSN has been unstoppable in playoffs" },
+        { "name": "Maye Magic", "legs": ["NE ML", "Maye 250+", "Maye rushing TD", "Henry TD"], "odds": "+1800", "confidence": "medium", "rationale": "Maye dual-threat exploits SEA's aggressive D" }
+      ]
+    }
+  }
+}
