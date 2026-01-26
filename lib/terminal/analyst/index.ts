@@ -295,7 +295,7 @@ For EACH finding, provide a JSON object keyed by the finding's \`id\`. Each entr
 \`\`\`
 
 ## Valid Metrics
-receiving_epa, rushing_epa, pass_block_win_rate, pressure_rate, target_share, snap_count, red_zone_epa, epa_allowed, completion_rate, yards_per_attempt, sack_rate, passer_rating, yards_after_contact, separation, contested_catch_rate, route_participation, red_zone_targets
+receiving_epa, rushing_epa, pass_block_win_rate, pressure_rate, target_share, snap_count, red_zone_epa, epa_allowed, completion_rate, yards_per_attempt, sack_rate, passer_rating, yards_after_contact, separation, contested_catch_rate, route_participation, red_zone_targets, player_status, practice_status, designation, snap_pct, target_share_l4, usage_trend, pace_rank, plays_per_game, projected_plays
 
 ## Valid Implications by Agent
 - EPA: wr_receptions_over/under, wr_yards_over/under, rb_yards_over/under, te_receptions_over, te_yards_over, team_total_over/under
@@ -305,6 +305,9 @@ receiving_epa, rushing_epa, pass_block_win_rate, pressure_rate, target_share, sn
 - HB: rb_rush_yards_over/under, rb_receptions_over, rb_rush_attempts_over, rb_tds_over
 - WR: wr_receptions_over/under, wr_yards_over/under, wr_tds_over, wr_longest_reception_over
 - TE: te_receptions_over/under, te_yards_over/under, te_tds_over
+- INJURY: qb_pass_yards_under, qb_ints_over, team_total_over/under, qb_sacks_over, rb_rush_yards_under
+- USAGE: rb_rush_attempts_over, rb_receptions_over, wr_receptions_over/under, wr_yards_over/under, wr_tds_over, rb_rush_yards_under
+- PACE: game_total_over/under, team_total_over/under, qb_pass_yards_over, rb_rush_attempts_over
 - NOTES: any implication from the lists above
 
 ## Rules

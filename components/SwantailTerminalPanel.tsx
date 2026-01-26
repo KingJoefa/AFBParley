@@ -628,7 +628,7 @@ export default function SwantailTerminalPanel(props: {
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-white/40">PROPS</span>
                 <div className="flex flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden md:pb-1 md:pr-1 md:snap-x">
-                  {runState.agents.filter(a => ['qb', 'hb', 'wr', 'te'].includes(a.id)).map(agent => {
+                  {runState.agents.filter(a => ['qb', 'hb', 'wr', 'te', 'usage'].includes(a.id)).map(agent => {
                     const meta = AGENT_META[agent.id]
                     const isDisabled = analysisMeta?.status === 'scanning'
                     const isSelected = selectedAgents.includes(agent.id)
@@ -671,7 +671,7 @@ export default function SwantailTerminalPanel(props: {
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-white/40">ANGLES</span>
                 <div className="flex flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden md:pb-1 md:pr-1 md:snap-x">
-                  {runState.agents.filter(a => ['epa', 'pressure', 'weather'].includes(a.id)).map(agent => {
+                  {runState.agents.filter(a => ['epa', 'pressure', 'weather', 'injury', 'pace'].includes(a.id)).map(agent => {
                     const meta = AGENT_META[agent.id]
                     const isDisabled = analysisMeta?.status === 'scanning'
                     const isSelected = selectedAgents.includes(agent.id)
