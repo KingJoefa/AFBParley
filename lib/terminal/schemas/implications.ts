@@ -45,6 +45,26 @@ export const TeImplicationSchema = z.enum([
   'te_tds_over',
 ])
 
+// New agents (2026-01-25)
+export const InjuryImplicationSchema = z.enum([
+  'qb_pass_yards_under', 'qb_ints_over', 'team_total_under',
+  'qb_sacks_over', 'rb_rush_yards_under',
+  'team_total_over',
+])
+
+export const UsageImplicationSchema = z.enum([
+  'rb_rush_attempts_over', 'rb_receptions_over',
+  'wr_receptions_over', 'wr_receptions_under',
+  'wr_yards_over', 'wr_yards_under', 'wr_tds_over',
+  'rb_rush_yards_under',
+])
+
+export const PaceImplicationSchema = z.enum([
+  'game_total_over', 'game_total_under',
+  'qb_pass_yards_over', 'rb_rush_attempts_over',
+  'team_total_over', 'team_total_under',
+])
+
 // All possible implications (union)
 export const AnyImplicationSchema = z.enum([
   ...EpaImplicationSchema.options,
@@ -54,6 +74,9 @@ export const AnyImplicationSchema = z.enum([
   ...HbImplicationSchema.options,
   ...WrImplicationSchema.options,
   ...TeImplicationSchema.options,
+  ...InjuryImplicationSchema.options,
+  ...UsageImplicationSchema.options,
+  ...PaceImplicationSchema.options,
 ])
 
 export const NotesImplicationSchema = AnyImplicationSchema
@@ -68,6 +91,10 @@ export const IMPLICATION_SCHEMAS: Record<AgentType, z.ZodEnum<[string, ...string
   wr: WrImplicationSchema,
   te: TeImplicationSchema,
   notes: NotesImplicationSchema,
+  // New agents (2026-01-25)
+  injury: InjuryImplicationSchema,
+  usage: UsageImplicationSchema,
+  pace: PaceImplicationSchema,
 }
 
 // Get allowed implications for an agent
@@ -94,4 +121,8 @@ export type HbImplication = z.infer<typeof HbImplicationSchema>
 export type WrImplication = z.infer<typeof WrImplicationSchema>
 export type TeImplication = z.infer<typeof TeImplicationSchema>
 export type NotesImplication = z.infer<typeof NotesImplicationSchema>
+// New agents (2026-01-25)
+export type InjuryImplication = z.infer<typeof InjuryImplicationSchema>
+export type UsageImplication = z.infer<typeof UsageImplicationSchema>
+export type PaceImplication = z.infer<typeof PaceImplicationSchema>
 export type AnyImplication = z.infer<typeof AnyImplicationSchema>

@@ -490,6 +490,10 @@ const DEFAULT_IMPLICATIONS: Record<AgentType, AnyImplication[]> = {
   wr: ['wr_yards_over'],
   te: ['te_receptions_over'],
   notes: ['team_total_over'],
+  // New agents (2026-01-25)
+  injury: ['team_total_under'],
+  usage: ['wr_receptions_over'],
+  pace: ['game_total_over'],
 }
 
 /**
@@ -504,6 +508,10 @@ const DEFAULT_METRICS: Record<AgentType, string> = {
   wr: 'target_share',
   te: 'target_share',
   notes: 'snap_count',
+  // New agents (2026-01-25)
+  injury: 'player_status',
+  usage: 'snap_pct',
+  pace: 'projected_plays',
 }
 
 /**
