@@ -7,7 +7,7 @@
       "kickoff": "2026-02-08T23:30:00Z",
       "totals": { "home": 22, "away": 21 },
       "spread": { "favorite": "SEA", "line": -4.5 },
-      "notes": "Super Bowl LX at Caesars Superdome, New Orleans. NE beat DEN 24-17 in AFC Championship - Drake Maye outdueled Jarrett Stidham, Rhamondre Stevenson dominant. SEA beat LAR 27-24 in NFC Championship - Jaxon Smith-Njigba 9/142/1, defense held Stafford in check. First Super Bowl meeting between franchises. Patriots seeking 7th Super Bowl title, Seahawks seeking 2nd. Drake Maye: led NFL in QBR, 4th in rushing yards among QBs (450), elite under pressure. Sam Darnold: PFF #4 QB when not pressured, oblique fully healed. Seattle defense elite: league-low 6.0 YPA allowed, 4th-lowest passer rating (77.9), #1 defensive success rate vs designed runs, 3.7 YPC allowed (best in NFL). NE defense: 30 pressures vs LAC in Divisional, dominant in playoffs. Key skill players - NE: Stevenson, DeMario Douglas, Kayshon Boutte, Hunter Henry. SEA: Kenneth Walker III, JSN, Tyler Lockett, AJ Barner. Neutral site dome eliminates weather factor.",
+      "notes": "Super Bowl LX at Levi's Stadium, Santa Clara, CA (San Francisco Bay Area). NE beat DEN 24-17 in AFC Championship - Drake Maye outdueled Jarrett Stidham, Rhamondre Stevenson dominant. SEA beat LAR 27-24 in NFC Championship - Jaxon Smith-Njigba 9/142/1, defense held Stafford in check. First Super Bowl meeting between franchises. Patriots seeking 7th Super Bowl title, Seahawks seeking 2nd. Drake Maye: led NFL in QBR, 4th in rushing yards among QBs (450), elite under pressure. Sam Darnold: PFF #4 QB when not pressured, oblique fully healed. Seattle defense elite: league-low 6.0 YPA allowed, 4th-lowest passer rating (77.9), #1 defensive success rate vs designed runs, 3.7 YPC allowed (best in NFL). NE defense: 30 pressures vs LAC in Divisional, dominant in playoffs. Key skill players - NE: Stevenson, DeMario Douglas, Kayshon Boutte, Hunter Henry. SEA: Kenneth Walker III, JSN, Tyler Lockett, AJ Barner. Levi's Stadium is open-air - mild Bay Area weather expected (mid-50s). Bad Bunny headlines halftime show.",
       "writeups": [
         {
           "perspective": "Subjective game script perspective (not ground truth).",
@@ -16,7 +16,7 @@
           "confidence": 0.55,
           "blocks": [
             { "tag": "angles", "text": "Seattle's defense held six of last eight opponents to 16 or fewer points; NE defense generated 30 pressures vs LAC and confused Herbert's reads." },
-            { "tag": "game_script", "text": "Expect low-scoring defensive battle. Both teams will try to establish the run early - Stevenson vs Walker/Charbonnet. Dome environment neutralizes weather." },
+            { "tag": "game_script", "text": "Expect low-scoring defensive battle. Both teams will try to establish the run early - Stevenson vs Walker. Mild Bay Area weather (mid-50s) suits both teams." },
             { "tag": "coverage_matchups", "text": "Seattle allowed 8th-fewest WR catches and 2nd-fewest WR yards - tough draw for Boutte/Douglas. NE secondary will be tested by JSN who torched LAR for 9/142/1." },
             { "tag": "player_notes", "text": "Rhamondre Stevenson out-snapped Henderson 80-51 in playoffs, 6.3 to 2.6 YPT advantage, zero fumbles since Week 5. Volume king for NE." },
             { "tag": "player_notes", "text": "JSN is the X-factor - 9/142/1 vs LAR, 6/84 and 9/124 vs SF regular season. NE must contain him to win." },
@@ -39,10 +39,10 @@
         "Kenneth Walker vs NE run D (held LAC to 2.5 YPC)",
         "NE pass rush vs Sam Darnold under pressure"
       ],
-      "weather": { "temp_f": 72, "wind_mph": 0, "dome": true },
+      "weather": { "temp_f": 58, "wind_mph": 8, "precipitation_chance": 10, "indoor": false },
       "prediction": { "home": 20, "away": 17 },
       "news": [
-        { "date": "2026-01-26", "text": "Super Bowl LX set: Seattle Seahawks vs New England Patriots at Caesars Superdome" },
+        { "date": "2026-01-26", "text": "Super Bowl LX set: Seattle Seahawks vs New England Patriots at Levi's Stadium, Santa Clara" },
         { "date": "2026-01-26", "text": "Seattle wins NFC Championship 27-24 over Rams - JSN 9/142/1" },
         { "date": "2026-01-26", "text": "New England wins AFC Championship 24-17 over Broncos - Maye outduels Stidham" },
         { "date": "2026-01-26", "text": "Patriots seeking 7th Super Bowl title, Seahawks seeking 2nd" }
@@ -69,7 +69,7 @@
           "Both teams top-10 in defensive efficiency - expect under to hit",
           "SEA plays MOFO 41% (top 5) - Maye must attack middle of field",
           "NE plays varied coverages - Darnold will face multiple looks",
-          "Dome environment favors passing but both teams run-first",
+          "Mild Bay Area weather favors both teams - no extreme conditions",
           "Coin flip game per analytics - home crowd slight edge to SEA designation"
         ]
       },
