@@ -8,6 +8,10 @@ import { checkHbThresholds } from '../agents/hb/thresholds'
 import { checkWrThresholds } from '../agents/wr/thresholds'
 import { checkTeThresholds } from '../agents/te/thresholds'
 import { runNotesAgent } from '../agents/notes/thresholds'
+// New agents (2026-01-25)
+import { checkInjuryThresholds } from '../agents/injury/thresholds'
+import { checkUsageThresholds } from '../agents/usage/thresholds'
+import { checkPaceThresholds } from '../agents/pace/thresholds'
 
 const log = createLogger('scan')
 
@@ -18,7 +22,10 @@ const log = createLogger('scan')
  * Each agent runs independently and produces Finding[] or stays silent.
  */
 
-const ALL_AGENTS: AgentType[] = ['epa', 'pressure', 'weather', 'qb', 'hb', 'wr', 'te']
+const ALL_AGENTS: AgentType[] = [
+  'epa', 'pressure', 'weather', 'qb', 'hb', 'wr', 'te',
+  'injury', 'usage', 'pace',  // New agents (2026-01-25)
+]
 
 export interface PlayerData {
   name: string
@@ -375,6 +382,60 @@ export async function runAgents(
     if (notesFindings.length > 0) {
       findings.push(...notesFindings)
       agentsWithFindings.add('notes')
+    }
+  }
+
+  // =========================================================================
+  // New Agents (2026-01-25)
+  // =========================================================================
+
+  // Run Injury agent (if enabled)
+  // Parses Notes JSON injuries to identify material absences
+  if (agentsToRun.includes('injury') && context.injuries) {
+    const injuryFindings = checkInjuryThresholds({
+      homeTeam: context.homeTeam,
+      awayTeam: context.awayTeam,
+      injuries: context.injuries,
+      dataTimestamp: context.dataTimestamp,
+      dataVersion: context.dataVersion,
+    })
+    if (injuryFindings.length > 0) {
+      findings.push(...injuryFindings)
+      agentsWithFindings.add('injury')
+    }
+  }
+
+  // Run Usage agent (if enabled)
+  // Analyzes player snap share and target volume trends
+  if (agentsToRun.includes('usage')) {
+    const usageFindings = checkUsageThresholds({
+      homeTeam: context.homeTeam,
+      awayTeam: context.awayTeam,
+      players: context.players,
+      dataTimestamp: context.dataTimestamp,
+      dataVersion: context.dataVersion,
+    })
+    if (usageFindings.length > 0) {
+      findings.push(...usageFindings)
+      agentsWithFindings.add('usage')
+    }
+  }
+
+  // Run Pace agent (if enabled)
+  // Combines team pace data to project total plays
+  if (agentsToRun.includes('pace')) {
+    const paceFindings = checkPaceThresholds({
+      homeTeam: context.homeTeam,
+      awayTeam: context.awayTeam,
+      teamStats: context.teamStats,
+      weather: context.weather,
+      dataTimestamp: context.dataTimestamp,
+      dataVersion: context.dataVersion,
+      seasonYear: context.year,
+    })
+    if (paceFindings.length > 0) {
+      findings.push(...paceFindings)
+      agentsWithFindings.add('pace')
     }
   }
 
