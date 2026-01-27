@@ -444,7 +444,7 @@ async function loadMatchupContext(
       dataVersion: '2025-week-22-superbowl',
       year: 2025,
       week: 22,
-      gameNotes: 'Super Bowl matchup: Patriots vs Seahawks. Neutral site conditions. Elite defense has paved Seattle\'s road to the Super Bowl, and they are the only team since the 2016 Patriots to post 84.0+ PFF grades across offense, defense, and special teams. New England ranks 31st in strength of schedule. Patriots push deep (4th-highest deep pass rate, 14.9%), but Seattle\'s two-high usage holds 15+ yard passes under 12%. Seahawks generate pressure at 39.8% (7th) without heavy blitz (25.9%, 28th), and Drake Maye is charged with 22.4% of his sacks (5th-highest).',
+      gameNotes: 'Super Bowl matchup: Patriots vs Seahawks. Neutral site conditions.',
       injuries: {
         SEA: [],
         NE: [],
