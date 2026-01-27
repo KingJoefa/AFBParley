@@ -15,6 +15,7 @@ import { hashObject, generateRequestId } from '@/lib/terminal/engine/provenance'
 import { checkRequestLimits, estimateTokens } from '@/lib/terminal/engine/guardrails'
 import type { BuildView, OutputType } from '@/lib/terminal/terminal-state'
 import { SwantailResponseSchema, type SwantailResponse } from '@/lib/swantail/schema'
+import { enforceTeamTotalGuard } from '@/lib/swantail/team-total-guard'
 import OpenAI from 'openai'
 import {
   extractPlayers,
@@ -859,6 +860,22 @@ async function buildSwantailViewDirect(
     gameNotes?.spread             // Notes fallback for spread
   )
   let result = await callLLM(client, initialPrompt)
+
+  const gameTotalFromOdds = rosterResult.odds.gameLines?.total
+  const gameTotalFromNotes = gameNotes?.totals
+    ? gameNotes.totals.home + gameNotes.totals.away
+    : undefined
+  const gameTotal = gameTotalFromOdds ?? gameTotalFromNotes
+
+  if (gameTotal !== undefined) {
+    result = {
+      ...result,
+      scripts: result.scripts.map(script => ({
+        ...script,
+        legs: script.legs.map(leg => enforceTeamTotalGuard(leg, { gameTotal })),
+      })),
+    }
+  }
 
   // Step 3: Validate players if roster available
   if (rosterResult.player_props_enabled && rosterResult.players.length > 0) {
