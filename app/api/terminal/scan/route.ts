@@ -177,6 +177,7 @@ async function loadMatchupContext(
 
   const isAFC = (homeTeam === 'DEN' && awayTeam === 'NE') || (homeTeam === 'NE' && awayTeam === 'DEN')
   const isNFC = (homeTeam === 'SEA' && awayTeam === 'LAR') || (homeTeam === 'LAR' && awayTeam === 'SEA')
+  const isSuperBowl = (homeTeam === 'SEA' && awayTeam === 'NE') || (homeTeam === 'NE' && awayTeam === 'SEA')
 
   // AFC Championship: Patriots @ Broncos
   if (isAFC && homeTeam === 'DEN') {
@@ -357,7 +358,104 @@ async function loadMatchupContext(
     }
   }
 
+  // Super Bowl: Patriots vs Seahawks
+  if (isSuperBowl) {
+    return {
+      homeTeam,
+      awayTeam,
+      players: {
+        SEA: [
+          {
+            name: 'Sam Darnold',
+            team: 'SEA',
+            position: 'QB',
+            qb_rating_rank: 9,
+            yards_per_attempt_rank: 12,
+            attempts: 480,
+          },
+          {
+            name: 'Jaxon Smith-Njigba',
+            team: 'SEA',
+            position: 'WR',
+            receiving_epa_rank: 6,
+            target_share_rank: 3,
+            targets: 125,
+            separation_rank: 4,
+          },
+          {
+            name: 'Kenneth Walker III',
+            team: 'SEA',
+            position: 'HB',
+            rushing_epa_rank: 7,
+            rush_yards_rank: 8,
+            carries: 245,
+          },
+        ],
+        NE: [
+          {
+            name: 'Drake Maye',
+            team: 'NE',
+            position: 'QB',
+            qb_rating_rank: 1,
+            yards_per_attempt_rank: 3,
+            attempts: 520,
+          },
+          {
+            name: 'DeMario Douglas',
+            team: 'NE',
+            position: 'WR',
+            receiving_epa_rank: 8,
+            target_share_rank: 5,
+            targets: 110,
+            separation_rank: 6,
+          },
+          {
+            name: 'Rhamondre Stevenson',
+            team: 'NE',
+            position: 'HB',
+            rushing_epa_rank: 6,
+            rush_yards_rank: 9,
+            carries: 230,
+          },
+        ],
+      },
+      teamStats: {
+        SEA: {
+          pass_defense_rank: 2,
+          epa_allowed_to_wr_rank: 8,
+          pressure_rate_rank: 4,
+          qb_name: 'Sam Darnold',
+        },
+        NE: {
+          epa_allowed_to_rb_rank: 7,
+          pressure_rate_rank: 11,
+          pass_block_win_rate_rank: 14,
+          qb_name: 'Drake Maye',
+        },
+      },
+      weather: {
+        temperature: 58,
+        wind_mph: 18,
+        precipitation_chance: 10,
+        indoor: false,
+        stadium: 'Super Bowl (Neutral Site)',
+      },
+      dataTimestamp: Date.now(),
+      dataVersion: '2025-week-22-superbowl',
+      year: 2025,
+      week: 22,
+      gameNotes: 'Super Bowl matchup: Patriots vs Seahawks. Neutral site conditions. Elite defense has paved Seattle\'s road to the Super Bowl, and they are the only team since the 2016 Patriots to post 84.0+ PFF grades across offense, defense, and special teams. New England ranks 31st in strength of schedule. Patriots push deep (4th-highest deep pass rate, 14.9%), but Seattle\'s two-high usage holds 15+ yard passes under 12%. Seahawks generate pressure at 39.8% (7th) without heavy blitz (25.9%, 28th), and Drake Maye is charged with 22.4% of his sacks (5th-highest).',
+      injuries: {
+        SEA: [],
+        NE: [],
+      },
+      totals: { home: 24, away: 23 },
+      spread: { favorite: homeTeam, line: 1.5 },
+    }
+  }
+
   // Fallback: Return minimal context for other matchups
+  console.warn(`[scan] Unknown matchup context for ${awayTeam}@${homeTeam}; using fallback.`)
   return {
     homeTeam,
     awayTeam,
