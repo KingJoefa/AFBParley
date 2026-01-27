@@ -8,6 +8,10 @@ import { checkHbThresholds } from '../agents/hb/thresholds'
 import { checkWrThresholds } from '../agents/wr/thresholds'
 import { checkTeThresholds } from '../agents/te/thresholds'
 import { runNotesAgent } from '../agents/notes/thresholds'
+// New agents (2026-01-25)
+import { checkInjuryThresholds } from '../agents/injury/thresholds'
+import { checkUsageThresholds } from '../agents/usage/thresholds'
+import { checkPaceThresholds } from '../agents/pace/thresholds'
 
 const log = createLogger('scan')
 
@@ -18,12 +22,18 @@ const log = createLogger('scan')
  * Each agent runs independently and produces Finding[] or stays silent.
  */
 
-const ALL_AGENTS: AgentType[] = ['epa', 'pressure', 'weather', 'qb', 'hb', 'wr', 'te']
+const ALL_AGENTS: AgentType[] = [
+  'epa', 'pressure', 'weather', 'qb', 'hb', 'wr', 'te',
+  'injury', 'usage', 'pace',  // New agents (2026-01-25)
+]
 
-interface PlayerData {
+export interface PlayerData {
   name: string
   team: string
   position: string
+  // Stable identifier (optional for backward compatibility)
+  player_id?: string
+
   // EPA fields
   receiving_epa_rank?: number
   rushing_epa_rank?: number
@@ -47,9 +57,23 @@ interface PlayerData {
   separation_rank?: number
   // TE fields
   red_zone_target_rank?: number
+
+  // NEW: Usage fields (2026-01-25) - 0-1 scale
+  snap_pct_season?: number
+  snap_pct_l4?: number
+  route_participation_season?: number
+  route_participation_l4?: number
+  target_share_season?: number
+  target_share_l4?: number
+
+  // Sample size for suppression
+  games_in_window?: number
+  routes_sample?: number
+  targets_sample?: number
+  injury_limited?: boolean
 }
 
-interface TeamStats {
+export interface TeamStats {
   // EPA defense
   epa_allowed_to_wr_rank?: number
   epa_allowed_to_rb_rank?: number
@@ -74,9 +98,15 @@ interface TeamStats {
   te_defense_rank?: number
   yards_allowed_to_te_rank?: number
   td_allowed_to_te_rank?: number
+
+  // NEW: Pace fields (2026-01-25) - raw inputs only
+  pace_rank?: number             // 1-32
+  plays_per_game?: number        // e.g., 64.5
+  seconds_per_play?: number      // e.g., 26.8
+  neutral_pace?: number          // pace when score within 7
 }
 
-interface WeatherData {
+export interface WeatherData {
   temperature: number
   wind_mph: number
   precipitation_chance: number
@@ -352,6 +382,60 @@ export async function runAgents(
     if (notesFindings.length > 0) {
       findings.push(...notesFindings)
       agentsWithFindings.add('notes')
+    }
+  }
+
+  // =========================================================================
+  // New Agents (2026-01-25)
+  // =========================================================================
+
+  // Run Injury agent (if enabled)
+  // Parses Notes JSON injuries to identify material absences
+  if (agentsToRun.includes('injury') && context.injuries) {
+    const injuryFindings = checkInjuryThresholds({
+      homeTeam: context.homeTeam,
+      awayTeam: context.awayTeam,
+      injuries: context.injuries,
+      dataTimestamp: context.dataTimestamp,
+      dataVersion: context.dataVersion,
+    })
+    if (injuryFindings.length > 0) {
+      findings.push(...injuryFindings)
+      agentsWithFindings.add('injury')
+    }
+  }
+
+  // Run Usage agent (if enabled)
+  // Analyzes player snap share and target volume trends
+  if (agentsToRun.includes('usage')) {
+    const usageFindings = checkUsageThresholds({
+      homeTeam: context.homeTeam,
+      awayTeam: context.awayTeam,
+      players: context.players,
+      dataTimestamp: context.dataTimestamp,
+      dataVersion: context.dataVersion,
+    })
+    if (usageFindings.length > 0) {
+      findings.push(...usageFindings)
+      agentsWithFindings.add('usage')
+    }
+  }
+
+  // Run Pace agent (if enabled)
+  // Combines team pace data to project total plays
+  if (agentsToRun.includes('pace')) {
+    const paceFindings = checkPaceThresholds({
+      homeTeam: context.homeTeam,
+      awayTeam: context.awayTeam,
+      teamStats: context.teamStats,
+      weather: context.weather,
+      dataTimestamp: context.dataTimestamp,
+      dataVersion: context.dataVersion,
+      seasonYear: context.year,
+    })
+    if (paceFindings.length > 0) {
+      findings.push(...paceFindings)
+      agentsWithFindings.add('pace')
     }
   }
 

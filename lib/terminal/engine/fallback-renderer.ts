@@ -56,6 +56,10 @@ const AGENT_DISPLAY: Record<AgentType, string> = {
   wr: 'WR Agent',
   te: 'TE Agent',
   notes: 'Notes Agent',
+  // New agents (2026-01-25)
+  injury: 'Injury Agent',
+  usage: 'Usage Agent',
+  pace: 'Pace Agent',
 }
 
 /**

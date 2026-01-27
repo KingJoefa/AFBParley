@@ -2,19 +2,17 @@ import { NextResponse } from "next/server"
 import { existsSync, readFileSync } from "fs"
 import path from "path"
 
-// 2025 Season - Conference Championships (Sun Jan 25, 2026)
-// Note: post-season games are surfaced as "week 21" for downstream odds/combos APIs that expect a numeric week.
-const WEEK = 21
+// 2025 Season - Super Bowl LX (Sun Feb 8, 2026)
+// Note: post-season games are surfaced as "week 22" for downstream odds/combos APIs that expect a numeric week.
+const WEEK = 22
 const SEASON = 2025
 
 const GAMES = [
-  // Sunday, Jan 25 - AFC Championship
-  { id: "patriots-broncos", display: "New England Patriots @ Denver Broncos", time: "Sun 3:00 PM ET", week: WEEK, date: "2026-01-25" },
-  // Sunday, Jan 25 - NFC Championship
-  { id: "rams-seahawks", display: "Los Angeles Rams @ Seattle Seahawks", time: "Sun 6:30 PM ET", week: WEEK, date: "2026-01-25" },
+  // Sunday, Feb 8 - Super Bowl LX at Levi's Stadium, Santa Clara
+  { id: "patriots-seahawks", display: "New England Patriots @ Seattle Seahawks", time: "Sun 6:30 PM ET", week: WEEK, date: "2026-02-08" },
 ]
 
-// Both conference championships are featured games
+// Super Bowl is the featured game
 const POPULAR = new Set(GAMES.map(g => g.id))
 
 export async function GET() {

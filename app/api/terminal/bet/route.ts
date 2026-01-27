@@ -26,7 +26,7 @@ const BetRequestSchema = z.object({
   // Alert metadata needed for ladder organization
   alert_metadata: z.array(z.object({
     id: z.string(),
-    agent: z.enum(['epa', 'pressure', 'weather', 'qb', 'hb', 'wr', 'te']),
+    agent: z.enum(['epa', 'pressure', 'weather', 'qb', 'hb', 'wr', 'te', 'notes', 'injury', 'usage', 'pace']),
     market: z.string(),
     line: z.number().optional(),
     confidence: z.number().min(0).max(1),
