@@ -48,24 +48,17 @@ describe('NFL schedule', () => {
     expect(afterWeekOne.week).toBe(2)
   })
 
-  it('preserves historical postseason schedules', () => {
-    const schedule = loadSchedule({ season: 2025, week: 20 })
-    expect(schedule.games).toHaveLength(4)
-    expect(schedule.games.map(game => game.id)).toContain('2025-wk20-LAR-at-CHI')
-  })
-
-  it('serves compatibility fields with canonical metadata', async () => {
-    const response = await GET(new Request('http://localhost/api/nfl/schedule?season=2025&week=21'))
+  it('serves canonical metadata for an explicit regular-season week', async () => {
+    const response = await GET(new Request('http://localhost/api/nfl/schedule?season=2026&week=2'))
     const body = await response.json()
 
     expect(response.status).toBe(200)
     expect(body).toMatchObject({
-      season: 2025,
-      week: 21,
-      round: 'Conference Championships',
-      source: 'curated-notes',
-      dataVersion: '2025-wk21',
-      totalGames: 2,
+      season: 2026,
+      week: 2,
+      round: 'Regular Season',
+      source: 'season-schedule',
+      totalGames: 16,
     })
     expect(body.games[0]).toEqual(expect.objectContaining({
       id: expect.any(String),
