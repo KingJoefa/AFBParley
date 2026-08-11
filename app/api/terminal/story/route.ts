@@ -17,6 +17,7 @@ import {
 import type { Alert, Finding, AgentType } from '@/lib/terminal/schemas'
 import { createHash } from 'crypto'
 import { isActionEnabled } from '@/lib/terminal/feature-flags'
+import { parseMatchup } from '@/lib/nfl/teams'
 
 /**
  * /api/terminal/story
@@ -49,65 +50,6 @@ const StoryRequestSchema = z.object({
 })
 
 type StoryRequest = z.infer<typeof StoryRequestSchema>
-
-// Team name mappings (shared with scan/prop)
-const TEAM_ALIASES: Record<string, string> = {
-  '49ers': 'SF', niners: 'SF', 'san francisco': 'SF',
-  seahawks: 'SEA', seattle: 'SEA',
-  cardinals: 'ARI', arizona: 'ARI',
-  rams: 'LAR', 'los angeles rams': 'LAR',
-  chiefs: 'KC', 'kansas city': 'KC',
-  raiders: 'LV', 'las vegas': 'LV',
-  broncos: 'DEN', denver: 'DEN',
-  chargers: 'LAC', 'los angeles chargers': 'LAC',
-  cowboys: 'DAL', dallas: 'DAL',
-  eagles: 'PHI', philadelphia: 'PHI',
-  giants: 'NYG', 'new york giants': 'NYG',
-  commanders: 'WAS', washington: 'WAS',
-  bears: 'CHI', chicago: 'CHI',
-  lions: 'DET', detroit: 'DET',
-  packers: 'GB', 'green bay': 'GB',
-  vikings: 'MIN', minnesota: 'MIN',
-  falcons: 'ATL', atlanta: 'ATL',
-  panthers: 'CAR', carolina: 'CAR',
-  saints: 'NO', 'new orleans': 'NO',
-  buccaneers: 'TB', bucs: 'TB', 'tampa bay': 'TB',
-  ravens: 'BAL', baltimore: 'BAL',
-  bengals: 'CIN', cincinnati: 'CIN',
-  browns: 'CLE', cleveland: 'CLE',
-  steelers: 'PIT', pittsburgh: 'PIT',
-  texans: 'HOU', houston: 'HOU',
-  colts: 'IND', indianapolis: 'IND',
-  jaguars: 'JAX', jacksonville: 'JAX',
-  titans: 'TEN', tennessee: 'TEN',
-  bills: 'BUF', buffalo: 'BUF',
-  dolphins: 'MIA', miami: 'MIA',
-  patriots: 'NE', 'new england': 'NE',
-  jets: 'NYJ', 'new york jets': 'NYJ',
-}
-
-function normalizeTeamName(name: string): string {
-  const lower = name.toLowerCase().trim()
-  return TEAM_ALIASES[lower] || name.toUpperCase()
-}
-
-function parseMatchup(matchup: string): { homeTeam: string; awayTeam: string } | null {
-  const atMatch = matchup.match(/^(.+?)\s*@\s*(.+)$/i)
-  if (atMatch) {
-    return {
-      awayTeam: normalizeTeamName(atMatch[1]),
-      homeTeam: normalizeTeamName(atMatch[2]),
-    }
-  }
-  const vsMatch = matchup.match(/^(.+?)\s*vs\.?\s*(.+)$/i)
-  if (vsMatch) {
-    return {
-      homeTeam: normalizeTeamName(vsMatch[1]),
-      awayTeam: normalizeTeamName(vsMatch[2]),
-    }
-  }
-  return null
-}
 
 /**
  * Load matchup context

@@ -336,7 +336,7 @@ describe('checkPaceThresholds', () => {
     if (fullSignal && partialSignal) {
       expect(fullSignal.payload?.data_quality).toBe('full')
       // Full data should have higher confidence
-      expect(fullSignal.confidence).toBeGreaterThanOrEqual(partialSignal.confidence)
+      expect(fullSignal.confidence ?? 0).toBeGreaterThanOrEqual(partialSignal.confidence ?? 0)
     }
   })
 })

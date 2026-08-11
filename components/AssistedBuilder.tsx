@@ -251,7 +251,7 @@ export default function AssistedBuilder() {
     }
     const derived = (s.schedule.season && s.schedule.week)
       ? { year: s.schedule.season, week: s.schedule.week }
-      : { year: 2025, week: 20 }
+      : { year: 2026, week: 1 }
     const anyDegraded = s.schedule.state === 'degraded' || s.lines.state === 'degraded' || s.backend.state === 'degraded'
     let value: PreflightStatus
     if (s.phase === 'error') {

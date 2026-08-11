@@ -33,6 +33,7 @@ import {
 } from '@/lib/terminal/engine/props-roster'
 import { loadGameNotes } from '@/lib/terminal/engine/notes-loader'
 import type { Analytics, SGP, Writeup } from '@/lib/terminal/analyst'
+import { parseMatchup } from '@/lib/nfl/teams'
 
 /**
  * /api/terminal/build
@@ -691,58 +692,8 @@ async function callLLM(
  * e.g., "Texans @ Patriots" → { home: "NE", away: "HOU" }
  */
 function parseMatchupTeams(matchup: string): { home: string; away: string } | null {
-  // Common patterns: "Team1 @ Team2", "Team1 vs Team2", "Team1 at Team2"
-  const match = matchup.match(/^(.+?)\s*[@vs]+\s*(.+)$/i)
-  if (!match) return null
-
-  const away = match[1].trim()
-  const home = match[2].trim()
-
-  // Map team names to codes (simplified)
-  const teamCodes: Record<string, string> = {
-    'patriots': 'NE', 'new england': 'NE', 'ne': 'NE',
-    'texans': 'HOU', 'houston': 'HOU', 'hou': 'HOU',
-    'broncos': 'DEN', 'denver': 'DEN', 'den': 'DEN',
-    'bills': 'BUF', 'buffalo': 'BUF', 'buf': 'BUF',
-    '49ers': 'SF', 'niners': 'SF', 'san francisco': 'SF', 'sf': 'SF',
-    'seahawks': 'SEA', 'seattle': 'SEA', 'sea': 'SEA',
-    'rams': 'LA', 'los angeles rams': 'LA', 'la': 'LA', 'lar': 'LA',
-    'bears': 'CHI', 'chicago': 'CHI', 'chi': 'CHI',
-    'chiefs': 'KC', 'kansas city': 'KC', 'kc': 'KC',
-    'raiders': 'LV', 'las vegas': 'LV', 'lv': 'LV',
-    'chargers': 'LAC', 'los angeles chargers': 'LAC', 'lac': 'LAC',
-    'cowboys': 'DAL', 'dallas': 'DAL', 'dal': 'DAL',
-    'eagles': 'PHI', 'philadelphia': 'PHI', 'phi': 'PHI',
-    'giants': 'NYG', 'new york giants': 'NYG', 'nyg': 'NYG',
-    'commanders': 'WAS', 'washington': 'WAS', 'was': 'WAS',
-    'lions': 'DET', 'detroit': 'DET', 'det': 'DET',
-    'packers': 'GB', 'green bay': 'GB', 'gb': 'GB',
-    'vikings': 'MIN', 'minnesota': 'MIN', 'min': 'MIN',
-    'falcons': 'ATL', 'atlanta': 'ATL', 'atl': 'ATL',
-    'panthers': 'CAR', 'carolina': 'CAR', 'car': 'CAR',
-    'saints': 'NO', 'new orleans': 'NO', 'no': 'NO',
-    'buccaneers': 'TB', 'bucs': 'TB', 'tampa bay': 'TB', 'tb': 'TB',
-    'ravens': 'BAL', 'baltimore': 'BAL', 'bal': 'BAL',
-    'bengals': 'CIN', 'cincinnati': 'CIN', 'cin': 'CIN',
-    'browns': 'CLE', 'cleveland': 'CLE', 'cle': 'CLE',
-    'steelers': 'PIT', 'pittsburgh': 'PIT', 'pit': 'PIT',
-    'colts': 'IND', 'indianapolis': 'IND', 'ind': 'IND',
-    'jaguars': 'JAX', 'jacksonville': 'JAX', 'jax': 'JAX',
-    'titans': 'TEN', 'tennessee': 'TEN', 'ten': 'TEN',
-    'dolphins': 'MIA', 'miami': 'MIA', 'mia': 'MIA',
-    'jets': 'NYJ', 'new york jets': 'NYJ', 'nyj': 'NYJ',
-    'cardinals': 'ARI', 'arizona': 'ARI', 'ari': 'ARI',
-  }
-
-  const normalizeTeam = (t: string): string => {
-    const lower = t.toLowerCase()
-    return teamCodes[lower] || t.toUpperCase().slice(0, 3)
-  }
-
-  return {
-    home: normalizeTeam(home),
-    away: normalizeTeam(away),
-  }
+  const parsed = parseMatchup(matchup)
+  return parsed ? { home: parsed.homeTeam, away: parsed.awayTeam } : null
 }
 
 interface BuildSwantailResult {

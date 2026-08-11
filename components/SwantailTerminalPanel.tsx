@@ -14,6 +14,8 @@ import {
 import { computeScanHash, type AnalysisMeta } from '@/lib/terminal/terminal-state'
 
 type CheckState = 'booting' | 'ready' | 'degraded' | 'error'
+const DEFAULT_SEASON = 2026
+const DEFAULT_WEEK = 1
 
 // Re-export for consumers
 export type { RunMode, RunState, AgentRunState }
@@ -158,10 +160,8 @@ export default function SwantailTerminalPanel(props: {
     setLines({ state: 'booting' })
     setBackend({ state: 'booting' })
 
-    let hardError = false
-    let degraded = false
-    let derivedYear = 2025
-    let derivedWeek = 20
+    let derivedYear = DEFAULT_SEASON
+    let derivedWeek = DEFAULT_WEEK
     let schedulePayload: any | null = null
     let gameCount = 0
     let linesLive = false
@@ -179,15 +179,13 @@ export default function SwantailTerminalPanel(props: {
       gameCount = list.length
       setGames(list)
       if (derived.degraded) {
-        degraded = true
         setSchedule({ state: 'degraded', games: list.length, week: derivedWeek, season: derivedYear, error: 'missing season/week in schedule payload' })
       } else {
         setSchedule({ state: 'ready', games: list.length, week: derivedWeek, season: derivedYear })
       }
     } catch (e: any) {
-      degraded = true
-      derivedYear = 2025
-      derivedWeek = 20
+      derivedYear = DEFAULT_SEASON
+      derivedWeek = DEFAULT_WEEK
       setSchedule({ state: 'degraded', season: derivedYear, week: derivedWeek, error: e?.message || 'schedule failed' })
     }
 
@@ -210,37 +208,25 @@ export default function SwantailTerminalPanel(props: {
       } else if (mode === 'fallback') {
         setLines({ state: 'ready', mode, expectedRel, expectedAbs })
       } else if (mode === 'missing') {
-        setLines({ state: 'error', mode, expectedRel, expectedAbs })
-        hardError = true
+        setLines({ state: 'degraded', mode, expectedRel, expectedAbs, error: 'lines not posted yet' })
       } else {
-        const hasFallback = Boolean(json?.fallback?.exists)
-        setLines({ state: hasFallback ? 'degraded' : 'error', mode, expectedRel, expectedAbs, error: String(json?.api?.error || '') })
-        if (!hasFallback) hardError = true
-        else degraded = true
+        setLines({ state: 'degraded', mode, expectedRel, expectedAbs, error: String(json?.api?.error || '') })
       }
     } catch (e: any) {
       setLines({ state: 'degraded', error: e?.message || 'lines status failed' })
-      degraded = true
     }
 
     // Backend - Terminal 2.0 is self-contained
     setBackend({ state: 'ready', configured: true, probeOk: true })
 
-    setPhase(hardError ? 'error' : 'ready')
+    setPhase('ready')
 
-    // Capability-focused ready state (no process text)
-    if (hardError) {
-      append('swantail — attention required', 'warn')
-      append('lines unavailable. check configuration.', 'err')
-    } else {
-      append('swantail ready — 7 agents standing by', 'ok')
-      // Game count + lines (only show "lines live" if actually live API)
-      const statusParts = [`${gameCount} game${gameCount !== 1 ? 's' : ''}`]
-      if (linesLive) statusParts.push('lines live')
-      append(statusParts.join(' • '), 'muted')
-      append('', 'muted') // spacer
-      append('pick a matchup. run agents. build your thesis.', 'muted')
-    }
+    append('swantail ready — 7 agents standing by', 'ok')
+    const statusParts = [`${gameCount} game${gameCount !== 1 ? 's' : ''}`]
+    if (linesLive) statusParts.push('lines live')
+    append(statusParts.join(' • '), 'muted')
+    append('', 'muted')
+    append('pick a matchup. run agents. build your thesis.', 'muted')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [append])
 
