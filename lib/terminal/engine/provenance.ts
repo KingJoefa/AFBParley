@@ -33,8 +33,8 @@ interface BuildProvenanceInput {
   dataVersion: string
   dataTimestamp: number
   searchTimestamps: number[]
-  agentsInvoked: AgentType[]
-  agentsSilent: AgentType[]
+  agentsInvoked: readonly AgentType[]
+  agentsSilent: readonly AgentType[]
   cacheHits: number
   cacheMisses: number
   llmModel: string
@@ -68,8 +68,8 @@ export function buildProvenance(inputs: BuildProvenanceInput): Provenance {
     data_version: inputs.dataVersion,
     data_timestamp: inputs.dataTimestamp,
     search_timestamps: inputs.searchTimestamps,
-    agents_invoked: inputs.agentsInvoked,
-    agents_silent: inputs.agentsSilent,
+    agents_invoked: [...inputs.agentsInvoked],
+    agents_silent: [...inputs.agentsSilent],
     cache_hits: inputs.cacheHits,
     cache_misses: inputs.cacheMisses,
     llm_model: inputs.llmModel,

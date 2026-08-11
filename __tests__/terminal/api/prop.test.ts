@@ -306,7 +306,7 @@ describe('/api/terminal/prop', () => {
         ]),
         expect.any(String),
         expect.any(Object),
-        expect.anything() // gameNotes (optional)
+        undefined // gameNotes is optional and unavailable for this fixture
       )
 
       // Verify EPA, weather, pressure findings were filtered out

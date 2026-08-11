@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { teamNameToCode } from '@/lib/nfl/teams'
+import { normalizeTeamCode, parseMatchup } from '@/lib/nfl/teams'
 
 export type DirectLine = {
 	total?: number
@@ -27,38 +27,43 @@ export async function fetchDirectLines(params: {
 	matchup: string
 }): Promise<DirectLine | null> {
 	const base = process.env.LINES_API_URL
-	if (!base) return null
-	try {
-		const u = new URL(base)
-		u.searchParams.set('year', String(params.year))
-		u.searchParams.set('week', String(params.week))
-		u.searchParams.set('matchup', params.matchup)
-		const res = await fetch(u.toString(), { cache: 'no-store' })
-		if (!res.ok) return null
-		const json = await res.json().catch(() => null)
-		if (!json || typeof json !== 'object') return null
-		return {
-			total: pick(Number((json as any).total)),
-			spreadHome: pick(Number((json as any).spreadHome)),
-			spreadAway: pick(Number((json as any).spreadAway)),
-			source: typeof (json as any).source === 'string' ? (json as any).source : 'lines',
-			timestamp: pick(Number((json as any).timestamp)),
+	if (base) {
+		try {
+			const u = new URL(base)
+			u.searchParams.set('year', String(params.year))
+			u.searchParams.set('week', String(params.week))
+			u.searchParams.set('matchup', params.matchup)
+			const res = await fetch(u.toString(), { cache: 'no-store' })
+			if (res.ok) {
+				const json = await res.json().catch(() => null)
+				if (json && typeof json === 'object') {
+					return {
+						total: pick(Number((json as any).total)),
+						spreadHome: pick(Number((json as any).spreadHome)),
+						spreadAway: pick(Number((json as any).spreadAway)),
+						source: typeof (json as any).source === 'string' ? (json as any).source : 'lines',
+						timestamp: pick(Number((json as any).timestamp)),
+					}
+				}
+			}
+		} catch {
+			// Fall through to local data below.
 		}
-	} catch {
-		// fall through to local file below
 	}
 
 	// Local manual override fallback: my-parlaygpt/data/lines/{year}/week-XX.json
 	try {
-		const [awayRaw, homeRaw] = params.matchup.split('@').map(s => s.trim())
-		const awayCode = teamNameToCode[awayRaw] || Object.entries(teamNameToCode).find(([name]) => awayRaw?.includes(name))?.[1]
-		const homeCode = teamNameToCode[homeRaw] || Object.entries(teamNameToCode).find(([name]) => homeRaw?.includes(name))?.[1]
-		if (!awayCode || !homeCode) return null
+		const matchup = parseMatchup(params.matchup)
+		if (!matchup) return null
+		const { awayTeam: awayCode, homeTeam: homeCode } = matchup
 		const w = String(params.week).padStart(2, '0')
 		const file = path.join(process.cwd(), 'my-parlaygpt', 'data', 'lines', String(params.year), `week-${w}.json`)
 		if (fs.existsSync(file)) {
 			const arr = JSON.parse(fs.readFileSync(file, 'utf8')) as Array<any>
-			const rec = arr.find(r => (r.awayCode === awayCode && r.homeCode === homeCode))
+			const rec = arr.find(record => (
+				normalizeTeamCode(record.awayCode) === awayCode
+				&& normalizeTeamCode(record.homeCode) === homeCode
+			))
 			if (rec) {
 				return {
 					total: pick(Number(rec.total)),
@@ -86,7 +91,7 @@ export async function fetchDirectLines(params: {
 				let spreadAway: number | undefined
 				if (game.spread) {
 					const line = Math.abs(game.spread.line || 0)
-					if (game.spread.favorite === homeCode) {
+					if (normalizeTeamCode(game.spread.favorite) === homeCode) {
 						spreadHome = -line
 						spreadAway = line
 					} else {
@@ -108,5 +113,3 @@ export async function fetchDirectLines(params: {
 		return null
 	}
 }
-
-

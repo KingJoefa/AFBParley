@@ -8,6 +8,7 @@ import { analyzeFindings, generateFallbackAlerts } from '@/lib/terminal/analyst'
 import { loadGameNotes } from '@/lib/terminal/engine/notes-loader'
 import { ALL_AGENT_IDS } from '@/lib/terminal/run-state'
 import type { AgentType } from '@/lib/terminal/schemas'
+import { parseMatchup } from '@/lib/nfl/teams'
 
 /**
  * /api/terminal/scan
@@ -31,133 +32,6 @@ const ScanRequestSchema = z.object({
 })
 
 type ScanRequest = z.infer<typeof ScanRequestSchema>
-
-// Team name mappings
-const TEAM_ALIASES: Record<string, string> = {
-  // Full names (for dropdown/autocomplete selections)
-  'san francisco 49ers': 'SF',
-  'seattle seahawks': 'SEA',
-  'arizona cardinals': 'ARI',
-  'los angeles rams': 'LAR',
-  'kansas city chiefs': 'KC',
-  'las vegas raiders': 'LV',
-  'denver broncos': 'DEN',
-  'los angeles chargers': 'LAC',
-  'dallas cowboys': 'DAL',
-  'philadelphia eagles': 'PHI',
-  'new york giants': 'NYG',
-  'washington commanders': 'WAS',
-  'chicago bears': 'CHI',
-  'detroit lions': 'DET',
-  'green bay packers': 'GB',
-  'minnesota vikings': 'MIN',
-  'atlanta falcons': 'ATL',
-  'carolina panthers': 'CAR',
-  'new orleans saints': 'NO',
-  'tampa bay buccaneers': 'TB',
-  'baltimore ravens': 'BAL',
-  'cincinnati bengals': 'CIN',
-  'cleveland browns': 'CLE',
-  'pittsburgh steelers': 'PIT',
-  'houston texans': 'HOU',
-  'indianapolis colts': 'IND',
-  'jacksonville jaguars': 'JAX',
-  'tennessee titans': 'TEN',
-  'buffalo bills': 'BUF',
-  'miami dolphins': 'MIA',
-  'new england patriots': 'NE',
-  'new york jets': 'NYJ',
-  // Short names and nicknames
-  '49ers': 'SF',
-  niners: 'SF',
-  'san francisco': 'SF',
-  seahawks: 'SEA',
-  seattle: 'SEA',
-  cardinals: 'ARI',
-  arizona: 'ARI',
-  rams: 'LAR',
-  chiefs: 'KC',
-  'kansas city': 'KC',
-  raiders: 'LV',
-  'las vegas': 'LV',
-  broncos: 'DEN',
-  denver: 'DEN',
-  chargers: 'LAC',
-  cowboys: 'DAL',
-  dallas: 'DAL',
-  eagles: 'PHI',
-  philadelphia: 'PHI',
-  giants: 'NYG',
-  commanders: 'WAS',
-  washington: 'WAS',
-  bears: 'CHI',
-  chicago: 'CHI',
-  lions: 'DET',
-  detroit: 'DET',
-  packers: 'GB',
-  'green bay': 'GB',
-  vikings: 'MIN',
-  minnesota: 'MIN',
-  falcons: 'ATL',
-  atlanta: 'ATL',
-  panthers: 'CAR',
-  carolina: 'CAR',
-  saints: 'NO',
-  'new orleans': 'NO',
-  buccaneers: 'TB',
-  bucs: 'TB',
-  'tampa bay': 'TB',
-  ravens: 'BAL',
-  baltimore: 'BAL',
-  bengals: 'CIN',
-  cincinnati: 'CIN',
-  browns: 'CLE',
-  cleveland: 'CLE',
-  steelers: 'PIT',
-  pittsburgh: 'PIT',
-  texans: 'HOU',
-  houston: 'HOU',
-  colts: 'IND',
-  indianapolis: 'IND',
-  jaguars: 'JAX',
-  jacksonville: 'JAX',
-  titans: 'TEN',
-  tennessee: 'TEN',
-  bills: 'BUF',
-  buffalo: 'BUF',
-  dolphins: 'MIA',
-  miami: 'MIA',
-  patriots: 'NE',
-  'new england': 'NE',
-  jets: 'NYJ',
-}
-
-function normalizeTeamName(name: string): string {
-  const lower = name.toLowerCase().trim()
-  return TEAM_ALIASES[lower] || name.toUpperCase()
-}
-
-function parseMatchup(matchup: string): { homeTeam: string; awayTeam: string } | null {
-  // Try "@" format: "SF @ SEA" or "49ers @ Seahawks"
-  const atMatch = matchup.match(/^(.+?)\s*@\s*(.+)$/i)
-  if (atMatch) {
-    return {
-      awayTeam: normalizeTeamName(atMatch[1]),
-      homeTeam: normalizeTeamName(atMatch[2]),
-    }
-  }
-
-  // Try "vs" format: "SF vs SEA"
-  const vsMatch = matchup.match(/^(.+?)\s*vs\.?\s*(.+)$/i)
-  if (vsMatch) {
-    return {
-      homeTeam: normalizeTeamName(vsMatch[1]),
-      awayTeam: normalizeTeamName(vsMatch[2]),
-    }
-  }
-
-  return null
-}
 
 /**
  * Load matchup context from 2026 AFC/NFC Championship Games

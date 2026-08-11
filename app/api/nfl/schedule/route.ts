@@ -1,43 +1,50 @@
-import { NextResponse } from "next/server"
-import { existsSync, readFileSync } from "fs"
-import path from "path"
+import { NextResponse } from 'next/server'
+import { SeasonSchema, WeekSchema } from '@/lib/nfl/game'
+import { loadSchedule, ScheduleNotFoundError } from '@/lib/nfl/schedule'
 
-// 2025 Season - Super Bowl LX (Sun Feb 8, 2026)
-// Note: post-season games are surfaced as "week 22" for downstream odds/combos APIs that expect a numeric week.
-const WEEK = 22
-const SEASON = 2025
+export const dynamic = 'force-dynamic'
 
-const GAMES = [
-  // Sunday, Feb 8 - Super Bowl LX at Levi's Stadium, Santa Clara
-  { id: "patriots-seahawks", display: "New England Patriots @ Seattle Seahawks", time: "Sun 6:30 PM ET", week: WEEK, date: "2026-02-08" },
-]
+function optionalInteger(value: string | null, fallback?: string): number | undefined {
+  const candidate = value ?? fallback
+  if (!candidate?.trim()) return undefined
+  const parsed = Number(candidate)
+  return Number.isInteger(parsed) ? parsed : Number.NaN
+}
 
-// Super Bowl is the featured game
-const POPULAR = new Set(GAMES.map(g => g.id))
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const season = optionalInteger(
+    url.searchParams.get('season'),
+    process.env.NFL_SEASON ?? process.env.NFL_YEAR,
+  )
+  const week = optionalInteger(url.searchParams.get('week'), process.env.NFL_WEEK)
 
-export async function GET() {
-  let games = GAMES
+  const selection = SeasonSchema.optional().safeParse(season)
+  const weekSelection = WeekSchema.optional().safeParse(week)
+  if (!selection.success || !weekSelection.success) {
+    return NextResponse.json(
+      { error: 'season and week must be valid integers', code: 'INVALID_SCHEDULE_RANGE' },
+      { status: 400 },
+    )
+  }
+
   try {
-    const overridePath = path.join(process.cwd(), 'my-parlaygpt', 'data', 'schedule.override.json')
-    if (existsSync(overridePath)) {
-      const raw = readFileSync(overridePath, 'utf8')
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed?.games)) {
-        games = parsed.games as typeof GAMES
-      }
+    const schedule = loadSchedule({ season: selection.data, week: weekSelection.data })
+    return NextResponse.json({
+      ...schedule,
+      totalGames: schedule.games.length,
+    })
+  } catch (error) {
+    if (error instanceof ScheduleNotFoundError) {
+      return NextResponse.json(
+        { error: error.message, code: 'SCHEDULE_NOT_FOUND' },
+        { status: 404 },
+      )
     }
-  } catch {}
 
-  const gamesWithFlag = games.map(game => ({
-    ...game,
-    isPopular: POPULAR.has(game.id),
-  }))
-
-  return NextResponse.json({
-    games: gamesWithFlag,
-    week: WEEK,
-    season: SEASON,
-    lastUpdated: new Date().toISOString(),
-    totalGames: gamesWithFlag.length,
-  })
+    return NextResponse.json(
+      { error: 'Schedule data is unavailable', code: 'SCHEDULE_INVALID' },
+      { status: 500 },
+    )
+  }
 }

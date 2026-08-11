@@ -27,6 +27,7 @@ import { normalizeName as oddsNormalizeName } from '@/lib/odds-provider'
 import { loadMatchupProjections, getCurrentWeekYear } from './projections-loader'
 import { fetchInjuriesContext } from '@/lib/context/injuries'
 import { normalizeName, buildAliasSet, type Player } from './roster-validator'
+import { parseMatchup } from '@/lib/nfl/teams'
 
 // Minimum players required before falling back
 const MIN_PLAYERS_THRESHOLD = 6
@@ -347,51 +348,8 @@ async function loadFromProjections(
  * Parse matchup to extract team codes
  */
 function parseTeamCodes(matchup: string): string[] {
-  const teamMap: Record<string, string> = {
-    'patriots': 'NE', 'new england': 'NE', 'ne': 'NE',
-    'texans': 'HOU', 'houston': 'HOU', 'hou': 'HOU',
-    'broncos': 'DEN', 'denver': 'DEN', 'den': 'DEN',
-    'bills': 'BUF', 'buffalo': 'BUF', 'buf': 'BUF',
-    '49ers': 'SF', 'niners': 'SF', 'san francisco': 'SF', 'sf': 'SF',
-    'seahawks': 'SEA', 'seattle': 'SEA', 'sea': 'SEA',
-    'rams': 'LA', 'los angeles rams': 'LA', 'la': 'LA', 'lar': 'LA',
-    'bears': 'CHI', 'chicago': 'CHI', 'chi': 'CHI',
-    'chiefs': 'KC', 'kansas city': 'KC', 'kc': 'KC',
-    'ravens': 'BAL', 'baltimore': 'BAL', 'bal': 'BAL',
-    'bengals': 'CIN', 'cincinnati': 'CIN', 'cin': 'CIN',
-    'browns': 'CLE', 'cleveland': 'CLE', 'cle': 'CLE',
-    'steelers': 'PIT', 'pittsburgh': 'PIT', 'pit': 'PIT',
-    'colts': 'IND', 'indianapolis': 'IND', 'ind': 'IND',
-    'jaguars': 'JAX', 'jacksonville': 'JAX', 'jax': 'JAX',
-    'titans': 'TEN', 'tennessee': 'TEN', 'ten': 'TEN',
-    'raiders': 'LV', 'las vegas': 'LV', 'lv': 'LV',
-    'chargers': 'LAC', 'lac': 'LAC',
-    'cowboys': 'DAL', 'dallas': 'DAL', 'dal': 'DAL',
-    'giants': 'NYG', 'nyg': 'NYG',
-    'eagles': 'PHI', 'philadelphia': 'PHI', 'phi': 'PHI',
-    'commanders': 'WAS', 'washington': 'WAS', 'was': 'WAS',
-    'lions': 'DET', 'detroit': 'DET', 'det': 'DET',
-    'packers': 'GB', 'green bay': 'GB', 'gb': 'GB',
-    'vikings': 'MIN', 'minnesota': 'MIN', 'min': 'MIN',
-    'falcons': 'ATL', 'atlanta': 'ATL', 'atl': 'ATL',
-    'panthers': 'CAR', 'carolina': 'CAR', 'car': 'CAR',
-    'saints': 'NO', 'new orleans': 'NO', 'no': 'NO',
-    'buccaneers': 'TB', 'tampa bay': 'TB', 'tb': 'TB', 'bucs': 'TB',
-    'cardinals': 'ARI', 'arizona': 'ARI', 'ari': 'ARI',
-    'dolphins': 'MIA', 'miami': 'MIA', 'mia': 'MIA',
-    'jets': 'NYJ', 'nyj': 'NYJ',
-  }
-
-  const codes: string[] = []
-  const lower = matchup.toLowerCase()
-
-  for (const [key, code] of Object.entries(teamMap)) {
-    if (lower.includes(key) && !codes.includes(code)) {
-      codes.push(code)
-    }
-  }
-
-  return codes.slice(0, 2)
+  const parsed = parseMatchup(matchup)
+  return parsed ? [parsed.awayTeam, parsed.homeTeam] : []
 }
 
 /**

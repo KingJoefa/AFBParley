@@ -9,8 +9,11 @@ import fs from 'fs'
 import path from 'path'
 import { createLogger } from '@/lib/logger'
 import type { Player } from './roster-validator'
+import { loadSchedule } from '@/lib/nfl/schedule'
+import { normalizeTeamCode } from '@/lib/nfl/teams'
 
 const log = createLogger('projections')
+const PROJECTIONS_ROOT = path.join(process.cwd(), 'my-parlaygpt', 'data', 'projections')
 
 interface ProjectionsFile {
   ts: number
@@ -39,8 +42,8 @@ export async function loadProjections(params: {
 
   // Try with and without zero-padding
   const files = [
-    path.join(process.cwd(), 'my-parlaygpt', 'data', 'projections', String(year), `week-${week}.json`),
-    path.join(process.cwd(), 'my-parlaygpt', 'data', 'projections', String(year), `week-${String(week).padStart(2, '0')}.json`),
+    path.join(PROJECTIONS_ROOT, String(year), `week-${week}.json`),
+    path.join(PROJECTIONS_ROOT, String(year), `week-${String(week).padStart(2, '0')}.json`),
   ]
 
   for (const file of files) {
@@ -54,7 +57,7 @@ export async function loadProjections(params: {
 
       return data.players.map(p => ({
         name: p.name,
-        team: p.team.toUpperCase(),
+        team: normalizeTeamCode(p.team) ?? p.team.toUpperCase(),
         pos: p.pos,
         rank: p.rank,
       }))
@@ -71,21 +74,16 @@ export async function loadProjections(params: {
  */
 export async function getCurrentWeekYear(): Promise<{ week: number; year: number }> {
   try {
-    // Try to fetch from internal API
-    const res = await fetch('http://localhost:3000/api/nfl/schedule')
-    if (res.ok) {
-      const data = await res.json()
-      return {
-        week: data.week || 20,
-        year: data.year || 2025,
-      }
-    }
+    const schedule = loadSchedule()
+    return { week: schedule.week, year: schedule.season }
   } catch {
-    // Fallback to hardcoded values
+    const year = Number(process.env.NFL_SEASON ?? process.env.NFL_YEAR)
+    const week = Number(process.env.NFL_WEEK)
+    return {
+      year: Number.isInteger(year) ? year : 2025,
+      week: Number.isInteger(week) ? week : 20,
+    }
   }
-
-  // Default: Divisional Round 2025
-  return { week: 20, year: 2025 }
 }
 
 /**
@@ -107,7 +105,7 @@ export async function loadMatchupProjections(
   }
 
   // Normalize team codes for comparison
-  const normalizeTeam = (t: string) => t.toUpperCase()
+  const normalizeTeam = (team: string) => normalizeTeamCode(team) ?? team.toUpperCase()
   const home = normalizeTeam(homeTeam)
   const away = normalizeTeam(awayTeam)
 

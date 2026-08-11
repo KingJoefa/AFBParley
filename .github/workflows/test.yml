@@ -22,10 +22,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests with baseline check
-        run: |
-          chmod +x scripts/check-test-baseline.sh
-          ./scripts/check-test-baseline.sh
+      - name: Run tests
+        run: npm run test:run
 
       - name: Type check
-        run: npm run type-check || true
+        run: npm run type-check

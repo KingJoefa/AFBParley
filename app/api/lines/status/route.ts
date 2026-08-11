@@ -29,8 +29,8 @@ async function getCurrentWeekFromSchedule(baseUrl: string): Promise<{ week: numb
   }
   // Fallback to env vars or hardcoded defaults
   return {
-    week: safeNum(process.env.NFL_WEEK) ?? 21,
-    season: safeNum(process.env.NFL_YEAR) ?? 2025,
+    week: safeNum(process.env.NFL_WEEK) ?? 1,
+    season: safeNum(process.env.NFL_SEASON ?? process.env.NFL_YEAR) ?? 2026,
   }
 }
 
@@ -81,4 +81,3 @@ export async function GET(req: Request) {
     lastChecked: new Date().toISOString(),
   })
 }
-

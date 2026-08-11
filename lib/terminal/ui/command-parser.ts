@@ -4,6 +4,8 @@
  * Parses user input into structured commands for the terminal.
  */
 
+import { NFL_TEAM_CODES, normalizeTeamCode } from '@/lib/nfl/teams'
+
 export type CommandType = 'matchup' | 'build' | 'bet' | 'help' | 'theme' | 'retry' | 'clear' | 'unknown'
 
 export interface ParsedCommand {
@@ -17,54 +19,12 @@ export interface ParsedCommand {
 const MATCHUP_AT_PATTERN = /^([a-zA-Z0-9]+)\s*@\s*([a-zA-Z0-9]+)$/
 const MATCHUP_VS_PATTERN = /^([a-zA-Z0-9]+)\s+vs\.?\s+([a-zA-Z0-9]+)$/i
 
-// Team abbreviation mappings
-const TEAM_ALIASES: Record<string, string> = {
-  '49ers': 'SF',
-  'niners': 'SF',
-  'seahawks': 'SEA',
-  'cardinals': 'ARI',
-  'rams': 'LAR',
-  'bears': 'CHI',
-  'lions': 'DET',
-  'packers': 'GB',
-  'vikings': 'MIN',
-  'cowboys': 'DAL',
-  'eagles': 'PHI',
-  'giants': 'NYG',
-  'commanders': 'WAS',
-  'falcons': 'ATL',
-  'panthers': 'CAR',
-  'saints': 'NO',
-  'buccaneers': 'TB',
-  'bucs': 'TB',
-  'chiefs': 'KC',
-  'raiders': 'LV',
-  'broncos': 'DEN',
-  'chargers': 'LAC',
-  'ravens': 'BAL',
-  'bengals': 'CIN',
-  'browns': 'CLE',
-  'steelers': 'PIT',
-  'texans': 'HOU',
-  'colts': 'IND',
-  'jaguars': 'JAX',
-  'jags': 'JAX',
-  'titans': 'TEN',
-  'bills': 'BUF',
-  'dolphins': 'MIA',
-  'fins': 'MIA',
-  'patriots': 'NE',
-  'pats': 'NE',
-  'jets': 'NYJ',
-}
-
 /**
  * Normalize team name to abbreviation
  */
 export function normalizeTeam(team: string): string {
   const trimmed = team.trim()
-  const lower = trimmed.toLowerCase()
-  return TEAM_ALIASES[lower] || trimmed.toUpperCase()
+  return normalizeTeamCode(trimmed) ?? trimmed.toUpperCase()
 }
 
 /**
@@ -212,16 +172,7 @@ Available Commands
  * Validate a matchup command
  */
 export function validateMatchup(away: string, home: string): { valid: boolean; error?: string } {
-  const validTeams = new Set([
-    'SF', 'SEA', 'ARI', 'LAR', // NFC West
-    'CHI', 'DET', 'GB', 'MIN', // NFC North
-    'DAL', 'PHI', 'NYG', 'WAS', // NFC East
-    'ATL', 'CAR', 'NO', 'TB', // NFC South
-    'KC', 'LV', 'DEN', 'LAC', // AFC West
-    'BAL', 'CIN', 'CLE', 'PIT', // AFC North
-    'HOU', 'IND', 'JAX', 'TEN', // AFC South
-    'BUF', 'MIA', 'NE', 'NYJ', // AFC East
-  ])
+  const validTeams = new Set<string>(NFL_TEAM_CODES)
 
   if (!validTeams.has(away)) {
     return { valid: false, error: `Unknown team: ${away}` }
