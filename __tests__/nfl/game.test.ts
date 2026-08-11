@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { createGameId, createSnapshotId, GameSnapshotSchema } from '@/lib/nfl/game'
+import { GameSnapshotSchema } from '@/lib/data/contracts'
+import { createGameId } from '@/lib/nfl/game'
 
 describe('canonical NFL game contracts', () => {
   it('creates stable season and week scoped IDs', () => {
     const gameId = createGameId({ season: 2025, week: 22, awayTeam: 'NE', homeTeam: 'SEA' })
     expect(gameId).toBe('2025-wk22-NE-at-SEA')
-    expect(createSnapshotId(gameId, 'notes-v1')).toBe('2025-wk22-NE-at-SEA:notes-v1')
   })
 
   it('validates a provenance-bearing snapshot', () => {
@@ -14,7 +14,7 @@ describe('canonical NFL game contracts', () => {
       snapshot_id: `${gameId}:notes-v1`,
       game_id: gameId,
       captured_at: '2026-02-08T18:00:00Z',
-      data_version: 'notes-v1',
+      contract_version: 'observation-v1',
       game: {
         game_id: gameId,
         season: 2025,
@@ -27,18 +27,13 @@ describe('canonical NFL game contracts', () => {
         status: 'scheduled',
         display: 'New England Patriots @ Seattle Seahawks',
       },
-      availability: {
-        schedule: 'available',
-        odds: 'available',
-        injuries: 'available',
-        projections: 'degraded',
-        notes: 'available',
-      },
-      provenance: [{
-        source: 'curated-notes',
-        observed_at: '2026-02-08T18:00:00Z',
-        source_version: 'notes-v1',
-      }],
+      observations: [],
+      availability: Object.fromEntries(['weather', 'injury', 'epa'].map(agent => [agent, {
+        state: 'missing',
+        checked_at: '2026-02-08T18:00:00Z',
+        observation_count: 0,
+      }])),
+      content_hash: 'a'.repeat(64),
     })
 
     expect(snapshot.game.neutral_site).toBe(true)
@@ -49,7 +44,7 @@ describe('canonical NFL game contracts', () => {
       snapshot_id: 'snapshot-1',
       game_id: '2025-wk21-NE-at-DEN',
       captured_at: '2026-02-08T18:00:00Z',
-      data_version: 'notes-v1',
+      contract_version: 'observation-v1',
       game: {
         game_id: '2025-wk22-NE-at-SEA',
         season: 2025,
@@ -59,14 +54,13 @@ describe('canonical NFL game contracts', () => {
         kickoff: '2026-02-08T23:30:00Z',
         display: 'New England Patriots @ Seattle Seahawks',
       },
-      availability: {
-        schedule: 'available',
-        odds: 'missing',
-        injuries: 'missing',
-        projections: 'missing',
-        notes: 'available',
-      },
-      provenance: [{ source: 'curated-notes', observed_at: '2026-02-08T18:00:00Z' }],
+      observations: [],
+      availability: Object.fromEntries(['weather', 'injury', 'epa'].map(agent => [agent, {
+        state: 'missing',
+        checked_at: '2026-02-08T18:00:00Z',
+        observation_count: 0,
+      }])),
+      content_hash: 'a'.repeat(64),
     })
 
     expect(result.success).toBe(false)

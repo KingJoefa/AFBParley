@@ -42,6 +42,8 @@ describe('/api/terminal/script', () => {
     expect(body.script.anchor_ids).toEqual(['game_under', 'grind'])
     expect(body.script).not.toHaveProperty('legs')
     expect(body.script).not.toHaveProperty('parlay_math')
+    expect(body.evaluation.passed).toBe(true)
+    expect(body.script.scenario_revision_id).toBe(scenario.scenario_revision_id)
   })
 
   it('rejects mutually exclusive anchors', async () => {

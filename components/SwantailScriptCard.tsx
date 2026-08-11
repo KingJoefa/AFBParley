@@ -82,7 +82,7 @@ export default function SwantailScriptCard({ script, scenario, selectedAnchorIds
       </div>
 
       <div className="mt-7 flex items-center justify-between border-t border-white/10 pt-5">
-        <span className="font-mono text-[10px] uppercase text-white/25">Scenario assumptions / {script.generation}</span>
+        <span className="font-mono text-[10px] uppercase text-white/25">{scenario.evidence_state.replace(/_/g, ' ')} / {script.generation}</span>
         <button
           type="button"
           disabled

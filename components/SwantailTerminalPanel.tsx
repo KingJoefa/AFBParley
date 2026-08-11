@@ -103,7 +103,7 @@ export default function SwantailTerminalPanel({
       <div className="flex items-center justify-between border-b border-white/10 bg-[#151816] px-4 py-3">
         <div className="flex items-center gap-2 font-mono text-xs uppercase text-white/65">
           <span className="h-2 w-2 rounded-full bg-emerald-300" />
-          Terminal contract 1.0
+          Terminal contract 2.0
         </div>
         <span className="font-mono text-[11px] text-white/35">CURRENT WEEK ONLY</span>
       </div>
@@ -185,12 +185,15 @@ export default function SwantailTerminalPanel({
         {scenario?.events.map(event => (
           <div key={event.id} className="grid grid-cols-[72px_1fr] gap-2">
             <span className="text-emerald-200/70">{event.agent_id}</span>
-            <span className="text-white/75">{event.statement}</span>
+            <span className="text-white/75">
+              {event.statement}
+              <span className="ml-2 text-[10px] uppercase text-white/30">[{event.evidence_state.replace(/_/g, ' ')}]</span>
+            </span>
           </div>
         ))}
         {scenario && (
           <div className="mt-2 text-cyan-200/75">
-            scenario  {scenario.events.length} assumptions / {scenario.suggested_anchor_ids.length} anchors suggested
+            scenario  {scenario.events.length} agents / {scenario.evidence_state.replace(/_/g, ' ')} / {scenario.suggested_anchor_ids.length} anchors
           </div>
         )}
         {!scenario && !scenarioLoading && (

@@ -1,4 +1,7 @@
 import { z } from 'zod'
+import { ObservationSchema } from '@/lib/data/contracts'
+
+export const TERMINAL_CONTRACT_VERSION = 'game-script-v2'
 
 export const GAME_AGENT_IDS = [
   'weather',
@@ -113,19 +116,39 @@ export const ScenarioEventSchema = z.object({
   id: z.string().min(1),
   agent_id: GameAgentIdSchema,
   label: z.string().min(1),
+  assumption: z.string().min(1),
   statement: z.string().min(1),
   suggested_anchor_ids: z.array(ScenarioAnchorIdSchema),
+  evidence_state: z.enum([
+    'assumption_only',
+    'observed_context',
+    'observed_support',
+    'observed_conflict',
+    'stale',
+    'missing',
+  ]),
+  observations: z.array(ObservationSchema),
 })
 
 export const ScenarioResolutionSchema = z.object({
   scenario_id: z.string().min(1),
+  scenario_revision_id: z.string().min(1),
+  snapshot_id: z.string().min(1),
+  snapshot_captured_at: z.string().datetime({ offset: true }),
+  contract_version: z.literal(TERMINAL_CONTRACT_VERSION),
+  input_hash: z.string().regex(/^[a-f0-9]{64}$/),
   game: ScenarioGameSchema,
   selected_agent_ids: z.array(GameAgentIdSchema).min(1),
   events: z.array(ScenarioEventSchema).min(1),
   anchors: z.array(ScenarioAnchorSchema).min(1),
   suggested_anchor_ids: z.array(ScenarioAnchorIdSchema).min(1),
   resolved_at: z.string().datetime({ offset: true }),
-  evidence_state: z.literal('scenario_assumptions'),
+  evidence_state: z.enum([
+    'scenario_assumptions',
+    'observations_available',
+    'mixed',
+    'degraded',
+  ]),
 })
 
 export const ScenarioRequestSchema = z.object({
@@ -142,6 +165,11 @@ export const CausalStepSchema = z.object({
 export const GameScriptSchema = z.object({
   script_id: z.string().min(1),
   scenario_id: z.string().min(1),
+  scenario_revision_id: z.string().min(1),
+  snapshot_id: z.string().min(1),
+  contract_version: z.literal(TERMINAL_CONTRACT_VERSION),
+  input_hash: z.string().regex(/^[a-f0-9]{64}$/),
+  parent_script_id: z.string().min(1).optional(),
   title: z.string().min(1),
   summary: z.string().min(1),
   causal_chain: z.array(CausalStepSchema).min(2).max(8),
@@ -150,11 +178,25 @@ export const GameScriptSchema = z.object({
   anchor_ids: z.array(ScenarioAnchorIdSchema).min(1),
   created_at: z.string().datetime({ offset: true }),
   generation: z.enum(['model', 'deterministic']),
+  model_id: z.string().min(1),
 })
 
 export const ScriptRequestSchema = z.object({
   scenario: ScenarioResolutionSchema,
   anchor_ids: z.array(ScenarioAnchorIdSchema).min(1),
+  parent_script_id: z.string().min(1).optional(),
+})
+
+export const ScriptEvaluationSchema = z.object({
+  evaluation_version: z.literal('script-eval-v1'),
+  passed: z.boolean(),
+  checks: z.object({
+    selected_agents_represented: z.boolean(),
+    anchors_valid: z.boolean(),
+    failure_conditions_present: z.boolean(),
+    numeric_claims_sourced: z.boolean(),
+  }),
+  issues: z.array(z.string()),
 })
 
 export type ScenarioGame = z.infer<typeof ScenarioGameSchema>
@@ -162,3 +204,4 @@ export type ScenarioAnchor = z.infer<typeof ScenarioAnchorSchema>
 export type ScenarioEvent = z.infer<typeof ScenarioEventSchema>
 export type ScenarioResolution = z.infer<typeof ScenarioResolutionSchema>
 export type GameScript = z.infer<typeof GameScriptSchema>
+export type ScriptEvaluation = z.infer<typeof ScriptEvaluationSchema>

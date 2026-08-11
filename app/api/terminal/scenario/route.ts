@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { loadSchedule, ScheduleNotFoundError } from '@/lib/nfl/schedule'
+import { loadLatestGameSnapshot, persistScenario } from '@/lib/data/repository'
+import { loadOperationalSchedule, ScheduleNotFoundError } from '@/lib/nfl/schedule'
 import { ScenarioRequestSchema, type ScenarioGame } from '@/lib/terminal/contracts'
 import { resolveScenario } from '@/lib/terminal/scenario'
 
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const schedule = loadSchedule()
+    const schedule = loadOperationalSchedule()
     const scheduledGame = schedule.games.find(game => game.game_id === parsed.data.game_id)
     if (!scheduledGame) {
       return NextResponse.json(
@@ -42,13 +43,17 @@ export async function POST(request: Request) {
       time: scheduledGame.time,
     }
     const agentIds = [...new Set(parsed.data.agent_ids)]
-    const scenario = resolveScenario({ game, agentIds })
+    const snapshot = await loadLatestGameSnapshot(game.game_id)
+    const scenario = resolveScenario({ game, agentIds, snapshot })
+    const persistence = await persistScenario(scenario)
 
-    return NextResponse.json({ scenario })
+    return NextResponse.json({ scenario, persistence })
   } catch (error) {
     const message = error instanceof ScheduleNotFoundError
       ? error.message
-      : 'The active schedule is unavailable'
+      : error instanceof Error
+        ? error.message
+        : 'The active schedule is unavailable'
     return NextResponse.json({ error: message }, { status: 503 })
   }
 }
