@@ -65,6 +65,13 @@ export class ScheduleNotFoundError extends Error {}
 const SCHEDULES_ROOT = path.join(process.cwd(), 'data', 'schedules')
 const GAME_WINDOW_MS = 6 * 60 * 60 * 1000
 
+function environmentInteger(value?: string): number | undefined {
+  if (!value?.trim()) return undefined
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed)) throw new Error(`Invalid schedule environment value: ${value}`)
+  return parsed
+}
+
 function listSeasonScheduleYears(): number[] {
   if (!existsSync(SCHEDULES_ROOT)) return []
   return readdirSync(SCHEDULES_ROOT, { withFileTypes: true })
@@ -203,4 +210,12 @@ export function loadSchedule(params: {
     availableWeeks: [...new Set(schedule.games.map(game => game.week))].sort((a, b) => a - b),
     totalSeasonGames: schedule.games.length,
   }
+}
+
+export function loadOperationalSchedule(params: { now?: Date } = {}): LoadedSchedule {
+  return loadSchedule({
+    season: environmentInteger(process.env.NFL_SEASON ?? process.env.NFL_YEAR),
+    week: environmentInteger(process.env.NFL_WEEK),
+    now: params.now,
+  })
 }

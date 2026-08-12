@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start -p 3000",
+    "db:migrate": "node scripts/migrate.mjs",
     "schedule:import": "node scripts/import-nfl-schedule.mjs",
     "test": "vitest",
     "test:run": "vitest --run",
@@ -13,9 +14,11 @@
   },
   "dependencies": {
     "@vercel/analytics": "^1.5.0",
+    "csv-parse": "^6.2.1",
     "lucide-react": "^0.453.0",
     "next": "^16.3.0",
     "openai": "^4.58.1",
+    "postgres": "^3.4.9",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "zod": "^3.23.8"

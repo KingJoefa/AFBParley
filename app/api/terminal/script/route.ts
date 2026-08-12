@@ -1,10 +1,16 @@
 import OpenAI from 'openai'
 import { NextResponse } from 'next/server'
 import {
+  isDatabaseConfigured,
+  loadScenarioRevision,
+  persistScript,
+} from '@/lib/data/repository'
+import {
   ScriptRequestSchema,
   type ScenarioAnchorId,
   type ScenarioResolution,
 } from '@/lib/terminal/contracts'
+import { evaluateScript } from '@/lib/terminal/evaluate'
 import {
   ScriptDraftSchema,
   createDeterministicDraft,
@@ -39,7 +45,17 @@ function buildPrompt(scenario: ScenarioResolution, anchorIds: ScenarioAnchorId[]
     scenario_events: scenario.events.map(event => ({
       agent_id: event.agent_id,
       label: event.label,
-      assumption: event.statement,
+      assumption: event.assumption,
+      resolved_statement: event.statement,
+      evidence_state: event.evidence_state,
+      observations: event.observations.map(observation => ({
+        metric: observation.metric,
+        value: observation.value,
+        source: observation.source,
+        observed_at: observation.observed_at,
+        effective_at: observation.effective_at,
+        expires_at: observation.expires_at,
+      })),
     })),
     output_contract: {
       title: 'short descriptive title',
@@ -54,14 +70,15 @@ function buildPrompt(scenario: ScenarioResolution, anchorIds: ScenarioAnchorId[]
 async function generateDraft(
   scenario: ScenarioResolution,
   anchorIds: ScenarioAnchorId[],
-): Promise<ScriptDraft | null> {
+): Promise<{ draft: ScriptDraft; modelId: string } | null> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return null
 
   try {
     const client = new OpenAI({ apiKey })
+    const modelId = process.env.SWANTAIL_SCRIPT_MODEL ?? 'gpt-4o-mini'
     const response = await client.chat.completions.create({
-      model: process.env.SWANTAIL_SCRIPT_MODEL ?? 'gpt-4o-mini',
+      model: modelId,
       temperature: 0.35,
       response_format: { type: 'json_object' },
       messages: [
@@ -69,9 +86,9 @@ async function generateDraft(
           role: 'system',
           content: [
             'You write compact American football game scripts.',
-            'Treat every supplied event as a scenario assumption, never as a verified live fact.',
+            'Distinguish scenario assumptions from attached sourced observations using each event evidence_state.',
             'Connect causes to game outcomes without recommending bets, claiming confidence, or claiming positive expected value.',
-            'Do not add statistics, injuries, weather details, lines, prices, players, or evidence that were not supplied.',
+            'Do not add statistics, injuries, weather details, lines, prices, players, or evidence that were not supplied in observations.',
             'Return only JSON matching the requested contract.',
           ].join(' '),
         },
@@ -80,7 +97,7 @@ async function generateDraft(
     })
     const content = response.choices[0]?.message?.content
     if (!content) return null
-    return ScriptDraftSchema.parse(JSON.parse(content))
+    return { draft: ScriptDraftSchema.parse(JSON.parse(content)), modelId }
   } catch {
     return null
   }
@@ -99,23 +116,46 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid scenario or anchor selection' }, { status: 400 })
   }
 
+  let scenario = parsed.data.scenario
+  if (isDatabaseConfigured()) {
+    try {
+      const storedScenario = await loadScenarioRevision(scenario.scenario_revision_id)
+      if (!storedScenario) {
+        return NextResponse.json(
+          { error: 'The stored scenario revision is unavailable; resolve the agents again' },
+          { status: 409 },
+        )
+      }
+      scenario = storedScenario
+    } catch {
+      return NextResponse.json({ error: 'Scenario storage is unavailable' }, { status: 503 })
+    }
+  }
+
   const selectedAnchorIds = new Set(parsed.data.anchor_ids)
-  const anchorIds = parsed.data.scenario.anchors
+  const anchorIds = scenario.anchors
     .map(anchor => anchor.id)
     .filter(anchorId => selectedAnchorIds.has(anchorId))
-  const anchorError = validateAnchorSelection(parsed.data.scenario, anchorIds)
+  const anchorError = validateAnchorSelection(scenario, anchorIds)
   if (anchorError) {
     return NextResponse.json({ error: anchorError }, { status: 400 })
   }
 
-  const modelDraft = await generateDraft(parsed.data.scenario, anchorIds)
-  const draft = modelDraft ?? createDeterministicDraft(parsed.data.scenario, anchorIds)
+  const generated = await generateDraft(scenario, anchorIds)
+  const draft = generated?.draft ?? createDeterministicDraft(scenario, anchorIds)
   const script = finalizeScript({
-    scenario: parsed.data.scenario,
+    scenario,
     anchorIds,
     draft,
-    generation: modelDraft ? 'model' : 'deterministic',
+    generation: generated ? 'model' : 'deterministic',
+    modelId: generated?.modelId ?? 'deterministic-v1',
+    parentScriptId: parsed.data.parent_script_id,
   })
-
-  return NextResponse.json({ script })
+  const evaluation = evaluateScript({ scenario, script })
+  try {
+    const persistence = await persistScript({ script, evaluation })
+    return NextResponse.json({ script, evaluation, persistence })
+  } catch {
+    return NextResponse.json({ error: 'Script storage is unavailable' }, { status: 503 })
+  }
 }

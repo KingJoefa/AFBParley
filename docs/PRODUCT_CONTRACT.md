@@ -4,7 +4,7 @@
 
 Swantail turns a user's game thesis into a causal Game Script. The user's selected Game Agents are the hypothesis; there is no separate hypothesis object or free-text thesis field.
 
-The system does not support, reject, or fact-check that thesis in the Script Builder. It makes the thesis legible by exposing what must happen, how the effects connect, what outcome follows, and how the story can fail.
+The system does not adjudicate the thesis as a forecast or promise confidence. It makes the thesis legible by exposing what must happen, how the effects connect, what outcome follows, and how the story can fail. When a current snapshot exists, sourced observations may be shown as context, support, conflict, stale, or missing without changing the user's selected hypothesis.
 
 ## Objects
 
@@ -16,11 +16,11 @@ A canonical current-week matchup identified by `game_id`. The full regular-seaso
 
 A selectable causal lens such as Weather, Pressure, Pace, Injury, Efficiency, Quarterback, Backfield, Receivers, Tight Ends, or Usage.
 
-Agent selection is the user's implicit hypothesis. In the present contract, agent events are explicitly marked as scenario assumptions. Future live-data adapters may add observations and provenance without changing the user flow.
+Agent selection is the user's implicit hypothesis. Agent events always retain the selected assumption and may attach provider observations with source quality, observed time, effective time, expiry, and raw-import lineage.
 
 ### Scenario
 
-The stable resolution of one game plus selected agents. A scenario contains:
+The stable resolution of one game plus selected agents. `scenario_id` identifies that selection, while `scenario_revision_id` identifies its resolution against one immutable `snapshot_id`. A scenario contains:
 
 - selected agent IDs;
 - one causal event per selected agent;
@@ -28,13 +28,15 @@ The stable resolution of one game plus selected agents. A scenario contains:
 - compatible suggested anchor IDs;
 - an evidence-state label.
 
+The same game and agents can therefore be replayed against later snapshots without mutating an earlier scenario.
+
 ### Anchor
 
 A concrete outcome the story resolves toward. Anchors cover score, winner, cover, game shape, and offensive style. Only one anchor may be active inside each exclusive group.
 
 ### Game Script
 
-One structured story containing a title, summary, causal chain, conditions that must remain true, failure conditions, and selected anchors. It contains no odds, betting legs, payout math, expected-value claim, or confidence guarantee.
+One structured story containing a title, summary, causal chain, conditions that must remain true, failure conditions, and selected anchors. It carries its scenario revision, snapshot, contract version, model ID, and input hash. It contains no odds, betting legs, payout math, expected-value claim, or confidence guarantee.
 
 ### Bet Station
 
@@ -47,7 +49,7 @@ The terminal is a visible state machine, not a command-line parser. Its output m
 1. active schedule loaded;
 2. matchup selected;
 3. agents selected and dispatched;
-4. scenario events resolved;
+4. latest stored snapshot attached and scenario events resolved;
 5. anchors suggested and confirmed;
 6. Game Script generated.
 

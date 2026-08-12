@@ -1,7 +1,8 @@
-import { createHash } from 'crypto'
 import { z } from 'zod'
+import { contentHash, stableId } from '@/lib/data/hash'
 import {
   GameScriptSchema,
+  TERMINAL_CONTRACT_VERSION,
   type GameAgentId,
   type GameScript,
   type ScenarioAnchorId,
@@ -20,10 +21,6 @@ export const ScriptDraftSchema = z.object({
 })
 
 export type ScriptDraft = z.infer<typeof ScriptDraftSchema>
-
-function scriptId(scenarioId: string, anchorIds: ScenarioAnchorId[]): string {
-  return `script_${createHash('sha256').update([scenarioId, ...anchorIds].join('|')).digest('hex').slice(0, 12)}`
-}
 
 export function createDeterministicDraft(
   scenario: ScenarioResolution,
@@ -58,6 +55,8 @@ export function finalizeScript(params: {
   anchorIds: ScenarioAnchorId[]
   draft: ScriptDraft
   generation: GameScript['generation']
+  modelId: string
+  parentScriptId?: string
   now?: Date
 }): GameScript {
   const selectedAgentIds = new Set(params.scenario.selected_agent_ids)
@@ -69,9 +68,21 @@ export function finalizeScript(params: {
     statement: step.statement,
   }))
 
+  const inputHash = contentHash({
+    contract_version: TERMINAL_CONTRACT_VERSION,
+    scenario_revision_id: params.scenario.scenario_revision_id,
+    anchor_ids: params.anchorIds,
+    generation: params.generation,
+    model_id: params.modelId,
+  })
   return GameScriptSchema.parse({
-    script_id: scriptId(params.scenario.scenario_id, params.anchorIds),
+    script_id: stableId('script', inputHash),
     scenario_id: params.scenario.scenario_id,
+    scenario_revision_id: params.scenario.scenario_revision_id,
+    snapshot_id: params.scenario.snapshot_id,
+    contract_version: TERMINAL_CONTRACT_VERSION,
+    input_hash: inputHash,
+    parent_script_id: params.parentScriptId,
     title: params.draft.title,
     summary: params.draft.summary,
     causal_chain: causalChain,
@@ -80,5 +91,6 @@ export function finalizeScript(params: {
     anchor_ids: params.anchorIds,
     created_at: (params.now ?? new Date()).toISOString(),
     generation: params.generation,
+    model_id: params.modelId,
   })
 }
