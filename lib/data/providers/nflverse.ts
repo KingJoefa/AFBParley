@@ -83,7 +83,7 @@ function failedFeed(params: {
 }
 
 export const nflverseInjuryProvider: ObservationProvider = {
-  agentId: 'injury',
+  agentIds: ['injury'],
   async collect(context): Promise<IngestionFeedResult> {
     const checkedAt = context.now.toISOString()
     const url = `${NFLVERSE_RELEASE_ROOT}/injuries/injuries_${context.season}.csv`
@@ -190,37 +190,130 @@ type TeamPerformance = {
   plays: number
   offensiveEpa: number
   offensiveEpaPerPlay: number
+  passingAttempts: number
+  dropbacks: number
+  carries: number
+  passingInterceptions: number
+  fumblesLost: number
+  giveawaysPerGame: number
+  interceptionRate: number
+  defensiveInterceptions: number
+  opponentFumbleRecoveries: number
+  takeawaysPerGame: number
+  defensiveForcedFumbles: number
+  sacksSuffered: number
+  sackRateAllowed: number
+  rushingEpa: number
+  rushingEpaPerCarry: number
+  defensiveSacks: number
+  defensiveQbHits: number
+  disruptionPerGame: number
+  defensiveTacklesForLoss: number
+  tacklesForLossPerGame: number
 }
 
+type TeamPerformanceTotal = Omit<TeamPerformance,
+  | 'team'
+  | 'offensiveEpaPerPlay'
+  | 'giveawaysPerGame'
+  | 'interceptionRate'
+  | 'takeawaysPerGame'
+  | 'sackRateAllowed'
+  | 'rushingEpaPerCarry'
+  | 'disruptionPerGame'
+  | 'tacklesForLossPerGame'
+>
+
 function aggregateTeamPerformance(rows: CsvRow[], season: number, beforeWeek?: number): TeamPerformance[] {
-  const totals = new Map<TeamCode, Omit<TeamPerformance, 'team' | 'offensiveEpaPerPlay'>>()
+  const totals = new Map<TeamCode, TeamPerformanceTotal>()
   for (const row of rows) {
     if (Number(row.season) !== season) continue
     if (beforeWeek !== undefined && Number(row.week) >= beforeWeek) continue
+    if (row.season_type && row.season_type !== 'REG') continue
     const team = normalizeTeamCode(row.team)
     if (!team) continue
-    const current = totals.get(team) ?? { games: 0, plays: 0, offensiveEpa: 0 }
+    const current = totals.get(team) ?? {
+      games: 0,
+      plays: 0,
+      offensiveEpa: 0,
+      passingAttempts: 0,
+      dropbacks: 0,
+      carries: 0,
+      passingInterceptions: 0,
+      fumblesLost: 0,
+      defensiveInterceptions: 0,
+      opponentFumbleRecoveries: 0,
+      defensiveForcedFumbles: 0,
+      sacksSuffered: 0,
+      rushingEpa: 0,
+      defensiveSacks: 0,
+      defensiveQbHits: 0,
+      defensiveTacklesForLoss: 0,
+    }
+    const attempts = numeric(row.attempts)
+    const carries = numeric(row.carries)
+    const sacksSuffered = numeric(row.sacks_suffered)
     current.games += numeric(row.games) || 1
-    current.plays += numeric(row.attempts) + numeric(row.carries) + numeric(row.sacks_suffered)
+    current.plays += attempts + carries + sacksSuffered
     current.offensiveEpa += numeric(row.passing_epa) + numeric(row.rushing_epa)
+    current.passingAttempts += attempts
+    current.dropbacks += attempts + sacksSuffered
+    current.carries += carries
+    current.passingInterceptions += numeric(row.passing_interceptions)
+    current.fumblesLost += numeric(row.fumbles_lost_total)
+    current.defensiveInterceptions += numeric(row.def_interceptions)
+    current.opponentFumbleRecoveries += numeric(row.fumble_recovery_opp)
+    current.defensiveForcedFumbles += numeric(row.def_fumbles_forced)
+    current.sacksSuffered += sacksSuffered
+    current.rushingEpa += numeric(row.rushing_epa)
+    current.defensiveSacks += numeric(row.def_sacks)
+    current.defensiveQbHits += numeric(row.def_qb_hits)
+    current.defensiveTacklesForLoss += numeric(row.def_tackles_for_loss)
     totals.set(team, current)
   }
   return [...totals.entries()].map(([team, total]) => ({
     team,
     ...total,
     offensiveEpaPerPlay: total.plays ? total.offensiveEpa / total.plays : 0,
+    giveawaysPerGame: total.games
+      ? (total.passingInterceptions + total.fumblesLost) / total.games
+      : 0,
+    interceptionRate: total.passingAttempts
+      ? total.passingInterceptions / total.passingAttempts
+      : 0,
+    takeawaysPerGame: total.games
+      ? (total.defensiveInterceptions + total.opponentFumbleRecoveries) / total.games
+      : 0,
+    sackRateAllowed: total.dropbacks ? total.sacksSuffered / total.dropbacks : 0,
+    rushingEpaPerCarry: total.carries ? total.rushingEpa / total.carries : 0,
+    disruptionPerGame: total.games
+      ? (total.defensiveSacks + total.defensiveQbHits) / total.games
+      : 0,
+    tacklesForLossPerGame: total.games
+      ? total.defensiveTacklesForLoss / total.games
+      : 0,
   }))
 }
 
-export const nflverseEpaProvider: ObservationProvider = {
-  agentId: 'epa',
+function rankBy(
+  performance: TeamPerformance[],
+  team: TeamCode,
+  value: (candidate: TeamPerformance) => number,
+  direction: 'ascending' | 'descending',
+): number {
+  const ranked = [...performance].sort((left, right) => (
+    direction === 'ascending' ? value(left) - value(right) : value(right) - value(left)
+  ))
+  return ranked.findIndex(candidate => candidate.team === team) + 1
+}
+
+export const nflverseTeamStatsProvider: ObservationProvider = {
+  agentIds: ['epa', 'turnovers', 'trenches'],
   async collect(context): Promise<IngestionFeedResult> {
     const checkedAt = context.now.toISOString()
     const useCurrentSeason = context.week > 1
     const dataSeason = useCurrentSeason ? context.season : context.season - 1
-    const file = useCurrentSeason
-      ? `stats_team_week_${dataSeason}.csv`
-      : `stats_team_reg_${dataSeason}.csv`
+    const file = `stats_team_week_${dataSeason}.csv`
     const url = `${NFLVERSE_RELEASE_ROOT}/stats_team/${file}`
     let response: Response
     let rows: CsvRow[]
@@ -236,11 +329,7 @@ export const nflverseEpaProvider: ObservationProvider = {
       })
     }
 
-    const performance = aggregateTeamPerformance(
-      rows,
-      dataSeason,
-      useCurrentSeason ? context.week : undefined,
-    ).sort((left, right) => right.offensiveEpaPerPlay - left.offensiveEpaPerPlay)
+    const performance = aggregateTeamPerformance(rows, dataSeason, useCurrentSeason ? context.week : undefined)
     const rawImport = createRawImport({
       provider: 'nflverse',
       feed: 'team-stats',
@@ -256,7 +345,11 @@ export const nflverseEpaProvider: ObservationProvider = {
       for (const team of [game.away_team, game.home_team]) {
         const teamPerformance = performance.find(candidate => candidate.team === team)
         if (!teamPerformance) continue
-        const rank = performance.findIndex(candidate => candidate.team === team) + 1
+        const shared = {
+          sample_games: teamPerformance.games,
+          data_season: dataSeason,
+          through_week: useCurrentSeason ? context.week - 1 : 'final',
+        }
         observations.push(createObservation({
           gameId: game.game_id,
           agentId: 'epa',
@@ -265,11 +358,9 @@ export const nflverseEpaProvider: ObservationProvider = {
           metric: 'team.offensive_epa_per_play',
           value: {
             value: Number(teamPerformance.offensiveEpaPerPlay.toFixed(4)),
-            rank,
+            rank: rankBy(performance, team, candidate => candidate.offensiveEpaPerPlay, 'descending'),
             league_size: performance.length,
-            sample_games: teamPerformance.games,
-            data_season: dataSeason,
-            through_week: useCurrentSeason ? context.week - 1 : null,
+            ...shared,
           },
           unit: 'epa_per_play',
           source: {
@@ -284,19 +375,83 @@ export const nflverseEpaProvider: ObservationProvider = {
           expiresAt: new Date(context.now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           importedAt: checkedAt,
           rawImportId: rawImport.raw_import_id,
-          providerRecordId: `${dataSeason}:${team}:${useCurrentSeason ? context.week - 1 : 'final'}`,
+          providerRecordId: `${dataSeason}:${team}:${useCurrentSeason ? context.week - 1 : 'final'}:epa`,
         }))
-        gameCounts.set(game.game_id, (gameCounts.get(game.game_id) ?? 0) + 1)
+        observations.push(createObservation({
+          gameId: game.game_id,
+          agentId: 'turnovers',
+          kind: 'measurement',
+          subject: { type: 'team', id: team, label: team, team },
+          metric: 'team.turnover_profile',
+          value: {
+            giveaways_per_game: Number(teamPerformance.giveawaysPerGame.toFixed(3)),
+            giveaway_rank: rankBy(performance, team, candidate => candidate.giveawaysPerGame, 'ascending'),
+            interception_rate: Number(teamPerformance.interceptionRate.toFixed(4)),
+            fumbles_lost: teamPerformance.fumblesLost,
+            takeaways_per_game: Number(teamPerformance.takeawaysPerGame.toFixed(3)),
+            takeaway_rank: rankBy(performance, team, candidate => candidate.takeawaysPerGame, 'descending'),
+            forced_fumbles_per_game: Number((teamPerformance.defensiveForcedFumbles / teamPerformance.games).toFixed(3)),
+            league_size: performance.length,
+            ...shared,
+          },
+          source: {
+            provider: 'nflverse',
+            feed: 'team-stats',
+            quality: 'research',
+            source_url: url,
+            terms_url: NFLVERSE_TERMS_URL,
+          },
+          observedAt,
+          effectiveAt: observedAt,
+          expiresAt: new Date(context.now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          importedAt: checkedAt,
+          rawImportId: rawImport.raw_import_id,
+          providerRecordId: `${dataSeason}:${team}:${useCurrentSeason ? context.week - 1 : 'final'}:turnovers`,
+        }))
+        observations.push(createObservation({
+          gameId: game.game_id,
+          agentId: 'trenches',
+          kind: 'measurement',
+          subject: { type: 'team', id: team, label: team, team },
+          metric: 'team.trenches_proxy',
+          value: {
+            sack_rate_allowed: Number(teamPerformance.sackRateAllowed.toFixed(4)),
+            pass_protection_rank: rankBy(performance, team, candidate => candidate.sackRateAllowed, 'ascending'),
+            rushing_epa_per_carry: Number(teamPerformance.rushingEpaPerCarry.toFixed(4)),
+            rushing_efficiency_rank: rankBy(performance, team, candidate => candidate.rushingEpaPerCarry, 'descending'),
+            defensive_disruptions_per_game: Number(teamPerformance.disruptionPerGame.toFixed(3)),
+            front_disruption_rank: rankBy(performance, team, candidate => candidate.disruptionPerGame, 'descending'),
+            tackles_for_loss_per_game: Number(teamPerformance.tacklesForLossPerGame.toFixed(3)),
+            run_disruption_rank: rankBy(performance, team, candidate => candidate.tacklesForLossPerGame, 'descending'),
+            proxy: true,
+            league_size: performance.length,
+            ...shared,
+          },
+          source: {
+            provider: 'nflverse',
+            feed: 'team-stats',
+            quality: 'research',
+            source_url: url,
+            terms_url: NFLVERSE_TERMS_URL,
+          },
+          observedAt,
+          effectiveAt: observedAt,
+          expiresAt: new Date(context.now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          importedAt: checkedAt,
+          rawImportId: rawImport.raw_import_id,
+          providerRecordId: `${dataSeason}:${team}:${useCurrentSeason ? context.week - 1 : 'final'}:trenches`,
+        }))
+        gameCounts.set(game.game_id, (gameCounts.get(game.game_id) ?? 0) + 3)
       }
     }
 
     const gameStates = Object.fromEntries(context.games.map(game => {
       const count = gameCounts.get(game.game_id) ?? 0
       return [game.game_id, availability({
-        state: count === 2 ? 'available' : count ? 'degraded' : 'missing',
+        state: count === 6 ? 'available' : count ? 'degraded' : 'missing',
         checkedAt,
         count,
-        ...(count !== 2 ? { message: 'A two-team performance baseline is incomplete' } : {}),
+        ...(count !== 6 ? { message: 'A two-team performance baseline is incomplete' } : {}),
       })]
     }))
 

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { contentHash, stableId } from '@/lib/data/hash'
 import {
+  GAME_AGENT_IDS,
   GameScriptSchema,
   TERMINAL_CONTRACT_VERSION,
   type GameAgentId,
@@ -15,7 +16,7 @@ export const ScriptDraftSchema = z.object({
   causal_chain: z.array(z.object({
     agent_id: z.string().optional(),
     statement: z.string().min(1),
-  })).min(2).max(8),
+  })).min(2).max(GAME_AGENT_IDS.length + 1),
   key_conditions: z.array(z.string().min(1)).min(1).max(6),
   failure_conditions: z.array(z.string().min(1)).min(1).max(6),
 })

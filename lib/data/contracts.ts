@@ -3,7 +3,16 @@ import { GameSchema } from '@/lib/nfl/game'
 
 export const OBSERVATION_CONTRACT_VERSION = 'observation-v1'
 
-export const ObservationAgentIdSchema = z.enum(['weather', 'injury', 'epa'])
+export const OBSERVATION_AGENT_IDS = [
+  'weather',
+  'injury',
+  'epa',
+  'trenches',
+  'turnovers',
+  'rest',
+] as const
+
+export const ObservationAgentIdSchema = z.enum(OBSERVATION_AGENT_IDS)
 export const ObservationKindSchema = z.enum(['forecast', 'report', 'measurement', 'venue'])
 export const SourceQualitySchema = z.enum(['official', 'licensed', 'research', 'internal'])
 export const SnapshotFeedStateSchema = z.enum([
@@ -74,6 +83,9 @@ export const GameSnapshotSchema = z.object({
     weather: SnapshotAvailabilitySchema,
     injury: SnapshotAvailabilitySchema,
     epa: SnapshotAvailabilitySchema,
+    trenches: SnapshotAvailabilitySchema.optional(),
+    turnovers: SnapshotAvailabilitySchema.optional(),
+    rest: SnapshotAvailabilitySchema.optional(),
   }),
   content_hash: z.string().regex(/^[a-f0-9]{64}$/),
 }).superRefine((snapshot, context) => {

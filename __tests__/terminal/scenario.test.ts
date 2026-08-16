@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
+import { createBetStationHandoff } from '@/lib/bet-station/contracts'
 import { GameSnapshotSchema } from '@/lib/data/contracts'
-import { ScenarioResolutionSchema, type ScenarioGame } from '@/lib/terminal/contracts'
+import {
+  GAME_AGENT_IDS,
+  GameScriptSchema,
+  ScenarioResolutionSchema,
+  type ScenarioGame,
+} from '@/lib/terminal/contracts'
 import { resolveScenario } from '@/lib/terminal/scenario'
+import { createDeterministicDraft, finalizeScript } from '@/lib/terminal/script'
 
 const GAME: ScenarioGame = {
   game_id: '2026-wk01-NE-at-SEA',
@@ -34,7 +41,43 @@ describe('scenario contract', () => {
 
     expect(scenario.suggested_anchor_ids).toContain('game_under')
     expect(scenario.suggested_anchor_ids).not.toContain('game_over')
-    expect(scenario.suggested_anchor_ids.filter(id => ['shootout', 'grind', 'blowout'].includes(id))).toHaveLength(1)
+    expect(scenario.suggested_anchor_ids.filter(id => ['shootout', 'grind', 'blowout', 'high_variance'].includes(id))).toHaveLength(1)
+  })
+
+  it('resolves the expanded football-native lenses as explicit assumptions', () => {
+    const agentIds = ['momentum', 'trenches', 'turnovers', 'qb', 'rest'] as const
+    const scenario = resolveScenario({ game: GAME, agentIds: [...agentIds] })
+
+    expect(scenario.selected_agent_ids).toEqual(agentIds)
+    expect(scenario.events.map(event => event.agent_id)).toEqual(agentIds)
+    expect(scenario.events.every(event => event.evidence_state === 'assumption_only')).toBe(true)
+    expect(scenario.suggested_anchor_ids).toEqual(['game_over', 'grind', 'run_heavy'])
+  })
+
+  it('derives a high-variance shape from a turnover finding without a volatility agent', () => {
+    const scenario = resolveScenario({ game: GAME, agentIds: ['turnovers'] })
+
+    expect(scenario.suggested_anchor_ids).toEqual(['high_variance'])
+  })
+
+  it('can synthesize every selectable agent without exceeding the script contract', () => {
+    const scenario = resolveScenario({ game: GAME, agentIds: [...GAME_AGENT_IDS] })
+    const anchorIds = scenario.suggested_anchor_ids
+    const script = finalizeScript({
+      scenario,
+      anchorIds,
+      draft: createDeterministicDraft(scenario, anchorIds),
+      generation: 'deterministic',
+      modelId: 'deterministic-v1',
+    })
+
+    expect(script.causal_chain).toHaveLength(GAME_AGENT_IDS.length + 1)
+    expect(GameScriptSchema.safeParse(script).success).toBe(true)
+    expect(createBetStationHandoff({ scenario, script })).toMatchObject({
+      script_id: script.script_id,
+      scenario_revision_id: scenario.scenario_revision_id,
+      game_id: GAME.game_id,
+    })
   })
 
   it('binds sourced observations to a stable scenario revision', () => {
@@ -78,6 +121,9 @@ describe('scenario contract', () => {
         weather: { state: 'available', checked_at: '2026-09-09T12:00:00.000Z', observation_count: 1 },
         injury: { state: 'missing', checked_at: '2026-09-09T12:00:00.000Z', observation_count: 0 },
         epa: { state: 'missing', checked_at: '2026-09-09T12:00:00.000Z', observation_count: 0 },
+        trenches: { state: 'missing', checked_at: '2026-09-09T12:00:00.000Z', observation_count: 0 },
+        turnovers: { state: 'missing', checked_at: '2026-09-09T12:00:00.000Z', observation_count: 0 },
+        rest: { state: 'missing', checked_at: '2026-09-09T12:00:00.000Z', observation_count: 0 },
       },
       content_hash: 'a'.repeat(64),
     })
@@ -92,6 +138,7 @@ describe('scenario contract', () => {
     expect(scenario.scenario_revision_id).toMatch(/^scenario_revision_/)
     expect(scenario.evidence_state).toBe('observations_available')
     expect(scenario.events[0].evidence_state).toBe('observed_support')
+    expect(scenario.events[0].finding.state).toBe('material')
     expect(scenario.events[0].observations[0].source.provider).toBe('nws')
   })
 })

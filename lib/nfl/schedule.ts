@@ -83,6 +83,18 @@ function listSeasonScheduleYears(): number[] {
     .sort((left, right) => left - right)
 }
 
+function readSeasonSchedule(season: number): SeasonSchedule {
+  const schedulePath = path.join(SCHEDULES_ROOT, `${season}.json`)
+  if (!existsSync(schedulePath)) {
+    throw new ScheduleNotFoundError(`No regular-season schedule found for ${season}`)
+  }
+  const schedule = SeasonScheduleSchema.parse(JSON.parse(readFileSync(schedulePath, 'utf8')))
+  if (schedule.season !== season) {
+    throw new Error(`Schedule metadata does not match filename: ${season}.json`)
+  }
+  return schedule
+}
+
 function formatEasternTime(kickoff: string): string {
   const date = new Date(kickoff)
   const weekday = new Intl.DateTimeFormat('en-US', {
@@ -166,15 +178,10 @@ export function loadSchedule(params: {
   now?: Date
 } = {}): LoadedSchedule {
   const season = params.season ?? listSeasonScheduleYears().at(-1)
-  const schedulePath = season === undefined ? '' : path.join(SCHEDULES_ROOT, `${season}.json`)
-  if (season === undefined || !existsSync(schedulePath)) {
+  if (season === undefined) {
     throw new ScheduleNotFoundError(`No regular-season schedule found for ${season ?? 'the requested season'}`)
   }
-
-  const schedule = SeasonScheduleSchema.parse(JSON.parse(readFileSync(schedulePath, 'utf8')))
-  if (schedule.season !== season) {
-    throw new Error(`Schedule metadata does not match filename: ${season}.json`)
-  }
+  const schedule = readSeasonSchedule(season)
 
   const selectedWeek = params.week ?? priorityWeek(schedule, params.now ?? new Date())
   const weekGames = schedule.games
@@ -210,6 +217,24 @@ export function loadSchedule(params: {
     availableWeeks: [...new Set(schedule.games.map(game => game.week))].sort((a, b) => a - b),
     totalSeasonGames: schedule.games.length,
   }
+}
+
+export function loadSeasonGames(season: number): ScheduleGame[] {
+  const schedule = readSeasonSchedule(season)
+  return schedule.games
+    .map(game => toScheduleGame({
+      season,
+      week: game.week,
+      awayTeam: game.away_team,
+      homeTeam: game.home_team,
+      kickoff: game.kickoff,
+      neutralSite: game.neutral_site,
+      status: game.status,
+      venue: game.venue,
+      externalId: game.external_id,
+      broadcast: game.broadcast,
+    }))
+    .sort((left, right) => Date.parse(left.kickoff) - Date.parse(right.kickoff))
 }
 
 export function loadOperationalSchedule(params: { now?: Date } = {}): LoadedSchedule {

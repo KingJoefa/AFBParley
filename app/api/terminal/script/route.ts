@@ -47,6 +47,7 @@ function buildPrompt(scenario: ScenarioResolution, anchorIds: ScenarioAnchorId[]
       label: event.label,
       assumption: event.assumption,
       resolved_statement: event.statement,
+      finding: event.finding,
       evidence_state: event.evidence_state,
       observations: event.observations.map(observation => ({
         metric: observation.metric,

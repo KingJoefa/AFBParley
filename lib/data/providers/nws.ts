@@ -191,7 +191,7 @@ async function collectGameWeather(
 }
 
 export const nwsWeatherProvider: ObservationProvider = {
-  agentId: 'weather',
+  agentIds: ['weather'],
   async collect(context): Promise<IngestionFeedResult> {
     const results = await Promise.all(context.games.map((_, index) => collectGameWeather(context, index)))
     const observations = results.flatMap(result => result.observations)
