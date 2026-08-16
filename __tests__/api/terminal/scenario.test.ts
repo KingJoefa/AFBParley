@@ -25,4 +25,22 @@ describe('/api/terminal/scenario', () => {
     expect(body.scenario.events).toHaveLength(2)
     expect(body.scenario.evidence_state).toBe('scenario_assumptions')
   })
+
+  it('rejects retired player-position selectors', async () => {
+    const game = loadSchedule().games[0]
+    const response = await POST(request({ game_id: game.game_id, agent_ids: ['wr'] }))
+
+    expect(response.status).toBe(400)
+  })
+
+  it('derives Rest context without requiring a stored snapshot', async () => {
+    const game = loadSchedule().games[0]
+    const response = await POST(request({ game_id: game.game_id, agent_ids: ['rest'] }))
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.scenario.events[0].finding.state).toBe('contextual')
+    expect(body.scenario.events[0].evidence_state).toBe('observed_context')
+    expect(body.scenario.events[0].observations).toHaveLength(2)
+  })
 })

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { nflverseEpaProvider, nflverseInjuryProvider } from '@/lib/data/providers/nflverse'
+import { nflverseInjuryProvider, nflverseTeamStatsProvider } from '@/lib/data/providers/nflverse'
 import { nwsWeatherProvider, parseWindMph } from '@/lib/data/providers/nws'
+import { scheduleRestProvider } from '@/lib/data/providers/rest'
 import { loadSchedule } from '@/lib/nfl/schedule'
 
 const game = loadSchedule({ season: 2026, week: 1 }).games[0]
@@ -64,18 +65,29 @@ describe('observation providers', () => {
     expect(result.game_states[game.game_id].state).toBe('available')
   })
 
-  it('creates a two-team offensive EPA baseline for week one', async () => {
+  it('creates shared efficiency, turnover, and trenches baselines for week one', async () => {
     const csv = [
-      'season,team,season_type,games,attempts,carries,sacks_suffered,passing_epa,rushing_epa',
-      '2025,NE,REG,17,600,400,40,20,10',
-      '2025,SEA,REG,17,550,450,30,80,20',
+      'season,week,team,season_type,attempts,carries,sacks_suffered,passing_epa,rushing_epa,passing_interceptions,fumbles_lost_total,def_interceptions,fumble_recovery_opp,def_fumbles_forced,def_sacks,def_qb_hits,def_tackles_for_loss',
+      '2025,1,NE,REG,35,20,5,-4,-2,2,1,0,0,0,1,2,2',
+      '2025,1,SEA,REG,30,28,1,8,4,0,0,2,1,2,4,7,6',
     ].join('\n')
     const fetcher = vi.fn(async () => new Response(csv, { status: 200 })) as unknown as typeof fetch
 
-    const result = await nflverseEpaProvider.collect(context(fetcher))
+    const result = await nflverseTeamStatsProvider.collect(context(fetcher))
+
+    expect(result.observations).toHaveLength(6)
+    expect(result.game_states[game.game_id].state).toBe('available')
+    expect(new Set(result.observations.map(item => item.agent_id))).toEqual(new Set(['epa', 'turnovers', 'trenches']))
+    expect(result.observations.map(item => item.subject.id)).toEqual(expect.arrayContaining(['NE', 'SEA']))
+  })
+
+  it('derives Week 1 rest and travel context without inventing prior-game rest', async () => {
+    const result = await scheduleRestProvider.collect(context(fetch))
+    const values = result.observations.map(observation => observation.value as Record<string, unknown>)
 
     expect(result.observations).toHaveLength(2)
-    expect(result.game_states[game.game_id].state).toBe('available')
-    expect(result.observations.map(item => item.subject.id)).toEqual(expect.arrayContaining(['NE', 'SEA']))
+    expect(result.observations.every(observation => observation.source.quality === 'internal')).toBe(true)
+    expect(values.every(value => value.schedule_spot === 'opening_week')).toBe(true)
+    expect(values.every(value => value.turnaround_days === null)).toBe(true)
   })
 })

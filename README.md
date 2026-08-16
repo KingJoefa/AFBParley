@@ -4,12 +4,14 @@ Swantail is a current-week football Game Script terminal. A user selects a match
 
 Swantail does not validate a user's thesis or claim betting confidence. It turns a selected set of causal assumptions into a structured story with explicit conditions and failure modes. Converting that story into correlated markets belongs to the later Bet Station product.
 
+The terminal exposes ten game-level agents. Player positions are deliberately downstream: QB, RB, WR, and TE are reserved Bet Station market families, while Usage is internal role-allocation logic and high variance is derived from resolved game mechanisms.
+
 ## Product Flow
 
 ```text
 Active-week matchup
   -> Game Agents (implicit hypothesis)
-  -> Scenario assumptions
+  -> Matchup-specific Agent Findings
   -> Suggested and user-confirmed anchors
   -> Game Script
   -> Bet Station (deferred)
@@ -21,9 +23,10 @@ Active-week matchup
 - `POST /api/terminal/scenario` accepts a current-week `game_id` and selected Game Agents, then reads the latest stored snapshot when configured.
 - `POST /api/terminal/script` accepts a resolved scenario and compatible outcome anchors.
 - `GET /api/cron/ingest` is the secured scheduled boundary for provider imports and immutable snapshots.
+- `lib/bet-station/contracts.ts` defines the lineage-preserving handoff and reserved position families without adding betting behavior to the terminal.
 - The terminal has no free-text hypothesis, odds paste, output mode, future-week navigation, or parlay builder.
 
-Game Agent output is labeled by evidence state. Without a stored snapshot it remains `scenario_assumptions`; with sourced data it can report observed context, support, conflict, stale data, or missing data. The script endpoint uses OpenAI when configured and a deterministic fallback otherwise.
+Game Agent output includes a matchup headline, materiality state, decisive signals, caveats, and evidence lineage. Rest/Travel is derived directly from the stored schedule even before Postgres is configured. Remote provider data remains snapshot-bound. The script endpoint uses OpenAI when configured and a deterministic fallback otherwise.
 
 ## Local Development
 
@@ -57,5 +60,6 @@ npm run build
 ```
 
 The active product contract is documented in [`docs/PRODUCT_CONTRACT.md`](docs/PRODUCT_CONTRACT.md). The data and product sequence is in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+The football-native agent blueprint and individual specialist specs are in [`docs/agents/README.md`](docs/agents/README.md).
 Provider status, setup, and owner decisions are in [`docs/DATA_FOUNDATION.md`](docs/DATA_FOUNDATION.md).
 The proposed initial market scope and responsible-gaming gate are in [`docs/BET_STATION_GUARDRAILS.md`](docs/BET_STATION_GUARDRAILS.md).

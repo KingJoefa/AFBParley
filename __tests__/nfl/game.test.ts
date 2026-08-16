@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSnapshotSchema } from '@/lib/data/contracts'
+import { GameSnapshotSchema, OBSERVATION_AGENT_IDS } from '@/lib/data/contracts'
 import { createGameId } from '@/lib/nfl/game'
 
 describe('canonical NFL game contracts', () => {
@@ -28,7 +28,7 @@ describe('canonical NFL game contracts', () => {
         display: 'New England Patriots @ Seattle Seahawks',
       },
       observations: [],
-      availability: Object.fromEntries(['weather', 'injury', 'epa'].map(agent => [agent, {
+      availability: Object.fromEntries(OBSERVATION_AGENT_IDS.map(agent => [agent, {
         state: 'missing',
         checked_at: '2026-02-08T18:00:00Z',
         observation_count: 0,
@@ -55,7 +55,7 @@ describe('canonical NFL game contracts', () => {
         display: 'New England Patriots @ Seattle Seahawks',
       },
       observations: [],
-      availability: Object.fromEntries(['weather', 'injury', 'epa'].map(agent => [agent, {
+      availability: Object.fromEntries(OBSERVATION_AGENT_IDS.map(agent => [agent, {
         state: 'missing',
         checked_at: '2026-02-08T18:00:00Z',
         observation_count: 0,

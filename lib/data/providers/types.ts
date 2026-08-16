@@ -16,6 +16,6 @@ export type WeekProviderContext = {
 }
 
 export type ObservationProvider = {
-  agentId: ObservationAgentId
+  agentIds: readonly ObservationAgentId[]
   collect(context: WeekProviderContext): Promise<IngestionFeedResult>
 }

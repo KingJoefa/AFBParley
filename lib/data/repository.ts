@@ -179,7 +179,9 @@ export async function loadScenarioRevision(revisionId: string): Promise<Scenario
     where scenario_revision_id = ${revisionId}
     limit 1
   `
-  return rows[0] ? ScenarioResolutionSchema.parse(rows[0].payload) : null
+  if (!rows[0]) return null
+  const parsed = ScenarioResolutionSchema.safeParse(rows[0].payload)
+  return parsed.success ? parsed.data : null
 }
 
 export async function persistScript(params: {

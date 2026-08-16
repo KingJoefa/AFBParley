@@ -14,9 +14,15 @@ A canonical current-week matchup identified by `game_id`. The full regular-seaso
 
 ### Game Agent
 
-A selectable causal lens such as Weather, Pressure, Pace, Injury, Efficiency, Quarterback, Backfield, Receivers, Tight Ends, or Usage.
+A selectable game-level causal lens: Weather, Momentum, Pace, Injuries, Efficiency, Pressure, Trenches, Turnovers, Quarterback, or Rest/Travel.
 
 Agent selection is the user's implicit hypothesis. Agent events always retain the selected assumption and may attach provider observations with source quality, observed time, effective time, expiry, and raw-import lineage.
+
+Each resolved event contains an Agent Finding with one of four materiality states: `material`, `contextual`, `balanced`, or `unavailable`. The finding states the matchup mechanism, any directional team path, up to four decisive signals, and explicit caveats. Materiality describes whether the lens separates this matchup; it is not a confidence score or prediction probability.
+
+Each selectable agent owns one specialist question and one explicit football scope. Its purpose, required inputs, assumptions, signals, failure modes, anchor behavior, and pairings are defined in `docs/agents/`. These specifications guide scenario and script behavior without changing the distinction between a selected hypothesis and sourced evidence.
+
+Player positions are not Game Agents. Quarterback remains selectable because quarterback response can determine the entire game shape. Running Back, Wide Receiver, and Tight End are reserved as downstream Bet Station market families. Usage is an internal allocation input, and Volatility is a derived script property supported by mechanisms such as explosives, turnover exposure, and unstable conversion.
 
 ### Scenario
 
@@ -24,6 +30,7 @@ The stable resolution of one game plus selected agents. `scenario_id` identifies
 
 - selected agent IDs;
 - one causal event per selected agent;
+- one matchup-specific Agent Finding per event;
 - the complete anchor catalog;
 - compatible suggested anchor IDs;
 - an evidence-state label.
@@ -40,7 +47,7 @@ One structured story containing a title, summary, causal chain, conditions that 
 
 ### Bet Station
 
-The future downstream product. It will translate a completed Game Script into available markets and correlated positions using fresh, sourced lines. It is intentionally outside the Script Builder contract.
+The future downstream product. It will receive a versioned handoff from a completed Game Script and translate that story into available markets using fresh, sourced lines. Quarterback, Running Back, Wide Receiver, and Tight End are market filters here rather than Game Agents; role and Usage data determine which players can capture the story. Bet Station is intentionally outside the Script Builder contract.
 
 ## Terminal Behavior
 
@@ -49,11 +56,13 @@ The terminal is a visible state machine, not a command-line parser. Its output m
 1. active schedule loaded;
 2. matchup selected;
 3. agents selected and dispatched;
-4. latest stored snapshot attached and scenario events resolved;
+4. latest stored snapshot attached, schedule-derived context added where applicable, and Agent Findings resolved;
 5. anchors suggested and confirmed;
 6. Game Script generated.
 
 No terminal line may imply that live evidence was checked unless a provider observation with provenance was actually used.
+
+Agents do not vote or produce confidence scores. A balanced or unavailable finding is a valid result and must not be forced into an outcome anchor. Game Script generation is the synthesis layer: it connects compatible agent mechanisms, retains contradictions, and states the conditions and failure modes of the combined story.
 
 ## Non-Goals
 

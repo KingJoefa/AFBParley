@@ -13,12 +13,18 @@ import {
   persistIngestionBundle,
   recordFailedIngestionRun,
 } from '@/lib/data/repository'
-import { nflverseEpaProvider, nflverseInjuryProvider } from '@/lib/data/providers/nflverse'
+import { nflverseInjuryProvider, nflverseTeamStatsProvider } from '@/lib/data/providers/nflverse'
 import { nwsWeatherProvider } from '@/lib/data/providers/nws'
+import { scheduleRestProvider } from '@/lib/data/providers/rest'
 import { GameSchema } from '@/lib/nfl/game'
 import { loadOperationalSchedule } from '@/lib/nfl/schedule'
 
-const PROVIDERS = [nwsWeatherProvider, nflverseInjuryProvider, nflverseEpaProvider]
+const PROVIDERS = [
+  nwsWeatherProvider,
+  nflverseInjuryProvider,
+  nflverseTeamStatsProvider,
+  scheduleRestProvider,
+]
 
 function carryForward(params: {
   agentId: ObservationAgentId
@@ -30,7 +36,11 @@ function carryForward(params: {
   availability: SnapshotAvailability
 } {
   const observations = params.current.observations.filter(item => item.game_id === params.gameId)
-  const availability = params.current.game_states[params.gameId]
+  const currentAvailability = params.current.game_states[params.gameId]
+  const availability = {
+    ...currentAvailability,
+    observation_count: observations.length,
+  }
   if (observations.length || !params.previous || !['missing', 'degraded'].includes(availability.state)) {
     return { observations, availability }
   }
@@ -87,7 +97,10 @@ export async function runActiveWeekIngestion(params: {
       fetch: params.fetch ?? fetch,
     }
     const feeds = await Promise.all(PROVIDERS.map(provider => provider.collect(context)))
-    const feedByAgent = new Map(PROVIDERS.map((provider, index) => [provider.agentId, feeds[index]]))
+    const feedByAgent = new Map<ObservationAgentId, IngestionFeedResult>()
+    PROVIDERS.forEach((provider, index) => {
+      provider.agentIds.forEach(agentId => feedByAgent.set(agentId, feeds[index]))
+    })
     const capturedAt = new Date().toISOString()
     const snapshots: GameSnapshot[] = []
 
@@ -102,7 +115,23 @@ export async function runActiveWeekIngestion(params: {
       const epa = carryForward({
         agentId: 'epa', current: feedByAgent.get('epa')!, previous, gameId: scheduledGame.game_id,
       })
-      const observations = [...weather.observations, ...injury.observations, ...epa.observations]
+      const trenches = carryForward({
+        agentId: 'trenches', current: feedByAgent.get('trenches')!, previous, gameId: scheduledGame.game_id,
+      })
+      const turnovers = carryForward({
+        agentId: 'turnovers', current: feedByAgent.get('turnovers')!, previous, gameId: scheduledGame.game_id,
+      })
+      const rest = carryForward({
+        agentId: 'rest', current: feedByAgent.get('rest')!, previous, gameId: scheduledGame.game_id,
+      })
+      const observations = [
+        ...weather.observations,
+        ...injury.observations,
+        ...epa.observations,
+        ...trenches.observations,
+        ...turnovers.observations,
+        ...rest.observations,
+      ]
         .sort((left, right) => left.observation_id.localeCompare(right.observation_id))
       const game = GameSchema.parse(scheduledGame)
       const snapshotContent = {
@@ -112,6 +141,9 @@ export async function runActiveWeekIngestion(params: {
           weather: weather.availability,
           injury: injury.availability,
           epa: epa.availability,
+          trenches: trenches.availability,
+          turnovers: turnovers.availability,
+          rest: rest.availability,
         },
       }
       const hash = contentHash(snapshotContent)

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { loadLatestGameSnapshot, persistScenario } from '@/lib/data/repository'
+import { attachScheduleRestSnapshot } from '@/lib/data/providers/rest'
 import { loadOperationalSchedule, ScheduleNotFoundError } from '@/lib/nfl/schedule'
 import { ScenarioRequestSchema, type ScenarioGame } from '@/lib/terminal/contracts'
 import { resolveScenario } from '@/lib/terminal/scenario'
@@ -43,7 +44,10 @@ export async function POST(request: Request) {
       time: scheduledGame.time,
     }
     const agentIds = [...new Set(parsed.data.agent_ids)]
-    const snapshot = await loadLatestGameSnapshot(game.game_id)
+    let snapshot = await loadLatestGameSnapshot(game.game_id)
+    if (agentIds.includes('rest') && !snapshot?.observations.some(observation => observation.agent_id === 'rest')) {
+      snapshot = await attachScheduleRestSnapshot({ game: scheduledGame, snapshot })
+    }
     const scenario = resolveScenario({ game, agentIds, snapshot })
     const persistence = await persistScenario(scenario)
 

@@ -29,7 +29,10 @@ export function evaluateScript(params: {
   const failureConditionsPresent = params.script.failure_conditions.length > 0
     && params.script.failure_conditions.every(condition => condition.trim().length >= 12)
   const claims = numericClaims(params.script)
-  const evidence = JSON.stringify(params.scenario.events.flatMap(event => event.observations))
+  const evidence = JSON.stringify(params.scenario.events.map(event => ({
+    observations: event.observations,
+    finding: event.finding,
+  })))
   const numericClaimsSourced = claims.every(claim => evidence.includes(claim.replace('%', '')))
   const issues = [
     ...(!selectedAgentsRepresented ? ['Not every selected agent appears in the causal chain'] : []),

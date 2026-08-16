@@ -11,6 +11,14 @@ The first Bet Station release should cover only pregame, full-game NFL:
 
 It should exclude moneylines, team totals, player props, parlays, futures, and in-play markets until ingestion, closing-line capture, calibration, and correlation testing are dependable.
 
+## Game Script Handoff
+
+Bet Station begins only after a Game Script is complete. The versioned handoff in `lib/bet-station/contracts.ts` carries the script, scenario revision, snapshot, game, and selected-anchor lineage. It does not place odds, markets, player choices, or recommendations back into the Game Script contract.
+
+Quarterback, Running Back, Wide Receiver, and Tight End are reserved Bet Station position families. They are not selectable Game Agents. Usage remains an internal role-allocation lens used to determine which players have the participation and high-value opportunities needed to express a resolved story.
+
+The first approved release remains spreads and totals only. Position families become user-facing only in a later player-market phase after player identity, participation, role, market, and pricing data meet the same freshness and lineage requirements as game-level recommendations.
+
 Every candidate position must include:
 
 - source book and quote timestamp;
