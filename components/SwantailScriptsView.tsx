@@ -16,18 +16,20 @@ type Props = {
 }
 export default function SwantailScriptsView({ script, scenario, selectedAnchorIds, isLoading }: Props) {
   return (
-    <section className="min-h-[720px] border-x border-b border-white/10 bg-[#0c0e0d] p-4 sm:p-6 lg:border-l-0 lg:border-t lg:p-7" aria-label="Game Script">
-      <div className="mb-5 flex items-center justify-between border-b border-white/10 pb-4">
+    <section className="swantail-panel min-h-[620px] rounded-md border p-4 sm:p-6 lg:min-h-[720px] lg:rounded-l-none lg:p-7" aria-label="Game Script">
+      <div className="mb-5 flex items-center justify-between border-b border-[#4a3c2e]/15 pb-4">
         <div>
-          <div className="font-mono text-[11px] uppercase text-white/40">Output</div>
-          <h2 className="mt-1 text-base font-semibold text-white">Game Script</h2>
+          <div className="swantail-label font-mono text-[11px] uppercase">Output</div>
+          <h2 className="mt-1 text-base font-semibold text-[#1b1714]">Game Script</h2>
         </div>
-        <FileText className="h-5 w-5 text-white/25" aria-hidden />
+        <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[#16716c]/10 text-[#16716c]">
+          <FileText className="h-5 w-5" aria-hidden />
+        </div>
       </div>
 
       {isLoading && (
-        <div className="flex min-h-[480px] items-center justify-center text-sm text-white/45">
-          <LoaderCircle className="mr-2 h-4 w-4 animate-spin text-cyan-200" aria-hidden />
+        <div className="swantail-soft-card flex min-h-[420px] items-center justify-center rounded-md border text-sm text-[#756b61] sm:min-h-[480px]">
+          <LoaderCircle className="mr-2 h-4 w-4 animate-spin text-[#16716c]" aria-hidden />
           Assembling causal chain
         </div>
       )}
@@ -41,13 +43,13 @@ export default function SwantailScriptsView({ script, scenario, selectedAnchorId
       )}
 
       {!isLoading && !script && (
-        <div className="flex min-h-[480px] items-center justify-center border border-dashed border-white/10 bg-black/10 p-8 text-center">
+        <div className="flex min-h-[420px] items-center justify-center rounded-md border border-dashed border-[#4a3c2e]/20 bg-[#fffaf1]/60 p-8 text-center sm:min-h-[480px]">
           <div>
-            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-md border border-white/10 text-white/25">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-md border border-[#4a3c2e]/15 bg-white text-[#756b61]">
               <FileText className="h-5 w-5" aria-hidden />
             </div>
-            <p className="mt-4 text-sm text-white/50">{scenario ? 'Scenario ready' : 'No active scenario'}</p>
-            <p className="mt-1 font-mono text-[11px] uppercase text-white/25">
+            <p className="mt-4 text-sm text-[#756b61]">{scenario ? 'Scenario ready' : 'No active scenario'}</p>
+            <p className="mt-1 font-mono text-[11px] uppercase text-[#756b61]/55">
               {scenario ? `${selectedAnchorIds.length} anchors selected` : 'Awaiting Game Agents'}
             </p>
           </div>

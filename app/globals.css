@@ -4,18 +4,32 @@
 
 :root {
   color-scheme: dark;
+  --swantail-bg: #11100f;
+  --swantail-bg-soft: #171513;
+  --swantail-panel: #fbf6ee;
+  --swantail-panel-strong: #fffaf1;
+  --swantail-ink: #1b1714;
+  --swantail-muted: #756b61;
+  --swantail-line: rgba(74, 60, 46, 0.16);
+  --swantail-teal: #16716c;
+  --swantail-teal-strong: #0d5753;
+  --swantail-gold: #bf8430;
+  --swantail-coral: #c75f4d;
+  --swantail-night: #24201d;
 }
 
 html {
   min-height: 100%;
-  background: #090a0a;
+  background: var(--swantail-bg);
 }
 
 body {
   min-height: 100%;
   margin: 0;
-  background: #090a0a;
-  color: #f3f5f4;
+  background:
+    linear-gradient(135deg, rgba(22, 113, 108, 0.16), transparent 34%),
+    linear-gradient(180deg, #151311 0%, #0f0e0d 100%);
+  color: var(--swantail-panel);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: 0;
 }
@@ -31,5 +45,95 @@ button:disabled {
 }
 
 ::selection {
-  background: rgba(110, 231, 183, 0.25);
+  background: rgba(22, 113, 108, 0.24);
+}
+
+.swantail-shell {
+  background:
+    linear-gradient(180deg, rgba(255, 250, 241, 0.05), transparent 220px),
+    radial-gradient(circle at top left, rgba(191, 132, 48, 0.18), transparent 34rem),
+    linear-gradient(135deg, #171412 0%, #10100f 62%, #181310 100%);
+}
+
+.swantail-header {
+  border-color: rgba(255, 250, 241, 0.12);
+  background: rgba(22, 19, 17, 0.92);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 50px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(18px);
+}
+
+.swantail-wordmark {
+  background: linear-gradient(135deg, #fff5e5 0%, #ead4b4 44%, #5eb5ad 100%);
+  color: #17110c;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45), 0 10px 28px rgba(0, 0, 0, 0.25);
+}
+
+.swantail-workspace {
+  filter: drop-shadow(0 18px 44px rgba(0, 0, 0, 0.32));
+}
+
+.swantail-panel {
+  border-color: var(--swantail-line);
+  background: var(--swantail-panel);
+  color: var(--swantail-ink);
+}
+
+.swantail-panel-dark {
+  border-color: rgba(255, 250, 241, 0.12);
+  background: linear-gradient(180deg, #26211d 0%, #191715 100%);
+  color: var(--swantail-panel);
+}
+
+.swantail-section {
+  border-color: var(--swantail-line);
+  background: rgba(255, 250, 241, 0.72);
+}
+
+.swantail-label {
+  color: rgba(117, 107, 97, 0.9);
+}
+
+.swantail-input {
+  border-color: rgba(74, 60, 46, 0.18);
+  background: #fffaf1;
+  color: var(--swantail-ink);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.swantail-input:focus {
+  border-color: rgba(22, 113, 108, 0.56);
+  box-shadow: 0 0 0 3px rgba(22, 113, 108, 0.12);
+}
+
+.swantail-primary {
+  background: linear-gradient(135deg, #1b817a 0%, #0d5753 100%);
+  color: #fffaf1;
+  box-shadow: 0 10px 22px rgba(13, 87, 83, 0.18);
+}
+
+.swantail-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #219189 0%, #11635f 100%);
+}
+
+.swantail-secondary {
+  border-color: rgba(22, 113, 108, 0.26);
+  background: rgba(22, 113, 108, 0.08);
+  color: #0d5753;
+}
+
+.swantail-secondary:hover:not(:disabled) {
+  background: rgba(22, 113, 108, 0.13);
+}
+
+.swantail-runlog {
+  background:
+    linear-gradient(180deg, rgba(255, 250, 241, 0.04), transparent),
+    #201c19;
+  color: #f8efe1;
+}
+
+.swantail-soft-card {
+  border-color: rgba(74, 60, 46, 0.14);
+  background: #fffaf1;
+  box-shadow: 0 8px 22px rgba(74, 60, 46, 0.06);
 }
