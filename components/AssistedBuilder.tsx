@@ -188,25 +188,25 @@ export default function AssistedBuilder() {
   }, [scenario, selectedAnchorIds])
 
   return (
-    <main className="min-h-screen bg-[#090a0a] text-[#f3f5f4]">
-      <header className="border-b border-white/10 bg-[#0d0f0e]">
-        <div className="mx-auto flex max-w-[1480px] items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+    <main className="swantail-shell min-h-screen text-[#fbf6ee]">
+      <header className="swantail-header sticky top-0 z-40 border-b">
+        <div className="mx-auto flex max-w-[1320px] items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md border border-emerald-300/30 bg-emerald-300/10 font-mono text-sm font-bold text-emerald-200">
+            <div className="swantail-wordmark flex h-10 w-10 items-center justify-center rounded-md font-mono text-sm font-black sm:h-11 sm:w-11">
               ST
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-white">Swantail</h1>
-              <p className="font-mono text-[11px] uppercase text-white/45">Game Script Terminal</p>
+              <h1 className="text-lg font-semibold leading-tight text-[#fffaf0]">Swantail</h1>
+              <p className="font-mono text-[10px] uppercase text-[#d8c9b5]/70 sm:text-[11px]">Game Script Desk</p>
             </div>
           </div>
-          <div className="text-right font-mono text-[11px] uppercase text-white/45">
+          <div className="rounded-md border border-[#f6f1e8]/10 bg-[#f6f1e8]/10 px-2.5 py-1.5 text-right font-mono text-[10px] uppercase text-[#e8dccb]/75 sm:text-[11px]">
             {schedule ? `${schedule.seasonLabel ?? schedule.season} / Week ${schedule.week}` : 'Schedule connecting'}
           </div>
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1480px] gap-0 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(380px,0.85fr)] lg:px-8">
+      <div className="swantail-workspace mx-auto grid max-w-[1320px] gap-4 px-3 py-4 sm:px-6 sm:py-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.82fr)] lg:px-8">
         <SwantailTerminalPanel
           schedule={schedule}
           scheduleLoading={scheduleLoading}
