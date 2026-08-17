@@ -137,17 +137,17 @@ export default function SwantailTerminalPanel({
     : []
 
   return (
-    <section className="swantail-panel overflow-hidden rounded-md border lg:rounded-r-none" aria-label="Game Script Terminal">
-      <div className="flex items-center justify-between border-b border-[#4a3c2e]/15 bg-[#fffaf1] px-4 py-3">
-        <div className="flex items-center gap-2 font-mono text-xs uppercase text-[#756b61]">
-          <span className="h-2 w-2 rounded-full bg-[#16716c]" />
+    <section className="swantail-board overflow-hidden rounded-md border" aria-label="Game Script Terminal">
+      <div className="swantail-board-top flex items-center justify-between border-b px-4 py-3">
+        <div className="flex items-center gap-2 font-mono text-xs uppercase text-[#f6f1e8]/80">
+          <span className="h-2 w-2 rounded-full bg-[#43b7aa] shadow-[0_0_18px_rgba(67,183,170,0.65)]" />
           {TERMINAL_CONTRACT_VERSION}
         </div>
-        <span className="font-mono text-[11px] text-[#756b61]/70">CURRENT WEEK ONLY</span>
+        <span className="font-mono text-[11px] text-[#e8dccb]/60">CURRENT WEEK ONLY</span>
       </div>
 
       <div className="swantail-section border-b p-4 sm:p-5">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex items-center justify-between gap-3">
           <label htmlFor="matchup" className="swantail-label font-mono text-[11px] uppercase">Active matchup</label>
           <span className="font-mono text-[11px] text-[#756b61]/70">
             {schedule ? `${schedule.totalGames} games` : 'connecting'}
@@ -169,10 +169,10 @@ export default function SwantailTerminalPanel({
         </select>
       </div>
 
-      <div className="border-b border-[#4a3c2e]/15 bg-[#fbf6ee] p-4 sm:p-5">
+      <div className="border-b border-[#15191a]/10 bg-[#f6f1e8] p-4 sm:p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="swantail-label font-mono text-[11px] uppercase">Game Agents</h2>
-          <span className="font-mono text-[11px] text-[#16716c]">{selectedAgentIds.length} selected</span>
+          <span className="rounded-full bg-[#0f766e]/10 px-2 py-1 font-mono text-[10px] uppercase text-[#0b5d56]">{selectedAgentIds.length} selected</span>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           {GAME_AGENT_IDS.map((agentId, index) => {
@@ -187,10 +187,10 @@ export default function SwantailTerminalPanel({
             return (
               <div
                 key={agentId}
-                className={`group relative min-h-[76px] rounded-md border transition focus-within:ring-2 focus-within:ring-[#16716c]/20 ${
+                className={`group relative min-h-[70px] rounded-md border transition focus-within:ring-2 focus-within:ring-[#0f766e]/25 ${
                   selected
-                    ? 'border-[#16716c]/40 bg-[#16716c]/10 text-[#1b1714] shadow-sm'
-                    : 'border-[#4a3c2e]/15 bg-white/60 text-[#756b61] hover:border-[#4a3c2e]/25 hover:bg-white hover:text-[#1b1714]'
+                    ? 'swantail-agent-card-selected text-[#111719]'
+                    : 'swantail-agent-card text-[#6d6860] hover:text-[#15191a]'
                 }`}
               >
                 <button
@@ -198,13 +198,13 @@ export default function SwantailTerminalPanel({
                   aria-pressed={selected}
                   aria-describedby={agentGuideEnabled ? `agent-tooltip-${agentId}` : undefined}
                   onClick={() => onAgentToggle(agentId)}
-                  className="min-h-[74px] w-full rounded-md p-2.5 text-left focus:outline-none"
+                  className="min-h-[68px] w-full rounded-md p-2.5 text-left focus:outline-none"
                 >
                   <div className="flex items-center justify-between pr-7">
-                    <Icon className={`h-4 w-4 ${selected ? 'text-[#16716c]' : 'text-[#756b61]/60'}`} aria-hidden />
-                    {selected && <Check className="h-3.5 w-3.5 text-[#16716c]" aria-hidden />}
+                    <Icon className={`h-4 w-4 ${selected ? 'text-[#0f766e]' : 'text-[#6d6860]/55'}`} aria-hidden />
+                    {selected && <Check className="h-3.5 w-3.5 text-[#0f766e]" aria-hidden />}
                   </div>
-                  <div className="mt-3 text-xs font-medium">{agent.label}</div>
+                  <div className="mt-2.5 text-xs font-semibold">{agent.label}</div>
                 </button>
 
                 {agentGuideEnabled && (
@@ -215,14 +215,14 @@ export default function SwantailTerminalPanel({
                       aria-expanded={infoAgentId === agentId}
                       aria-controls="agent-guide-detail"
                       onClick={() => setInfoAgentId(current => current === agentId ? null : agentId)}
-                      className="absolute right-1.5 top-1.5 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full text-[#756b61]/70 transition hover:bg-[#16716c]/10 hover:text-[#0d5753] focus:bg-[#16716c]/10 focus:text-[#0d5753] focus:outline-none focus:ring-2 focus:ring-[#16716c]/20 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+                      className="absolute right-1.5 top-1.5 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full text-[#6d6860]/70 transition hover:bg-[#0f766e]/10 hover:text-[#0b5d56] focus:bg-[#0f766e]/10 focus:text-[#0b5d56] focus:outline-none focus:ring-2 focus:ring-[#0f766e]/20 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
                     >
                       <Info className="h-3.5 w-3.5" aria-hidden />
                     </button>
                     <div
                       id={`agent-tooltip-${agentId}`}
                       role="tooltip"
-                      className={`invisible absolute top-[calc(100%+8px)] z-30 hidden w-64 rounded-md border border-[#4a3c2e]/15 bg-[#fffaf1] p-3 text-left opacity-0 shadow-xl transition sm:block sm:group-hover:visible sm:group-hover:opacity-100 sm:group-focus-within:visible sm:group-focus-within:opacity-100 ${tooltipAlignment}`}
+                      className={`invisible absolute top-[calc(100%+8px)] z-30 hidden w-64 rounded-md border border-[#15191a]/10 bg-[#fffaf0] p-3 text-left opacity-0 shadow-xl transition sm:block sm:group-hover:visible sm:group-hover:opacity-100 sm:group-focus-within:visible sm:group-focus-within:opacity-100 ${tooltipAlignment}`}
                     >
                       <div className="text-xs font-semibold leading-5 text-[#1b1714]">{agent.question}</div>
                       <p className="mt-1 text-[11px] leading-4 text-[#756b61]">{agent.description}</p>
@@ -238,32 +238,32 @@ export default function SwantailTerminalPanel({
         </div>
 
         {agentGuideEnabled && infoAgent && (
-          <div id="agent-guide-detail" role="region" aria-live="polite" className="mt-3 rounded-md border border-[#16716c]/15 bg-[#16716c]/10 px-3 py-2.5">
+          <div id="agent-guide-detail" role="region" aria-live="polite" className="mt-3 rounded-md border border-[#0f766e]/20 bg-[#0f766e]/10 px-3 py-2.5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="font-mono text-[10px] uppercase text-[#16716c]">{infoAgent.label} agent</div>
-                <div className="mt-1 text-sm font-medium leading-5 text-[#1b1714]">{infoAgent.question}</div>
+                <div className="font-mono text-[10px] uppercase text-[#0f766e]">{infoAgent.label} agent</div>
+                <div className="mt-1 text-sm font-semibold leading-5 text-[#15191a]">{infoAgent.question}</div>
               </div>
               <button
                 type="button"
                 aria-label="Close agent information"
                 onClick={() => setInfoAgentId(null)}
-                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#756b61] transition hover:bg-[#16716c]/10 hover:text-[#0d5753] focus:outline-none focus:ring-2 focus:ring-[#16716c]/20"
+                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#6d6860] transition hover:bg-[#0f766e]/10 hover:text-[#0b5d56] focus:outline-none focus:ring-2 focus:ring-[#0f766e]/20"
               >
                 <X className="h-3.5 w-3.5" aria-hidden />
               </button>
             </div>
-            <p className="mt-1 text-xs leading-5 text-[#756b61]">{infoAgent.description}</p>
-            <div className="mt-2 font-mono text-[9px] uppercase text-[#16716c]/80">
+            <p className="mt-1 text-xs leading-5 text-[#6d6860]">{infoAgent.description}</p>
+            <div className="mt-2 font-mono text-[9px] uppercase text-[#0f766e]/80">
               {infoAgent.dataSupport === 'pilot_observations' ? 'Sourced context available' : 'Scenario framing lens'}
             </div>
           </div>
         )}
 
-        <div className="mt-3 flex items-center justify-between border-t border-[#4a3c2e]/15 pt-3">
+        <div className="mt-4 flex items-center justify-between border-t border-[#15191a]/10 pt-3">
           <div>
-            <div className="text-xs font-medium text-[#1b1714]">Agent guide</div>
-            <div className="mt-0.5 text-[10px] text-[#756b61]">Descriptions and data status</div>
+            <div className="text-xs font-semibold text-[#15191a]">Agent guide</div>
+            <div className="mt-0.5 text-[10px] text-[#6d6860]">Descriptions and data status</div>
           </div>
           <button
             type="button"
@@ -271,13 +271,13 @@ export default function SwantailTerminalPanel({
             aria-checked={agentGuideEnabled}
             aria-label="Show agent guidance"
             onClick={toggleAgentGuide}
-            className={`relative h-5 w-9 rounded-full border transition focus:outline-none focus:ring-2 focus:ring-[#16716c]/20 ${
-              agentGuideEnabled ? 'border-[#16716c]/40 bg-[#16716c]/20' : 'border-[#4a3c2e]/15 bg-[#1b1714]/5'
+            className={`relative h-5 w-9 rounded-full border transition focus:outline-none focus:ring-2 focus:ring-[#0f766e]/20 ${
+              agentGuideEnabled ? 'border-[#0f766e]/40 bg-[#0f766e]/20' : 'border-[#15191a]/15 bg-[#15191a]/5'
             }`}
           >
             <span
               className={`absolute top-0.5 h-3.5 w-3.5 rounded-full transition ${
-                agentGuideEnabled ? 'left-[18px] bg-[#16716c]' : 'left-0.5 bg-[#756b61]/55'
+                agentGuideEnabled ? 'left-[18px] bg-[#0f766e]' : 'left-0.5 bg-[#6d6860]/55'
               }`}
             />
           </button>
@@ -286,7 +286,7 @@ export default function SwantailTerminalPanel({
           type="button"
           onClick={onResolveScenario}
           disabled={!selectedGame || !selectedAgentIds.length || scenarioLoading || scriptLoading}
-          className="swantail-primary mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-35"
+          className="swantail-primary mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-35"
         >
           {scenarioLoading
             ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
@@ -295,11 +295,11 @@ export default function SwantailTerminalPanel({
         </button>
       </div>
 
-      <div className="swantail-runlog min-h-[230px] border-b border-[#fffaf1]/10 p-4 font-mono text-xs leading-6 sm:p-5" aria-live="polite">
-        <div className="text-[#e8d9c5]/45">swantail://active-week</div>
+      <div className="swantail-runlog min-h-[190px] border-b border-[#f6f1e8]/10 p-4 font-mono text-xs leading-6 sm:p-5" aria-live="polite">
+        <div className="text-[#e8dccb]/45">swantail://active-week</div>
         {schedule && <div className="text-[#5eb5ad]">schedule  {schedule.seasonLabel ?? schedule.season} week {schedule.week} ready</div>}
-        {selectedGame && <div className="text-[#f8efe1]/75">matchup   {selectedGame.display}</div>}
-        <div className="text-[#f8efe1]/75">agents    {selectedAgentIds.length ? selectedAgentIds.join(' + ') : 'none'}</div>
+        {selectedGame && <div className="text-[#f6f1e8]/80">matchup   {selectedGame.display}</div>}
+        <div className="text-[#f6f1e8]/80">agents    {selectedAgentIds.length ? selectedAgentIds.join(' + ') : 'none'}</div>
         {scenarioLoading && <div className="text-[#e1aa62]">dispatch  analyzing matchup data...</div>}
         {scenario?.events.map(event => {
           const providers = [...new Set(event.observations.map(observation => observation.source.provider))]
@@ -308,42 +308,42 @@ export default function SwantailTerminalPanel({
             .filter(Number.isFinite)
             .sort((left, right) => right - left)[0]
           return (
-            <article key={event.id} className="border-b border-[#fffaf1]/10 py-4 last:border-b-0">
+            <article key={event.id} className="border-b border-[#f6f1e8]/10 py-4 last:border-b-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[11px] font-semibold uppercase text-[#5eb5ad]">{event.label}</span>
                 <span className={`rounded border px-1.5 py-0.5 text-[9px] uppercase leading-none ${FINDING_STYLES[event.finding.state]}`}>
                   {event.finding.state}
                 </span>
                 {event.finding.direction !== 'none' && (
-                  <span className="text-[10px] uppercase text-[#e8d9c5]/45">
+                  <span className="text-[10px] uppercase text-[#e8dccb]/45">
                     {event.finding.direction === 'away' ? selectedGame?.away_team : selectedGame?.home_team} path
                   </span>
                 )}
               </div>
-              <h3 className="mt-1.5 font-sans text-sm font-medium leading-5 text-[#fffaf1]">{event.finding.headline}</h3>
-              <p className="mt-1 font-sans text-xs leading-5 text-[#e8d9c5]/70">{event.finding.detail}</p>
+              <h3 className="mt-1.5 font-sans text-sm font-medium leading-5 text-[#fffaf0]">{event.finding.headline}</h3>
+              <p className="mt-1 font-sans text-xs leading-5 text-[#e8dccb]/70">{event.finding.detail}</p>
               {event.finding.signals.length > 0 && (
                 <div className="mt-3 grid gap-x-4 gap-y-2 sm:grid-cols-3">
                   {event.finding.signals.slice(0, 3).map(signal => (
-                    <div key={signal.label} className="min-w-0 border-l border-[#fffaf1]/10 pl-2.5">
-                      <div className="text-[9px] uppercase text-[#e8d9c5]/45">{signal.label}</div>
-                      {signal.value && <div className="mt-0.5 break-words text-[11px] leading-4 text-[#fffaf1]/80">{signal.value}</div>}
+                    <div key={signal.label} className="min-w-0 border-l border-[#f6f1e8]/10 pl-2.5">
+                      <div className="text-[9px] uppercase text-[#e8dccb]/45">{signal.label}</div>
+                      {signal.value && <div className="mt-0.5 break-words text-[11px] leading-4 text-[#fffaf0]/80">{signal.value}</div>}
                       {(signal.away_value || signal.home_value) && (
-                        <div className="mt-0.5 break-words text-[10px] leading-4 text-[#fffaf1]/75">
-                          {selectedGame?.away_team} {signal.away_value ?? '-'} <span className="text-[#e8d9c5]/35">/</span> {selectedGame?.home_team} {signal.home_value ?? '-'}
+                        <div className="mt-0.5 break-words text-[10px] leading-4 text-[#fffaf0]/75">
+                          {selectedGame?.away_team} {signal.away_value ?? '-'} <span className="text-[#e8dccb]/35">/</span> {selectedGame?.home_team} {signal.home_value ?? '-'}
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
               )}
-              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[9px] uppercase text-[#e8d9c5]/40">
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[9px] uppercase text-[#e8dccb]/40">
                 <span>{event.evidence_state.replace(/_/g, ' ')}</span>
                 {providers.length > 0 && <span>source {providers.join(' + ')}</span>}
                 {observedAt && <span>as of {new Date(observedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>}
               </div>
               {event.finding.caveats[0] && (
-                <p className="mt-1 font-sans text-[10px] leading-4 text-[#e8d9c5]/45">{event.finding.caveats[0]}</p>
+                <p className="mt-1 font-sans text-[10px] leading-4 text-[#e8dccb]/45">{event.finding.caveats[0]}</p>
               )}
             </article>
           )
@@ -354,7 +354,7 @@ export default function SwantailTerminalPanel({
           </div>
         )}
         {!scenario && !scenarioLoading && (
-          <div className="mt-2 flex items-center gap-2 text-[#e8d9c5]/45">
+          <div className="mt-2 flex items-center gap-2 text-[#e8dccb]/45">
             <span className="inline-block h-3 w-1.5 animate-pulse bg-[#5eb5ad]" />
             awaiting dispatch
           </div>

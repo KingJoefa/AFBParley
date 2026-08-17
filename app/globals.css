@@ -4,18 +4,17 @@
 
 :root {
   color-scheme: dark;
-  --swantail-bg: #11100f;
-  --swantail-bg-soft: #171513;
-  --swantail-panel: #fbf6ee;
-  --swantail-panel-strong: #fffaf1;
-  --swantail-ink: #1b1714;
-  --swantail-muted: #756b61;
-  --swantail-line: rgba(74, 60, 46, 0.16);
-  --swantail-teal: #16716c;
-  --swantail-teal-strong: #0d5753;
-  --swantail-gold: #bf8430;
-  --swantail-coral: #c75f4d;
-  --swantail-night: #24201d;
+  --swantail-bg: #0c1114;
+  --swantail-panel: #f6f1e8;
+  --swantail-panel-strong: #fffaf0;
+  --swantail-ink: #15191a;
+  --swantail-muted: #6d6860;
+  --swantail-line: rgba(30, 35, 36, 0.14);
+  --swantail-teal: #0f766e;
+  --swantail-teal-strong: #0b5d56;
+  --swantail-gold: #bf7f2c;
+  --swantail-coral: #c85d4f;
+  --swantail-night: #121719;
 }
 
 html {
@@ -27,8 +26,11 @@ body {
   min-height: 100%;
   margin: 0;
   background:
-    linear-gradient(135deg, rgba(22, 113, 108, 0.16), transparent 34%),
-    linear-gradient(180deg, #151311 0%, #0f0e0d 100%);
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(15, 118, 110, 0.16), transparent 36%),
+    linear-gradient(180deg, #11181b 0%, #090d0f 100%);
+  background-size: 44px 44px, 44px 44px, auto, auto;
   color: var(--swantail-panel);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: 0;
@@ -50,26 +52,27 @@ button:disabled {
 
 .swantail-shell {
   background:
-    linear-gradient(180deg, rgba(255, 250, 241, 0.05), transparent 220px),
-    radial-gradient(circle at top left, rgba(191, 132, 48, 0.18), transparent 34rem),
-    linear-gradient(135deg, #171412 0%, #10100f 62%, #181310 100%);
+    linear-gradient(180deg, rgba(246, 241, 232, 0.06), transparent 250px),
+    linear-gradient(135deg, rgba(191, 127, 44, 0.16), transparent 28rem),
+    linear-gradient(160deg, rgba(15, 118, 110, 0.16), transparent 34rem),
+    rgba(8, 12, 14, 0.82);
 }
 
 .swantail-header {
-  border-color: rgba(255, 250, 241, 0.12);
-  background: rgba(22, 19, 17, 0.92);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 50px rgba(0, 0, 0, 0.22);
+  border-color: rgba(246, 241, 232, 0.1);
+  background: rgba(9, 13, 15, 0.9);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 60px rgba(0, 0, 0, 0.32);
   backdrop-filter: blur(18px);
 }
 
 .swantail-wordmark {
-  background: linear-gradient(135deg, #fff5e5 0%, #ead4b4 44%, #5eb5ad 100%);
-  color: #17110c;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45), 0 10px 28px rgba(0, 0, 0, 0.25);
+  background: linear-gradient(135deg, #fff5df 0%, #e7c37f 45%, #43b7aa 100%);
+  color: #111719;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), 0 10px 28px rgba(0, 0, 0, 0.32);
 }
 
 .swantail-workspace {
-  filter: drop-shadow(0 18px 44px rgba(0, 0, 0, 0.32));
+  filter: drop-shadow(0 24px 52px rgba(0, 0, 0, 0.34));
 }
 
 .swantail-panel {
@@ -79,14 +82,14 @@ button:disabled {
 }
 
 .swantail-panel-dark {
-  border-color: rgba(255, 250, 241, 0.12);
-  background: linear-gradient(180deg, #26211d 0%, #191715 100%);
+  border-color: rgba(246, 241, 232, 0.12);
+  background: linear-gradient(180deg, #182124 0%, #101517 100%);
   color: var(--swantail-panel);
 }
 
 .swantail-section {
   border-color: var(--swantail-line);
-  background: rgba(255, 250, 241, 0.72);
+  background: #f4eee3;
 }
 
 .swantail-label {
@@ -94,46 +97,101 @@ button:disabled {
 }
 
 .swantail-input {
-  border-color: rgba(74, 60, 46, 0.18);
-  background: #fffaf1;
+  border-color: rgba(21, 25, 26, 0.16);
+  background: #fffaf0;
   color: var(--swantail-ink);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .swantail-input:focus {
-  border-color: rgba(22, 113, 108, 0.56);
-  box-shadow: 0 0 0 3px rgba(22, 113, 108, 0.12);
+  border-color: rgba(15, 118, 110, 0.56);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
 }
 
 .swantail-primary {
-  background: linear-gradient(135deg, #1b817a 0%, #0d5753 100%);
-  color: #fffaf1;
-  box-shadow: 0 10px 22px rgba(13, 87, 83, 0.18);
+  background: linear-gradient(135deg, #0f766e 0%, #0b5d56 100%);
+  color: #fffaf0;
+  box-shadow: 0 12px 24px rgba(11, 93, 86, 0.22);
 }
 
 .swantail-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #219189 0%, #11635f 100%);
+  background: linear-gradient(135deg, #12857c 0%, #0e6b63 100%);
 }
 
 .swantail-secondary {
-  border-color: rgba(22, 113, 108, 0.26);
-  background: rgba(22, 113, 108, 0.08);
-  color: #0d5753;
+  border-color: rgba(15, 118, 110, 0.28);
+  background: rgba(15, 118, 110, 0.08);
+  color: #0b5d56;
 }
 
 .swantail-secondary:hover:not(:disabled) {
-  background: rgba(22, 113, 108, 0.13);
+  background: rgba(15, 118, 110, 0.13);
 }
 
 .swantail-runlog {
   background:
-    linear-gradient(180deg, rgba(255, 250, 241, 0.04), transparent),
-    #201c19;
-  color: #f8efe1;
+    linear-gradient(180deg, rgba(246, 241, 232, 0.05), transparent),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0, rgba(255, 255, 255, 0.025) 1px, transparent 1px, transparent 26px),
+    #13191b;
+  color: #f6f1e8;
 }
 
 .swantail-soft-card {
-  border-color: rgba(74, 60, 46, 0.14);
-  background: #fffaf1;
-  box-shadow: 0 8px 22px rgba(74, 60, 46, 0.06);
+  border-color: rgba(21, 25, 26, 0.12);
+  background: #fffaf0;
+  box-shadow: 0 10px 28px rgba(21, 25, 26, 0.08);
+}
+
+.swantail-board {
+  border-color: rgba(246, 241, 232, 0.14);
+  background: #f6f1e8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.swantail-board-top {
+  border-color: rgba(246, 241, 232, 0.12);
+  background:
+    linear-gradient(90deg, rgba(15, 118, 110, 0.28), transparent 48%),
+    #151b1d;
+  color: #f6f1e8;
+}
+
+.swantail-agent-card {
+  border-color: rgba(21, 25, 26, 0.12);
+  background: linear-gradient(180deg, #fffdf7 0%, #f7f1e7 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.swantail-agent-card:hover {
+  border-color: rgba(15, 118, 110, 0.34);
+  background: #fffaf0;
+}
+
+.swantail-agent-card-selected {
+  border-color: rgba(15, 118, 110, 0.72);
+  background:
+    linear-gradient(180deg, rgba(15, 118, 110, 0.17), rgba(15, 118, 110, 0.08)),
+    #f7f1e7;
+  box-shadow: inset 3px 0 0 #0f766e, 0 10px 22px rgba(15, 118, 110, 0.08);
+}
+
+.swantail-output-panel {
+  border-color: rgba(246, 241, 232, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 250, 240, 0.94)),
+    #f6f1e8;
+}
+
+.swantail-empty-state {
+  background:
+    linear-gradient(90deg, rgba(15, 118, 110, 0.08) 0, transparent 1px),
+    linear-gradient(rgba(15, 118, 110, 0.06) 0, transparent 1px),
+    linear-gradient(180deg, #fffaf0 0%, #f4eee3 100%);
+  background-size: 28px 28px, 28px 28px, auto;
+}
+
+.swantail-ghost-line {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(21, 25, 26, 0.14), rgba(15, 118, 110, 0.16), rgba(21, 25, 26, 0.08));
 }
